@@ -1,35 +1,19 @@
-import { useEffect } from "react";
-import { login } from "../../services/auth/authService";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../firebase/firebase";
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
-export default function TestFirebase() {
-  useEffect(() => {
-    async function test() {
-      try {
-        await login("admin@hirehuub.in", "Admin@123");
+const firebaseConfig = {
+  apiKey: "AIzaSyBselGx7GmvCmickXwgwDgCucBGoQFhWUY",
+  authDomain: "hirehuub-hrms-86942.firebaseapp.com",
+  projectId: "hirehuub-hrms-86942",
+  storageBucket: "hirehuub-hrms-86942.firebasestorage.app",
+  messagingSenderId: "818125102902",
+  appId: "1:818125102902:web:389d157679d3cfb7ab9d97",
+};
 
-        console.log("Logged In Successfully");
+const app = initializeApp(firebaseConfig);
 
-        const snapshot = await getDocs(collection(db, "employees"));
+export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-        snapshot.forEach((doc) => {
-          console.log(doc.id, doc.data());
-        });
-
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    test();
-  }, []);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-4xl font-bold text-green-700">
-        Firebase Connected ✅
-      </h1>
-    </div>
-  );
-}
+export default app;

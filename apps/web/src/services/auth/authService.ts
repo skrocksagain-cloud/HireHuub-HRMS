@@ -1,14 +1,21 @@
-import {
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
 
-import { auth } from "../../firebase/firebase";
+export async function getEmployee(employeeId: string) {
+  try {
+    const docRef = doc(db, "employees", employeeId);
+    const docSnap = await getDoc(docRef);
 
-export async function login(email: string, password: string) {
-  return signInWithEmailAndPassword(auth, email, password);
-}
+    if (!docSnap.exists()) {
+      return null;
+    }
 
-export async function logout() {
-  return signOut(auth);
+    return {
+      id: docSnap.id,
+      ...docSnap.data(),
+    };
+  } catch (error) {
+    console.error("Employee Service Error:", error);
+    throw error;
+  }
 }

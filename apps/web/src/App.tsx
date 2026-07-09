@@ -1,7 +1,7 @@
-import TestFirebase from "./pages/TestFirebase";
+import AppRouter from "./routes/AppRouter";
 
 function App() {
-  return <TestFirebase />;
+  return <AppRouter />;
 }
 
 export default App;
