@@ -4,18 +4,49 @@ import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import OrganizationPage from "../pages/Organization";
 
+import CreateEmployee from "../pages/Employees/Create";
+import EmployeeList from "../pages/Employees/List";
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Login */}
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
+        {/* Dashboard */}
+        <Route
+          path="/dashboard"
+          element={<Dashboard />}
+        />
+
+        {/* Organization */}
         <Route
           path="/organization"
           element={<OrganizationPage />}
         />
+
+        {/* Employees */}
+        <Route
+          path="/employees"
+          element={<EmployeeList />}
+        />
+
+        <Route
+          path="/employees/create"
+          element={<CreateEmployee />}
+        />
+
+        {/* Default Route */}
+        <Route
+          path="/"
+          element={<Dashboard />}
+        />
+
       </Routes>
     </BrowserRouter>
   );
