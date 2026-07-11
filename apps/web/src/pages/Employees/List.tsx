@@ -80,9 +80,9 @@ export default function EmployeeList() {
       <div className="flex justify-between items-center">
 
         <PageHeader
-          title="Employees"
-          subtitle="Manage employee records"
-        />
+  title="Employees"
+  description="Manage employee records"
+/>
 
         <Button
           onClick={() =>

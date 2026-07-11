@@ -4,7 +4,7 @@ import PageHeader from "../../ui/PageHeader";
 import Card from "../../ui/Card";
 
 import Company from "./components/Company";
-import Departments from "./components/Departments";
+import DepartmentPage from "./Department";
 import Designations from "./components/Designations";
 import Roles from "./components/Roles";
 
@@ -24,7 +24,7 @@ export default function Organization() {
         return <Company />;
 
       case "Departments":
-        return <Departments />;
+        return <DepartmentPage />;
 
       case "Designations":
         return <Designations />;
@@ -42,7 +42,7 @@ export default function Organization() {
 
       <PageHeader
         title="Organization"
-        subtitle="Manage organization settings"
+        description="Manage organization settings"
       />
 
       <div className="grid grid-cols-12 gap-6">
