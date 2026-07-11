@@ -5,7 +5,7 @@ import Dashboard from "../pages/Dashboard";
 import OrganizationPage from "../pages/Organization";
 
 import CreateEmployee from "../pages/Employees/Create";
-import EmployeeList from "../pages/Employees/List";
+import EmployeePage from "../pages/Employees/EmployeePage";
 
 export default function AppRouter() {
   return (
@@ -33,7 +33,7 @@ export default function AppRouter() {
         {/* Employees */}
         <Route
           path="/employees"
-          element={<EmployeeList />}
+          element={<EmployeePage />}
         />
 
         <Route

@@ -1,9 +1,18 @@
 export interface Employee {
   id?: string;
 
-  // ==========================================
+  // ==================================================
+  // Company Information
+  // ==================================================
+
+  companyId: string;
+
+  branchId: string;
+  branchName: string;
+
+  // ==================================================
   // Employee Information
-  // ==========================================
+  // ==================================================
 
   employeeId: string;
   employeeSequence: number;
@@ -15,6 +24,7 @@ export interface Employee {
   gender: "Male" | "Female" | "Other";
 
   dateOfBirth: string;
+
   bloodGroup: string;
 
   maritalStatus:
@@ -25,9 +35,9 @@ export interface Employee {
 
   photoUrl: string;
 
-  // ==========================================
+  // ==================================================
   // Contact Information
-  // ==========================================
+  // ==================================================
 
   officialEmail: string;
   personalEmail: string;
@@ -35,9 +45,9 @@ export interface Employee {
   mobile: string;
   alternateMobile: string;
 
-  // ==========================================
+  // ==================================================
   // Current Address
-  // ==========================================
+  // ==================================================
 
   currentAddress: string;
   currentCity: string;
@@ -45,9 +55,9 @@ export interface Employee {
   currentPinCode: string;
   currentCountry: string;
 
-  // ==========================================
+  // ==================================================
   // Permanent Address
-  // ==========================================
+  // ==================================================
 
   sameAsCurrentAddress: boolean;
 
@@ -57,9 +67,9 @@ export interface Employee {
   permanentPinCode: string;
   permanentCountry: string;
 
-  // ==========================================
+  // ==================================================
   // Employment Information
-  // ==========================================
+  // ==================================================
 
   departmentId: string;
   departmentName: string;
@@ -70,7 +80,14 @@ export interface Employee {
   roleId: string;
   roleName: string;
 
+  reportingManagerId: string;
+  reportingManager: string;
+
   dateOfJoining: string;
+
+  probationEndDate: string;
+
+  confirmationDate: string;
 
   employmentType:
     | "Permanent"
@@ -78,43 +95,75 @@ export interface Employee {
     | "Intern"
     | "Consultant";
 
-  reportingManager: string;
-
   workLocation: string;
 
   shift: string;
 
-  status: "Active" | "Inactive";
+  status:
+    | "Active"
+    | "Inactive";
 
-  // ==========================================
+  employeeStatus:
+    | "Offer Released"
+    | "Offer Accepted"
+    | "Joining"
+    | "Profile Pending"
+    | "Documents Pending"
+    | "Working"
+    | "Notice Period"
+    | "Resigned"
+    | "Terminated";
+
+  // ==================================================
+  // HR Permissions
+  // ==================================================
+
+  isRecruiter: boolean;
+
+  isAttendanceEnabled: boolean;
+
+  isCallTrackerEnabled: boolean;
+
+  isPayrollEnabled: boolean;
+
+  // ==================================================
   // Government IDs
-  // ==========================================
+  // ==================================================
 
   aadhaarNumber: string;
+
   panNumber: string;
 
   passportNumber: string;
+
   drivingLicenceNumber: string;
+
   voterId: string;
 
   uanNumber: string;
+
   pfNumber: string;
+
   esicNumber: string;
 
-  taxRegime: "Old" | "New";
+  taxRegime:
+    | "Old"
+    | "New";
 
   professionalTaxNumber: string;
 
-  // ==========================================
+  // ==================================================
   // Bank Details
-  // ==========================================
+  // ==================================================
 
   accountHolderName: string;
 
   bankName: string;
-  branchName: string;
+
+  bankBranchName: string;
 
   accountNumber: string;
+
   ifscCode: string;
 
   accountType:
@@ -129,31 +178,45 @@ export interface Employee {
 
   upiId: string;
 
-  // ==========================================
+  // ==================================================
   // Salary
-  // ==========================================
+  // ==================================================
 
   monthlyGrossSalary: string;
+
   annualCTC: string;
 
   basicSalary: string;
+
   hra: string;
+
   specialAllowance: string;
+
   conveyanceAllowance: string;
+
   medicalAllowance: string;
 
   bonus: string;
+
   variablePay: string;
 
-  pfApplicable: "Yes" | "No";
-  esiApplicable: "Yes" | "No";
-  professionalTaxApplicable: "Yes" | "No";
+  pfApplicable:
+    | "Yes"
+    | "No";
+
+  esiApplicable:
+    | "Yes"
+    | "No";
+
+  professionalTaxApplicable:
+    | "Yes"
+    | "No";
 
   salaryEffectiveDate: string;
 
-  // ==========================================
+  // ==================================================
   // Emergency Contact
-  // ==========================================
+  // ==================================================
 
   emergencyContactName: string;
 
@@ -166,23 +229,66 @@ export interface Employee {
   emergencyEmail: string;
 
   emergencyAddress: string;
+
   emergencyCity: string;
+
   emergencyState: string;
+
   emergencyPinCode: string;
 
-  // ==========================================
+  // ==================================================
   // Documents
-  // ==========================================
+  // ==================================================
 
   resumeUrl: string;
 
   aadhaarUrl: string;
+
   panUrl: string;
 
-  // ==========================================
+  passportUrl: string;
+
+  photoIdUrl: string;
+
+  bankProofUrl: string;
+
+  educationCertificateUrl: string;
+
+  experienceLetterUrl: string;
+
+  offerLetterUrl: string;
+
+  joiningLetterUrl: string;
+
+  // ==================================================
+  // Authentication
+  // ==================================================
+
+  authUid?: string;
+
+  loginCreated: boolean;
+
+  loginCreatedAt?: unknown;
+
+  lastLoginAt?: unknown;
+
+  lastPasswordChangedAt?: unknown;
+
+  // ==================================================
   // Audit
-  // ==========================================
+  // ==================================================
+
+  remarks: string;
+
+  createdBy: string;
+
+  updatedBy: string;
 
   createdAt?: unknown;
+
   updatedAt?: unknown;
+
+  deletedAt?: unknown;
+
+  deletedBy?: string;
 }

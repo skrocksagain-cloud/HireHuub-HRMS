@@ -1,9 +1,19 @@
 import type { Employee } from "../types/Employee";
 
 export const DEFAULT_EMPLOYEE: Employee = {
-  // =========================
+  // ==================================================
+  // Company Information
+  // ==================================================
+
+  companyId: "",
+
+  branchId: "",
+  branchName: "",
+
+  // ==================================================
   // Employee Information
-  // =========================
+  // ==================================================
+
   employeeId: "",
   employeeSequence: 0,
 
@@ -14,32 +24,37 @@ export const DEFAULT_EMPLOYEE: Employee = {
   gender: "Male",
 
   dateOfBirth: "",
+
   bloodGroup: "",
+
   maritalStatus: "Single",
 
   photoUrl: "",
 
-  // =========================
-  // Contact
-  // =========================
+  // ==================================================
+  // Contact Information
+  // ==================================================
+
   officialEmail: "",
   personalEmail: "",
 
   mobile: "",
   alternateMobile: "",
 
-  // =========================
+  // ==================================================
   // Current Address
-  // =========================
+  // ==================================================
+
   currentAddress: "",
   currentCity: "",
   currentState: "",
   currentPinCode: "",
   currentCountry: "India",
 
-  // =========================
+  // ==================================================
   // Permanent Address
-  // =========================
+  // ==================================================
+
   sameAsCurrentAddress: true,
 
   permanentAddress: "",
@@ -48,9 +63,10 @@ export const DEFAULT_EMPLOYEE: Employee = {
   permanentPinCode: "",
   permanentCountry: "India",
 
-  // =========================
+  // ==================================================
   // Employment
-  // =========================
+  // ==================================================
+
   departmentId: "",
   departmentName: "",
 
@@ -60,11 +76,16 @@ export const DEFAULT_EMPLOYEE: Employee = {
   roleId: "",
   roleName: "",
 
+  reportingManagerId: "",
+  reportingManager: "",
+
   dateOfJoining: "",
 
-  employmentType: "Permanent",
+  probationEndDate: "",
 
-  reportingManager: "",
+  confirmationDate: "",
+
+  employmentType: "Permanent",
 
   workLocation: "",
 
@@ -72,33 +93,56 @@ export const DEFAULT_EMPLOYEE: Employee = {
 
   status: "Active",
 
-  // =========================
-  // Government
-  // =========================
+  employeeStatus: "Joining",
+
+  // ==================================================
+  // HR Permissions
+  // ==================================================
+
+  isRecruiter: false,
+
+  isAttendanceEnabled: true,
+
+  isCallTrackerEnabled: false,
+
+  isPayrollEnabled: false,
+
+  // ==================================================
+  // Government IDs
+  // ==================================================
+
   aadhaarNumber: "",
+
   panNumber: "",
 
   passportNumber: "",
+
   drivingLicenceNumber: "",
+
   voterId: "",
 
   uanNumber: "",
+
   pfNumber: "",
+
   esicNumber: "",
 
   taxRegime: "New",
 
   professionalTaxNumber: "",
 
-  // =========================
-  // Bank
-  // =========================
+  // ==================================================
+  // Bank Details
+  // ==================================================
+
   accountHolderName: "",
 
   bankName: "",
-  branchName: "",
+
+  bankBranchName: "",
 
   accountNumber: "",
+
   ifscCode: "",
 
   accountType: "Savings",
@@ -107,48 +151,111 @@ export const DEFAULT_EMPLOYEE: Employee = {
 
   upiId: "",
 
-  // =========================
+  // ==================================================
   // Salary
-  // =========================
+  // ==================================================
+
   monthlyGrossSalary: "",
+
   annualCTC: "",
 
   basicSalary: "",
+
   hra: "",
+
   specialAllowance: "",
+
   conveyanceAllowance: "",
+
   medicalAllowance: "",
 
   bonus: "",
+
   variablePay: "",
 
   pfApplicable: "Yes",
+
   esiApplicable: "Yes",
+
   professionalTaxApplicable: "Yes",
 
   salaryEffectiveDate: "",
 
-  // =========================
-  // Emergency
-  // =========================
+  // ==================================================
+  // Emergency Contact
+  // ==================================================
+
   emergencyContactName: "",
+
   emergencyRelationship: "",
 
   emergencyPrimaryMobile: "",
+
   emergencyAlternateMobile: "",
 
   emergencyEmail: "",
 
   emergencyAddress: "",
+
   emergencyCity: "",
+
   emergencyState: "",
+
   emergencyPinCode: "",
 
-  // =========================
+  // ==================================================
   // Documents
-  // =========================
+  // ==================================================
+
   resumeUrl: "",
 
   aadhaarUrl: "",
+
   panUrl: "",
+
+  passportUrl: "",
+
+  photoIdUrl: "",
+
+  bankProofUrl: "",
+
+  educationCertificateUrl: "",
+
+  experienceLetterUrl: "",
+
+  offerLetterUrl: "",
+
+  joiningLetterUrl: "",
+
+  // ==================================================
+  // Authentication
+  // ==================================================
+
+  authUid: "",
+
+  loginCreated: false,
+
+  loginCreatedAt: undefined,
+
+  lastLoginAt: undefined,
+
+  lastPasswordChangedAt: undefined,
+
+  // ==================================================
+  // Audit
+  // ==================================================
+
+  remarks: "",
+
+  createdBy: "",
+
+  updatedBy: "",
+
+  createdAt: undefined,
+
+  updatedAt: undefined,
+
+  deletedAt: undefined,
+
+  deletedBy: "",
 };
