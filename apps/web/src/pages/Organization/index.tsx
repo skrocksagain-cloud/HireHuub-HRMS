@@ -5,8 +5,8 @@ import Card from "../../ui/Card";
 
 import Company from "./components/Company";
 import DepartmentPage from "./Department";
-import Designations from "./components/Designations";
-import Roles from "./components/Roles";
+import DesignationPage from "./Designation";
+import RolePage from "./Role";
 
 const menus = [
   "Company",
@@ -27,10 +27,10 @@ export default function Organization() {
         return <DepartmentPage />;
 
       case "Designations":
-        return <Designations />;
+        return <DesignationPage />;
 
       case "Roles":
-        return <Roles />;
+        return <RolePage />;
 
       default:
         return <Company />;
@@ -39,18 +39,14 @@ export default function Organization() {
 
   return (
     <div className="p-6">
-
       <PageHeader
         title="Organization"
         description="Manage organization settings"
       />
 
       <div className="grid grid-cols-12 gap-6">
-
         <Card className="col-span-3 p-0">
-
           {menus.map((menu) => (
-
             <button
               key={menu}
               onClick={() => setSelected(menu)}
@@ -62,19 +58,13 @@ export default function Organization() {
             >
               {menu}
             </button>
-
           ))}
-
         </Card>
 
         <div className="col-span-9">
-
           {renderContent()}
-
         </div>
-
       </div>
-
     </div>
   );
 }
