@@ -2,10 +2,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
+
 import OrganizationPage from "../pages/Organization";
 
-import CreateEmployee from "../pages/Employees/Create";
 import EmployeePage from "../pages/Employees/EmployeePage";
+import CreateEmployee from "../pages/Employees/Create";
+
+import OfferPage from "../pages/InternalHiring/OfferPage";
+import OfferForm from "../pages/InternalHiring/OfferForm";
 
 export default function AppRouter() {
   return (
@@ -39,6 +43,30 @@ export default function AppRouter() {
         <Route
           path="/employees/create"
           element={<CreateEmployee />}
+        />
+
+        {/* ==========================================
+            Internal Hiring
+        ========================================== */}
+
+        <Route
+          path="/internal-hiring"
+          element={<OfferPage />}
+        />
+
+        <Route
+          path="/internal-hiring/create"
+          element={<OfferForm />}
+        />
+
+        <Route
+          path="/internal-hiring/edit/:id"
+          element={<OfferForm />}
+        />
+
+        <Route
+          path="/internal-hiring/view/:id"
+          element={<OfferForm />}
         />
 
         {/* Default Route */}
