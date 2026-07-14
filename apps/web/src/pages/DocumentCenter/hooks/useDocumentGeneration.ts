@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { DocumentGenerationRequest } from "../../../types/DocumentGenerationRequest";
 import type { DocumentGenerationResult } from "../../../types/DocumentGenerationResult";
+import { DocumentGenerationService } from "../../../services/documentGeneration/DocumentGenerationService";
 
 interface UseDocumentGenerationResult {
   loading: boolean;
@@ -16,21 +17,22 @@ export function useDocumentGeneration(): UseDocumentGenerationResult {
   const [error, setError] = useState<string | null>(null);
 
   async function generateDocument(
-    _request: DocumentGenerationRequest
+    request: DocumentGenerationRequest
   ): Promise<DocumentGenerationResult> {
     setLoading(true);
     setError(null);
 
-    const message = "Document generation service is not implemented.";
+    try {
+      const result = await DocumentGenerationService.generate(request);
 
-    setError(message);
+      if (!result.success && result.error) {
+        setError(result.error);
+      }
 
-    setLoading(false);
-
-    return {
-      success: false,
-      error: message,
-    };
+      return result;
+    } finally {
+      setLoading(false);
+    }
   }
 
   return {
