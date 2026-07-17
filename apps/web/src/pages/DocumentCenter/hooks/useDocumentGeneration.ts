@@ -1,43 +1,101 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import type { DocumentGenerationRequest } from "../../../types/DocumentGenerationRequest";
-import type { DocumentGenerationResult } from "../../../types/DocumentGenerationResult";
-import { DocumentGenerationService } from "../../../services/documentGeneration/DocumentGenerationService";
+import { pdfService } from '../../../services/document/pdfService';
+import type { DocumentGenerationRequest } from '../../../types/DocumentGenerationRequest';
+import type { DocumentGenerationResult } from '../../../types/DocumentGenerationResult';
 
 interface UseDocumentGenerationResult {
   loading: boolean;
   error: string | null;
   generateDocument: (
-    request: DocumentGenerationRequest
+    request: DocumentGenerationRequest,
   ) => Promise<DocumentGenerationResult>;
+  reset: () => void;
+}
+
+function validateRequest(request: DocumentGenerationRequest): string | null {
+  if (!request.documentType.trim()) {
+    return 'Document type is required.';
+  }
+
+  if (!request.referenceId.trim()) {
+    return 'Document reference ID is required.';
+  }
+
+  if (!request.fileName.trim()) {
+    return 'File name is required.';
+  }
+
+  if (!request.generatedBy.trim()) {
+    return 'Generated-by user is required.';
+  }
+
+  if (!Number.isInteger(request.version) || request.version < 1) {
+    return 'Document version must be a positive integer.';
+  }
+
+  if (!request.template) {
+    return 'Document template is required.';
+  }
+
+  return null;
 }
 
 export function useDocumentGeneration(): UseDocumentGenerationResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function generateDocument(
-    request: DocumentGenerationRequest
-  ): Promise<DocumentGenerationResult> {
+  const reset = (): void => {
+    setLoading(false);
+    setError(null);
+  };
+
+  const generateDocument = async (
+    request: DocumentGenerationRequest,
+  ): Promise<DocumentGenerationResult> => {
+    const validationError = validateRequest(request);
+
+    if (validationError) {
+      setError(validationError);
+      return {
+        success: false,
+        error: validationError,
+      };
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const result = await DocumentGenerationService.generate(request);
+      await pdfService.download(request.template, request.fileName);
 
-      if (!result.success && result.error) {
-        setError(result.error);
-      }
+      return {
+        success: true,
+        fileName: request.fileName.endsWith('.pdf')
+          ? request.fileName
+          : `${request.fileName}.pdf`,
+        generatedAt: new Date(),
+      };
+    } catch (downloadError: unknown) {
+      const message = downloadError instanceof Error
+        ? downloadError.message
+        : 'Unable to generate the document.';
 
-      return result;
+      setError(message);
+
+      return {
+        success: false,
+        error: message,
+      };
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return {
     loading,
     error,
     generateDocument,
+    reset,
   };
 }
