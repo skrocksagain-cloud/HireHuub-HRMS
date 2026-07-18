@@ -3,8 +3,10 @@ import RecentDocuments from "./components/cards/RecentDocuments";
 import DocumentDistribution from "./components/cards/DocumentDistribution";
 import DocumentActivity from "./components/cards/DocumentActivity";
 import QuickActions from "./components/cards/QuickActions";
+import OfferLetterGenerator from './components/OfferLetterGenerator';
 
 import useDocumentDashboard from "./useDocumentDashboard";
+import { useOfferLetterGeneration } from './hooks/useOfferLetterGeneration';
 
 export default function DocumentDashboard() {
   const {
@@ -21,6 +23,14 @@ export default function DocumentDashboard() {
 
     refresh,
   } = useDocumentDashboard();
+  const {
+    offers,
+    isLoadingOffers,
+    isGenerating,
+    error,
+    generatedFileName,
+    generateOfferLetter,
+  } = useOfferLetterGeneration();
 
   return (
     <div className="space-y-8">
@@ -42,6 +52,15 @@ export default function DocumentDashboard() {
         </div>
 
       </div>
+
+      <OfferLetterGenerator
+        offers={offers}
+        isLoadingOffers={isLoadingOffers}
+        isGenerating={isGenerating}
+        error={error}
+        generatedFileName={generatedFileName}
+        onGenerate={generateOfferLetter}
+      />
 
       {/* Statistics */}
 

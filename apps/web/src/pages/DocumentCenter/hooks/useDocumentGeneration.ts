@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { pdfService } from '../../../services/document/pdfService';
 import type { DocumentGenerationRequest } from '../../../types/DocumentGenerationRequest';
@@ -44,6 +44,7 @@ function validateRequest(request: DocumentGenerationRequest): string | null {
 export function useDocumentGeneration(): UseDocumentGenerationResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isGeneratingReference = useRef(false);
 
   const reset = (): void => {
     setLoading(false);
@@ -53,6 +54,17 @@ export function useDocumentGeneration(): UseDocumentGenerationResult {
   const generateDocument = async (
     request: DocumentGenerationRequest,
   ): Promise<DocumentGenerationResult> => {
+    if (isGeneratingReference.current) {
+      const duplicateRequestError = 'Document generation is already in progress.';
+
+      setError(duplicateRequestError);
+
+      return {
+        success: false,
+        error: duplicateRequestError,
+      };
+    }
+
     const validationError = validateRequest(request);
 
     if (validationError) {
@@ -63,6 +75,7 @@ export function useDocumentGeneration(): UseDocumentGenerationResult {
       };
     }
 
+    isGeneratingReference.current = true;
     setLoading(true);
     setError(null);
 
@@ -88,6 +101,7 @@ export function useDocumentGeneration(): UseDocumentGenerationResult {
         error: message,
       };
     } finally {
+      isGeneratingReference.current = false;
       setLoading(false);
     }
   };

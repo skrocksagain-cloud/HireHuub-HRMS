@@ -10,6 +10,7 @@ import CreateEmployee from "../pages/Employees/Create";
 
 import OfferPage from "../pages/InternalHiring/OfferPage";
 import OfferForm from "../pages/InternalHiring/OfferForm";
+import DocumentDashboard from '../pages/DocumentCenter/DocumentDashboard';
 
 export default function AppRouter() {
   return (
@@ -67,6 +68,11 @@ export default function AppRouter() {
         <Route
           path="/internal-hiring/view/:id"
           element={<OfferForm />}
+        />
+
+        <Route
+          path="/documents"
+          element={<DocumentDashboard />}
         />
 
         {/* Default Route */}
