@@ -5,7 +5,7 @@ import Dashboard from "../pages/Dashboard";
 
 import OrganizationPage from "../pages/Organization";
 
-import EmployeePage from "../pages/Employees/EmployeePage";
+import EmployeePage from '../pages/Employee/EmployeePage';
 import CreateEmployee from "../pages/Employees/Create";
 
 import OfferPage from "../pages/InternalHiring/OfferPage";
