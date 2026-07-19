@@ -1,4 +1,4 @@
-import type { EmployeeFilter, EmployeeStatus } from '../types/Employee';
+import type { EmployeeFilter, EmployeeSortOption, EmployeeStatus, EmploymentType } from '../types/Employee';
 
 interface EmployeeFilterPanelProps {
   filter: EmployeeFilter;
@@ -12,6 +12,13 @@ const EMPLOYEE_STATUSES: EmployeeStatus[] = [
   'Inactive',
   'Notice Period',
   'Terminated',
+];
+const EMPLOYMENT_TYPES: EmploymentType[] = ['Permanent', 'Contract', 'Intern', 'Consultant'];
+const SORT_OPTIONS: Array<{ value: EmployeeSortOption; label: string }> = [
+  { value: 'newest', label: 'Newest First' },
+  { value: 'oldest', label: 'Oldest First' },
+  { value: 'name', label: 'Employee Name' },
+  { value: 'employeeCode', label: 'Employee Code' },
 ];
 
 export default function EmployeeFilterPanel({
@@ -28,7 +35,7 @@ export default function EmployeeFilterPanel({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
       <select
         value={filter.department}
         onChange={(event) => updateFilter('department', event.target.value)}
@@ -52,6 +59,21 @@ export default function EmployeeFilterPanel({
       >
         <option value="">All statuses</option>
         {EMPLOYEE_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+      </select>
+      <select
+        value={filter.employmentType}
+        onChange={(event) => updateFilter('employmentType', event.target.value)}
+        className="rounded-xl border border-slate-300 px-4 py-3"
+      >
+        <option value="">All employment types</option>
+        {EMPLOYMENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+      </select>
+      <select
+        value={filter.sortBy}
+        onChange={(event) => updateFilter('sortBy', event.target.value)}
+        className="rounded-xl border border-slate-300 px-4 py-3"
+      >
+        {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </div>
   );

@@ -26,8 +26,8 @@ export interface Employee {
   address: string;
   emergencyContact: string;
   notes: string;
-  createdAt?: unknown;
-  updatedAt?: unknown;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface EmployeeFormData {
@@ -57,4 +57,9 @@ export interface EmployeeFilter {
   department: string;
   designation: string;
   employmentStatus: EmployeeStatus | '';
+  employmentType: EmploymentType | '';
+  sortBy: EmployeeSortOption;
 }
+
+export type EmployeeSortOption = 'newest' | 'oldest' | 'name' | 'employeeCode';
+import type { Timestamp } from 'firebase/firestore';

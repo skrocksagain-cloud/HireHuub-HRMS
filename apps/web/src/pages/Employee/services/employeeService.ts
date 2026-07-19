@@ -5,8 +5,12 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 
 import { db } from '../../../firebase/firebase';
@@ -19,10 +23,17 @@ const DEFAULT_GENDER: Employee['gender'] = 'Other';
 const EMPLOYEE_STATUSES: Employee['employmentStatus'][] = ['Active', 'Inactive', 'Notice Period', 'Terminated'];
 const EMPLOYMENT_TYPES: Employee['employmentType'][] = ['Permanent', 'Contract', 'Intern', 'Consultant'];
 const EMPLOYEE_GENDERS: Employee['gender'][] = ['Male', 'Female', 'Other'];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_NUMBER_PATTERN = /^\+?[0-9]{10,15}$/;
 
 const readString = (data: Record<string, unknown>, field: string): string => {
   const value = data[field];
   return typeof value === 'string' ? value : '';
+};
+
+const readTimestamp = (data: Record<string, unknown>, field: string): Timestamp | undefined => {
+  const value = data[field];
+  return value instanceof Timestamp ? value : undefined;
 };
 
 const readEmploymentStatus = (data: Record<string, unknown>): Employee['employmentStatus'] => {
@@ -73,8 +84,8 @@ const toEmployee = (id: string, data: Record<string, unknown>): Employee => {
     address: readString(data, 'address') || readString(data, 'currentAddress'),
     emergencyContact: readString(data, 'emergencyContact') || readString(data, 'emergencyPrimaryMobile'),
     notes: readString(data, 'notes') || readString(data, 'remarks'),
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
+    createdAt: readTimestamp(data, 'createdAt'),
+    updatedAt: readTimestamp(data, 'updatedAt'),
   };
 };
 
@@ -87,11 +98,77 @@ export interface EmployeeRepository {
 }
 
 const createEmployeeRecord = (employee: EmployeeFormData): Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> => ({
-  ...employee,
+  employeeId: employee.employeeId.trim(),
+  employeeCode: employee.employeeCode.trim(),
+  firstName: employee.firstName.trim(),
+  lastName: employee.lastName.trim(),
   fullName: `${employee.firstName.trim()} ${employee.lastName.trim()}`.trim(),
+  gender: employee.gender,
+  dateOfBirth: employee.dateOfBirth.trim(),
+  mobileNumber: employee.mobileNumber.trim(),
+  email: employee.email.trim(),
+  department: employee.department.trim(),
+  designation: employee.designation.trim(),
+  employmentType: employee.employmentType,
+  joiningDate: employee.joiningDate.trim(),
+  reportingManager: employee.reportingManager.trim(),
+  workLocation: employee.workLocation.trim(),
+  employmentStatus: employee.employmentStatus,
+  photoUrl: employee.photoUrl.trim(),
+  address: employee.address.trim(),
+  emergencyContact: employee.emergencyContact.trim(),
+  notes: employee.notes.trim(),
 });
 
+const validateEmployee = (employee: EmployeeFormData): void => {
+  const requiredFields: Array<[string, string]> = [
+    ['Employee ID', employee.employeeId],
+    ['Employee Code', employee.employeeCode],
+    ['First Name', employee.firstName],
+    ['Last Name', employee.lastName],
+    ['Email', employee.email],
+    ['Department', employee.department],
+    ['Designation', employee.designation],
+    ['Joining Date', employee.joiningDate],
+    ['Mobile Number', employee.mobileNumber],
+  ];
+  const missingField = requiredFields.find(([, value]) => value.trim() === '');
+
+  if (missingField) {
+    throw new Error(`${missingField[0]} is required.`);
+  }
+
+  if (!EMAIL_PATTERN.test(employee.email.trim())) {
+    throw new Error('Enter a valid email address.');
+  }
+
+  if (!MOBILE_NUMBER_PATTERN.test(employee.mobileNumber.trim())) {
+    throw new Error('Enter a valid mobile number with 10 to 15 digits.');
+  }
+};
+
 class FirestoreEmployeeRepository implements EmployeeRepository {
+  private async ensureUniqueEmployeeFields(employee: EmployeeFormData, excludedDocumentId?: string): Promise<void> {
+    const normalizedEmployee = createEmployeeRecord(employee);
+    const fields: Array<[string, string, string]> = [
+      ['employeeId', normalizedEmployee.employeeId, 'Employee ID'],
+      ['employeeCode', normalizedEmployee.employeeCode, 'Employee Code'],
+    ];
+
+    await Promise.all(fields.map(async ([field, value, label]) => {
+      const snapshot = await getDocs(query(
+        collection(db, EMPLOYEES_COLLECTION),
+        where(field, '==', value),
+        limit(2),
+      ));
+      const duplicateExists = snapshot.docs.some((employeeDocument) => employeeDocument.id !== excludedDocumentId);
+
+      if (duplicateExists) {
+        throw new Error(`${label} already exists.`);
+      }
+    }));
+  }
+
   async getEmployees(): Promise<Employee[]> {
     const snapshot = await getDocs(collection(db, EMPLOYEES_COLLECTION));
 
@@ -111,6 +188,8 @@ class FirestoreEmployeeRepository implements EmployeeRepository {
   }
 
   async createEmployee(employee: EmployeeFormData): Promise<string> {
+    validateEmployee(employee);
+    await this.ensureUniqueEmployeeFields(employee);
     const document = await addDoc(collection(db, EMPLOYEES_COLLECTION), {
       ...createEmployeeRecord(employee),
       createdAt: serverTimestamp(),
@@ -121,14 +200,30 @@ class FirestoreEmployeeRepository implements EmployeeRepository {
   }
 
   async updateEmployee(employeeId: string, employee: EmployeeFormData): Promise<void> {
-    await updateDoc(doc(db, EMPLOYEES_COLLECTION, employeeId), {
+    validateEmployee(employee);
+    await this.ensureUniqueEmployeeFields(employee, employeeId);
+    const employeeDocument = doc(db, EMPLOYEES_COLLECTION, employeeId);
+    const existingEmployee = await getDoc(employeeDocument);
+
+    if (!existingEmployee.exists()) {
+      throw new Error('This employee record no longer exists. Refresh the page and try again.');
+    }
+
+    await updateDoc(employeeDocument, {
       ...createEmployeeRecord(employee),
       updatedAt: serverTimestamp(),
     });
   }
 
   async deleteEmployee(employeeId: string): Promise<void> {
-    await deleteDoc(doc(db, EMPLOYEES_COLLECTION, employeeId));
+    const employeeDocument = doc(db, EMPLOYEES_COLLECTION, employeeId);
+    const existingEmployee = await getDoc(employeeDocument);
+
+    if (!existingEmployee.exists()) {
+      throw new Error('This employee record no longer exists. Refresh the page and try again.');
+    }
+
+    await deleteDoc(employeeDocument);
   }
 }
 

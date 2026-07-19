@@ -8,6 +8,7 @@ import FormInput from '../../../components/forms/FormInput';
 interface EmployeeFormProps {
   employee: Employee | null;
   isSaving: boolean;
+  error: string | null;
   onSave: (formData: EmployeeFormData) => Promise<void>;
   onCancel: () => void;
 }
@@ -47,7 +48,7 @@ const toFormData = (employee: Employee | null): EmployeeFormData => {
   };
 };
 
-export default function EmployeeForm({ employee, isSaving, onSave, onCancel }: EmployeeFormProps) {
+export default function EmployeeForm({ employee, isSaving, error, onSave, onCancel }: EmployeeFormProps) {
   const [formData, setFormData] = useState<EmployeeFormData>(() => toFormData(employee));
 
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function EmployeeForm({ employee, isSaving, onSave, onCancel }: E
           <div><h2 className="text-xl font-semibold text-slate-800">{employee ? 'Edit Employee' : 'Create Employee'}</h2><p className="mt-1 text-sm text-slate-500">Maintain core employee information for future HR modules.</p></div>
           <Button className="bg-slate-700 hover:bg-slate-800" onClick={onCancel}>Close</Button>
         </div>
+        {error ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <FormInput required label="Employee ID" value={formData.employeeId} onChange={(event) => updateField('employeeId', event.target.value)} />
           <FormInput required label="Employee Code" value={formData.employeeCode} onChange={(event) => updateField('employeeCode', event.target.value)} />
