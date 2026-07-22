@@ -22,6 +22,10 @@ export default function Sidebar() {
       path: "/attendance",
     },
     {
+      name: "Leave",
+      path: "/leave",
+    },
+    {
       name: "Payroll",
       path: "/payroll",
     },

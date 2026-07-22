@@ -1,9 +1,15 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type AttendanceStatus = 'Present' | 'Late' | 'Half Day' | 'Leave' | 'Holiday' | 'Week Off' | 'Absent';
-export type AttendanceRole = 'Recruiter' | 'Team Leader' | 'Manager' | 'HR' | 'Accounts' | 'Admin' | 'Super Admin';
-export type AttendanceRequestType = 'Regularisation' | 'Work From Home' | 'Leave' | 'Late' | 'Half Day' | 'Holiday';
+export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Half Day' | 'Holiday' | 'Week Off' | 'Leave' | 'WFH' | 'Regularization Pending';
+export type AttendanceRequestType = 'Regularization' | 'WFH';
 export type ApprovalStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface AttendanceActor {
+  employeeId: string;
+  name: string;
+  role: string;
+  department: string;
+}
 
 export interface DeviceDetails {
   deviceType: 'Web' | 'Mobile';
@@ -15,59 +21,65 @@ export interface DeviceDetails {
   address: string;
 }
 
-export interface AttendanceSession extends DeviceDetails {
-  id: string;
-  employeeId: string;
-  loginTime: Timestamp;
-  logoutTime: Timestamp | null;
-  createdAt: Timestamp;
-}
-
 export interface DailyAttendance {
   id: string;
+  documentType: 'daily';
   employeeId: string;
+  employeeName: string;
+  department: string;
   attendanceDate: string;
   status: AttendanceStatus;
+  loginTime: Timestamp | null;
+  logoutTime: Timestamp | null;
   totalWorkMinutes: number;
-  totalBreakMinutes: number;
-  sessionCount: number;
-  firstLoginTime: Timestamp | null;
-  lastLogoutTime: Timestamp | null;
   isLocked: boolean;
+  createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
 export interface AttendanceRequest {
   id: string;
+  documentType: 'request';
   employeeId: string;
-  type: AttendanceRequestType;
+  employeeName: string;
+  department: string;
+  requestType: AttendanceRequestType;
   attendanceDate: string;
   reason: string;
   status: ApprovalStatus;
-  approverRole: 'Manager' | 'Super Admin';
+  approverEmployeeId: string | null;
+  decisionReason: string;
   createdAt: Timestamp;
-}
-
-export interface AttendanceAuditLog extends DeviceDetails {
-  userId: string;
-  role: AttendanceRole;
-  action: string;
-  reason: string;
-  oldValue: string;
-  newValue: string;
-  timestamp: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface AttendanceDashboardData {
   today: DailyAttendance | null;
-  openSession: AttendanceSession | null;
-  monthlyDays: DailyAttendance[];
-  pendingRequests: AttendanceRequest[];
+  monthRecords: DailyAttendance[];
+  requests: AttendanceRequest[];
+  organizationRecords: DailyAttendance[];
 }
 
-export interface AttendanceEmployee {
-  employeeId: string;
-  name: string;
-  role: AttendanceRole;
+export interface AttendanceSummary {
+  workingDays: number;
+  lopDays: number;
+  lateCount: number;
+  halfDayCount: number;
+  presentCount: number;
+  wfhCount: number;
+}
+
+export interface AttendanceFilters {
+  search: string;
   department: string;
+  status: AttendanceStatus | '';
+  month: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface AttendanceApprovalInput {
+  requestId: string;
+  decision: Extract<ApprovalStatus, 'Approved' | 'Rejected'>;
+  reason: string;
 }

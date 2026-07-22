@@ -11,6 +11,7 @@ import OfferPage from "../pages/InternalHiring/OfferPage";
 import OfferForm from "../pages/InternalHiring/OfferForm";
 import DocumentDashboard from '../pages/DocumentCenter/DocumentDashboard';
 import AttendancePage from '../pages/Attendance';
+import LeavePage from '../pages/Leave';
 
 export default function AppRouter() {
   return (
@@ -76,6 +77,7 @@ export default function AppRouter() {
         />
 
         <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/leave" element={<LeavePage />} />
 
         {/* Default Route */}
         <Route
