@@ -37,7 +37,7 @@ const readTimestamp = (data: Record<string, unknown>, field: string): Timestamp 
 };
 
 const readEmploymentStatus = (data: Record<string, unknown>): Employee['employmentStatus'] => {
-  const status = readString(data, 'employmentStatus');
+  const status = readString(data, 'employmentStatus') || readString(data, 'status');
   return EMPLOYEE_STATUSES.some((validStatus) => validStatus === status)
     ? status as Employee['employmentStatus']
     : DEFAULT_EMPLOYMENT_STATUS;
@@ -67,19 +67,27 @@ const toEmployee = (id: string, data: Record<string, unknown>): Employee => {
     employeeId: readString(data, 'employeeId'),
     employeeCode: readString(data, 'employeeCode') || readString(data, 'employeeId'),
     firstName,
+    middleName: readString(data, 'middleName') || undefined,
     lastName,
     fullName,
     gender: readEmployeeGender(data),
     dateOfBirth: readString(data, 'dateOfBirth'),
     mobileNumber: readString(data, 'mobileNumber') || readString(data, 'mobile'),
     email: readString(data, 'email') || readString(data, 'officialEmail') || readString(data, 'personalEmail'),
+    officialEmail: readString(data, 'officialEmail') || readString(data, 'email') || undefined,
+    personalEmail: readString(data, 'personalEmail') || undefined,
+    mobile: readString(data, 'mobile') || readString(data, 'mobileNumber') || undefined,
+    departmentId: readString(data, 'departmentId') || undefined,
     department: readString(data, 'department') || readString(data, 'departmentName'),
+    designationId: readString(data, 'designationId') || undefined,
     designation: readString(data, 'designation') || readString(data, 'designationName'),
     employmentType: readEmploymentType(data),
     joiningDate: readString(data, 'joiningDate') || readString(data, 'dateOfJoining'),
     reportingManager: readString(data, 'reportingManager'),
+    reportingManagerId: readString(data, 'reportingManagerId') || undefined,
     workLocation: readString(data, 'workLocation'),
     employmentStatus: readEmploymentStatus(data),
+    status: (readString(data, 'status') || readEmploymentStatus(data)) === 'Inactive' ? 'Inactive' : 'Active',
     photoUrl: readString(data, 'photoUrl'),
     address: readString(data, 'address') || readString(data, 'currentAddress'),
     emergencyContact: readString(data, 'emergencyContact') || readString(data, 'emergencyPrimaryMobile'),

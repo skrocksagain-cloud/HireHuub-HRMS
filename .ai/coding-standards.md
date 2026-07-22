@@ -1,436 +1,361 @@
 # Hire Huub ERP
-# Coding Standards v1.0
+# Coding Standards
+Version: 1.0
+Status: Approved
 
----
+======================================================================
+PURPOSE
+======================================================================
 
-# PURPOSE
+This document defines the coding standards for the Hire Huub ERP.
 
-This document defines the coding standards for the Hire Huub ERP project.
+Every developer and AI coding agent must follow these standards.
 
-Every developer and AI assistant must follow these standards.
+The objective is to ensure consistency, readability, maintainability,
+and long-term scalability.
 
-Goals
+======================================================================
+GENERAL PRINCIPLES
+======================================================================
 
-- Consistency
-- Readability
-- Maintainability
-- Scalability
-- Production Quality
+Always write code that is:
 
-Always write code that another developer can understand.
+- Simple
+- Readable
+- Reusable
+- Testable
+- Maintainable
 
----
+Prefer clarity over cleverness.
 
-# GENERAL PRINCIPLES
+Write code for future developers.
 
-Write code for humans first.
-
-Optimize for readability.
-
-Keep functions small.
-
-Prefer explicit code over clever code.
-
-Always prefer maintainability over speed.
-
----
-
-# TYPESCRIPT
-
-Always use
-
-Strict Mode
-
-Never disable strict mode.
-
----
-
-Never use
-
-```ts
-any
-```
+======================================================================
+LANGUAGE
+======================================================================
 
 Use
 
-- interfaces
-- generics
-- unknown
-- proper type narrowing
+TypeScript (Strict Mode)
 
-instead.
+Never disable strict mode.
 
----
+Never bypass type safety.
 
-Prefer
+======================================================================
+TYPE SAFETY
+======================================================================
 
-```ts
-interface Employee {}
-```
+Avoid
 
-instead of
+any
 
-```ts
-type Employee = {}
-```
+unknown
 
-unless a union or mapped type is required.
+unless absolutely necessary.
 
----
+Always prefer
 
-Never ignore TypeScript errors.
-
-Build must always pass.
-
----
-
-# REACT
-
-Use Functional Components only.
-
-Never create Class Components.
-
-Example
-
-```tsx
-export default function EmployeePage() {
-    return <div />;
-}
-```
-
----
-
-Always use
-
-```tsx
-const
-```
-
-for helper functions.
-
----
-
-Keep components focused.
-
-One component.
-
-One responsibility.
-
----
-
-# COMPONENTS
-
-Components are presentation only.
-
-Components should never
-
-- call Firebase
-- call APIs
-- contain business logic
-
-Components receive data via props.
-
----
-
-Maximum component size
-
-≈ 300 lines
-
-Split large components.
-
----
-
-# PAGES
-
-Pages compose the UI.
-
-Pages
-
-- import hooks
-- render components
-- handle routing
-
-Pages should not implement business rules.
-
----
-
-# HOOKS
-
-Hooks orchestrate workflows.
-
-Hooks
-
-- manage loading
-- manage errors
-- call services
-- expose actions
-
-Hooks never
-
-- render JSX
-- contain business rules
-
-Example
-
-```ts
-const {
-    loading,
-    error,
-    saveEmployee,
-} = useEmployee();
-```
-
----
-
-# SERVICES
-
-Services contain business logic.
-
-Services
-
-- Promise based
-- Reusable
-- Testable
-
-Never import React inside services.
-
-Example
-
-```ts
-employeeService.create()
-
-employeeService.update()
-
-employeeService.delete()
-```
-
----
-
-# TYPES
-
-Location
-
-```
-src/types/
-```
-
-Only
-
-- interfaces
-- enums
-- type aliases
-
-No business logic.
-
----
-
-# IMPORT ORDER
-
-Always follow this order.
-
-1.
-
-React
-
-```ts
-import { useState } from "react";
-```
-
-2.
-
-Third-party libraries
-
-```ts
-import { pdf } from "@react-pdf/renderer";
-```
-
-3.
-
-Internal aliases
-
-```ts
-import { employeeService } from "@/services";
-```
-
-4.
-
-Relative imports
-
-```ts
-import "./Employee.css";
-```
-
----
-
-Never mix import order.
-
----
-
-# FILE NAMING
-
-Components
-
-```
-EmployeeCard.tsx
-```
-
-Pages
-
-```
-EmployeePage.tsx
-```
-
-Hooks
-
-```
-useEmployee.ts
-```
-
-Services
-
-```
-employeeService.ts
-```
+Interfaces
 
 Types
 
-```
+Generics
+
+Enums where appropriate.
+
+Every public function must have explicit parameter
+and return types.
+
+======================================================================
+NAMING CONVENTIONS
+======================================================================
+
+Components
+
+PascalCase
+
+EmployeeProfile.tsx
+
+Pages
+
+PascalCase
+
+EmployeePage.tsx
+
+Hooks
+
+camelCase
+
+useEmployee.ts
+
+Services
+
+camelCase
+
+employeeService.ts
+
+Repositories
+
+camelCase
+
+employeeRepository.ts
+
+Types
+
+PascalCase
+
 Employee.ts
-```
 
-PDF Templates
+Validation
 
-```
-OfferLetterPdf.tsx
-```
+camelCase
 
----
+employeeValidation.ts
 
-# VARIABLE NAMING
+Utilities
 
-Good
+camelCase
 
-```ts
-employee
+employeeUtils.ts
 
-employeeList
+Constants
 
-employeeId
+camelCase
 
-isLoading
+employeeConstants.ts
 
-hasPermission
-```
+Context
 
-Bad
+PascalCase
 
-```ts
-emp
+AuthContext.tsx
 
-list
+======================================================================
+FILE ORGANIZATION
+======================================================================
 
-temp
+One responsibility per file.
 
-data
+Avoid large files.
 
-obj
+Recommended size
 
-x
+Components
 
-y
-```
+<300 lines
 
----
+Services
 
-# CONSTANTS
+<300 lines
 
-Never use magic values.
+Repositories
 
-Bad
+<250 lines
 
-```ts
-if(age > 18)
-```
+Hooks
 
-Good
+<200 lines
 
-```ts
-const MINIMUM_WORKING_AGE = 18;
-```
+Split files when they become difficult to understand.
 
----
-
-# FUNCTIONS
+======================================================================
+FUNCTIONS
+======================================================================
 
 Functions should
 
-- do one thing
-- return early
-- avoid nesting
+Do one thing.
 
-Maximum
+Return early.
 
-≈ 50 lines
+Avoid deep nesting.
 
-Split when necessary.
+Prefer composition over large functions.
 
----
+Maximum recommended function length
 
-# ERROR HANDLING
+50 lines
 
-Never ignore errors.
+======================================================================
+COMPONENTS
+======================================================================
+
+Components are responsible only for
+
+Rendering
+
+User interaction
+
+Calling hooks
+
+Components must never
+
+Access Firestore
+
+Contain business logic
+
+Contain permission logic
+
+Contain data manipulation logic
+
+======================================================================
+HOOKS
+======================================================================
+
+Hooks
+
+Manage UI state
+
+Call services
+
+Handle loading
+
+Handle errors
+
+Never access Firestore directly.
+
+======================================================================
+SERVICES
+======================================================================
+
+Services contain
+
+Business rules
+
+Validation
+
+Permission checks
+
+Transactions
+
+Audit calls
+
+Notification calls
+
+Services must not know about UI.
+
+======================================================================
+REPOSITORIES
+======================================================================
+
+Repositories perform
+
+CRUD
+
+Queries
+
+Transactions
+
+Repositories must never
+
+Contain business logic
+
+Contain UI logic
+
+======================================================================
+STATE MANAGEMENT
+======================================================================
+
+Use
+
+TanStack Query
+
+for server state.
+
+Use
+
+React Context
+
+only for shared application state.
+
+Use
+
+useState
+
+for local component state.
+
+Avoid unnecessary global state.
+
+======================================================================
+FORMS
+======================================================================
 
 Always use
 
-```ts
+React Hook Form
+
++
+
+Zod
+
+Never manually validate forms
+unless unavoidable.
+
+======================================================================
+ERROR HANDLING
+======================================================================
+
+Every service should follow
+
 try
-```
 
-```ts
+↓
+
+validate
+
+↓
+
+repository
+
+↓
+
 catch
-```
 
-Throw meaningful errors.
+↓
 
-Never swallow exceptions.
+log
 
----
+↓
 
-# ASYNC CODE
+throw user-friendly error
 
-Prefer
+Never expose raw Firestore errors.
 
-```ts
-async
+======================================================================
+ASYNC CODE
+======================================================================
 
-await
-```
+Use
 
-Avoid chained
+async / await
 
-```ts
-.then()
-```
+Avoid nested promises.
 
-unless required.
+Always handle errors.
 
----
+Never ignore rejected promises.
 
-# COMMENTS
+======================================================================
+FIRESTORE
+======================================================================
 
-Write comments only when necessary.
+Access Firestore only through repositories.
 
-Bad
+Always use server timestamps.
 
-```ts
-// Increment i
+Use transactions when modifying
+multiple related documents.
 
-i++;
-```
+Optimize queries.
 
-Good
+Avoid unnecessary reads.
 
-Explain
+======================================================================
+COMMENTS
+======================================================================
+
+Comments should explain
 
 Why
 
@@ -438,222 +363,264 @@ not
 
 What.
 
----
+Avoid obvious comments.
 
-# LOGGING
+Remove outdated comments.
 
-Never commit
+======================================================================
+IMPORTS
+======================================================================
 
-```ts
-console.log()
-```
+Group imports
 
-Never commit
+1. React
 
-```ts
-debugger
-```
+2. Third-party libraries
 
-Remove temporary logging before commit.
+3. Internal modules
 
----
+4. Relative imports
 
-# ALERTS
+Remove unused imports.
 
-Never use
+======================================================================
+CODE STYLE
+======================================================================
 
-```ts
-alert()
-```
+Use
 
-Use project notification components.
+Early returns
 
----
+Descriptive names
 
-# DUPLICATION
+Small functions
 
-Avoid duplicated code.
+Small components
 
-If copied twice
+Avoid nested ternaries.
 
-Extract.
+Avoid deeply nested if statements.
 
-Examples
+Extract reusable logic.
 
-- utility
-- component
-- hook
-- service
+======================================================================
+MAGIC VALUES
+======================================================================
 
----
+Never hardcode
 
-# STYLING
+Status values
 
-Browser UI
+Limits
 
-Tailwind CSS
+Configuration
 
-PDF
+URLs
 
-React PDF StyleSheet
+Store them in constants.
 
-Never use Tailwind inside PDF templates.
+======================================================================
+PERMISSIONS
+======================================================================
 
----
+Never implement permissions inside UI.
 
-# PDF STANDARDS
+Always use
 
-Location
+PermissionService
 
-```
-src/templates/pdf/
-```
+======================================================================
+AUDIT
+======================================================================
 
-Use ONLY
+Every business action must use
 
-- Document
-- Page
-- View
-- Text
-- Image
-- StyleSheet
+AuditService
 
-Never use
+Never write audit logic manually.
 
-```tsx
-<div>
+======================================================================
+NOTIFICATIONS
+======================================================================
 
-<section>
+Always use
 
-<main>
+NotificationService
 
-className
-```
+Never duplicate notification logic.
 
-inside PDF templates.
+======================================================================
+SOFT DELETE
+======================================================================
 
----
+Archive business records.
 
-# SOLID PRINCIPLES
+Never permanently delete
+unless explicitly required.
 
-Always follow
+======================================================================
+GOOGLE DRIVE
+======================================================================
 
-Single Responsibility
+Always use centralized
+DocumentService.
 
-Open / Closed
+Never duplicate storage logic.
 
-Liskov
+======================================================================
+REUSABILITY
+======================================================================
 
-Interface Segregation
+Before creating
 
-Dependency Inversion
+Component
 
----
+Hook
 
-# CLEAN CODE
+Service
 
-Meaningful names.
+Repository
 
-Small functions.
+Utility
 
-Small files.
+Type
 
-No dead code.
+Search the project.
 
-No duplicated logic.
+Reuse
 
-Readable formatting.
+↓
 
----
+Extend
 
-# BUILD RULES
+↓
 
-Before commit
+Create
 
-Run
+Never duplicate existing functionality.
 
-```bash
+======================================================================
+PERFORMANCE
+======================================================================
+
+Prefer
+
+Lazy Loading
+
+Memoization
+
+Pagination
+
+Optimized Firestore Queries
+
+Reusable Components
+
+Minimize unnecessary renders.
+
+======================================================================
+TESTING CHECKLIST
+======================================================================
+
+Before completion verify
+
+TypeScript
+
+ESLint
+
+CRUD
+
+Validation
+
+Permissions
+
+Audit
+
+Notifications
+
+Search
+
+Filters
+
+Sorting
+
+Pagination
+
+Build
+
+======================================================================
+BUILD
+======================================================================
+
+Every implementation must pass
+
 npm run build
-```
 
-Build must succeed.
+Fix all build errors.
 
-Never commit broken code.
+Fix all TypeScript errors.
 
----
+Never submit a broken build.
 
-# GIT
+======================================================================
+PROHIBITED
+======================================================================
 
-Use Conventional Commits.
+Do NOT
 
-Examples
+Use any unnecessarily
 
-```text
-feat(document-center): add offer letter PDF
+Duplicate code
 
-fix(payroll): correct PF calculation
+Duplicate components
 
-refactor(employee): simplify hook
+Duplicate services
 
-docs(ai): update coding standards
-```
+Duplicate repositories
 
-Never commit
+Duplicate hooks
 
-"WIP"
+Access Firestore from UI
 
-or
+Write business logic in components
 
-"test"
+Disable TypeScript checks
 
-messages.
+Ignore lint warnings
 
----
+Leave TODO comments
 
-# CODE REVIEW CHECKLIST
+Leave console.log statements
 
-Before every commit verify
+======================================================================
+DEFINITION OF DONE
+======================================================================
+
+Code is considered complete only when
+
+✓ Readable
+
+✓ Reusable
+
+✓ Typed
+
+✓ Validated
+
+✓ Permission protected
+
+✓ Audited
 
 ✓ Build passes
 
-✓ No TypeScript errors
+✓ No duplicated logic
 
-✓ No console.log
+✓ No scope violations
 
-✓ No debugger
+======================================================================
+FINAL PRINCIPLE
+======================================================================
 
-✓ No any
+Write code that another developer can
+understand within five minutes.
 
-✓ No unused imports
-
-✓ No duplicated code
-
-✓ Proper naming
-
-✓ Strong typing
-
-✓ Architecture respected
-
----
-
-# FINAL RULE
-
-Every line of code should improve
-
-Hire Huub ERP.
-
-If uncertain
-
-STOP
-
-Review
-
-- developer.md
-
-- architecture.md
-
-Then continue.
-
-Never guess.
-
-Always follow the project standards.
+Optimize for maintainability,
+not cleverness.

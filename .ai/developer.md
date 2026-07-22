@@ -1,401 +1,525 @@
-# HireHuub ERP
-# AI Developer Manual v2.0
+# Hire Huub ERP
+# Developer Guidelines
+Version: 1.0
+Status: Approved
 
----
+======================================================================
+PROJECT OVERVIEW
+======================================================================
 
-# PURPOSE
+Project Name
 
-This repository follows strict enterprise engineering standards.
+Hire Huub ERP
 
-The objective is to build a production-grade ERP using disciplined software engineering practices.
+Tagline
 
-Every implementation must be:
+The Right People. The Right Job.
 
-- Reusable
-- Maintainable
-- Scalable
-- Strongly Typed
-- Easy to Review
+Hire Huub ERP is an enterprise Human Resource and Workforce Management
+system built using React, TypeScript, Firebase and Firestore.
 
-Never optimize for speed.
+This document defines the permanent engineering standards for the project.
 
-Always optimize for correctness and maintainability.
+These rules apply to every implementation sprint.
 
----
+======================================================================
+MISSION
+======================================================================
 
-# TEAM ROLES
+Build a scalable, maintainable and enterprise-grade ERP.
 
-## ChatGPT
+Every implementation must:
 
-Role
+- Preserve architecture
+- Reuse existing code
+- Avoid duplication
+- Maintain consistency
+- Pass production build
 
-Solution Architect & Technical Lead
+Never sacrifice long-term maintainability for short-term speed.
 
-Responsibilities
+======================================================================
+CORE PRINCIPLES
+======================================================================
 
-- Architecture
-- Sprint Planning
-- Technical Decisions
-- Code Review
-- Debugging
-- Documentation
-- Engineering Standards
+1. Existing architecture comes first.
 
-Never modify the repository directly.
+2. Reuse before create.
 
----
+3. Business logic never belongs in UI.
 
-## AI Coding Assistant
+4. Shared services should be used whenever possible.
 
-Role
+5. Shared components should be reused.
 
-Software Engineer
+6. Repository Pattern is mandatory.
 
-Responsibilities
+7. Every change must preserve build stability.
 
-- Implement approved sprint
-- Follow architecture
-- Produce production-quality code
-- Never redesign the system
+8. Every feature must respect permissions.
 
----
+9. Every business action must be auditable.
 
-## Product Owner
+10. Simplicity is preferred over cleverness.
 
-Responsibilities
-
-- Sprint approval
-- Business rules
-- QA
-- Build
-- Git
-- Release
-
-Only the Product Owner executes Git operations.
-
----
-
-# PROJECT
-
-Name
-
-HireHuub ERP
-
-Repository Root
-
-E:\Projects\HireHuub-HRMS
-
-Working Directory
-
-E:\Projects\HireHuub-HRMS\apps\web
-
----
-
-# TECHNOLOGY STACK
+======================================================================
+PROJECT STACK
+======================================================================
 
 Frontend
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
+React
+
+TypeScript
+
+Vite
+
+TailwindCSS
+
+State
+
+TanStack Query
+
+Forms
+
+React Hook Form
+
+Validation
+
+Zod
 
 Backend
 
-- Firebase
+Firebase Authentication
 
-Routing
+Firestore
 
-- React Router
+Storage
 
-Document Generation
+Google Drive Integration
 
-- @react-pdf/renderer
+======================================================================
+ARCHITECTURE
+======================================================================
 
----
+Every module follows
 
-# ENGINEERING PRINCIPLES
-
-Always preserve architecture.
-
-Never redesign existing architecture.
-
-Never invent APIs.
-
-Never invent business rules.
-
-Never invent database models.
-
-Never invent services.
-
-Never make assumptions.
-
-Prefer reusable code.
-
-Prefer composition over duplication.
-
-Keep implementations simple.
-
----
-
-# ARCHITECTURE RULES
-
-## Pages
-
-Pages contain UI only.
-
-Never place
-
-- Business logic
-- Firestore
-- PDF generation
-- Storage logic
-
-inside pages.
-
----
-
-## Hooks
-
-Hooks orchestrate workflows.
-
-Hooks never contain
-
-- UI
-- Business rules
-
-Hooks coordinate services.
-
----
-
-## Services
-
-Services contain business logic.
-
-Services never contain UI.
-
-Services expose Promise-based APIs.
-
-Services are reusable.
-
----
-
-## Templates
-
-Templates contain presentation only.
-
-Never call services.
-
-Never contain business logic.
-
-Reusable.
-
-Printable.
-
----
-
-## Types
-
-Types are shared contracts.
-
-Never mix business logic into types.
-
-Prefer generic contracts.
-
----
-
-# DOCUMENT GENERATION
-
-## Browser Templates
-
-src/templates/documents/
-
-These are standard React components.
-
-Used for browser preview.
-
----
-
-## PDF Templates
-
-src/templates/pdf/
-
-These use
-
-@react-pdf/renderer
-
----
-
-## Shared PDF Components
-
-src/templates/pdf/components/
-
-Reusable
-
-- DocumentLayoutPdf
-- CompanyHeaderPdf
-- CompanyFooterPdf
-- SignatureBlockPdf
-
----
-
-## Document Generation Flow
-
-Business Data
+UI
 
 ↓
 
-DocumentGenerationRequest
+Hook
 
 ↓
 
-React PDF Template
+Service
 
 ↓
 
-pdfService
+Repository
 
 ↓
 
-ReactPdfEngine
+Firestore
 
-↓
+Never bypass layers.
 
-Browser Download
+Never access Firestore directly from components.
 
----
+======================================================================
+REUSE POLICY
+======================================================================
 
-## Current MVP
+Before creating
 
-Generate PDF
+Component
 
-↓
+Hook
 
-Browser Download
+Repository
 
-No Firebase Storage.
+Service
 
-No Email.
+Type
 
-No Cloud Upload.
+Utility
 
----
+Search the project.
 
-# TYPESCRIPT
+If existing implementation exists
 
-Always use strict mode.
+Reuse it.
 
-Never use
+If partial implementation exists
 
-any
+Extend it.
 
-Avoid unnecessary type assertions.
+Only create new code when absolutely necessary.
 
-Use interfaces where appropriate.
+Avoid duplicate implementations.
 
-Use meaningful names.
+======================================================================
+MODULE STRUCTURE
+======================================================================
 
----
+Each module should contain
 
-# CODING STANDARDS
+pages/
+
+components/
+
+hooks/
+
+services/
+
+repositories/
+
+types/
+
+validation/
+
+constants/
+
+utils/
+
+index.ts
+
+Maintain consistency across all modules.
+
+======================================================================
+NAMING CONVENTION
+======================================================================
+
+Pages
+
+EmployeePage.tsx
+
+Components
+
+EmployeeTable.tsx
+
+Hooks
+
+useEmployee.ts
+
+Repositories
+
+employeeRepository.ts
+
+Services
+
+employeeService.ts
+
+Types
+
+Employee.ts
+
+Validation
+
+employeeValidation.ts
+
+Utilities
+
+employeeUtils.ts
+
+Constants
+
+employeeConstants.ts
+
+======================================================================
+CODING STANDARDS
+======================================================================
+
+Strict TypeScript
+
+No any
 
 No console.log
 
-No alert()
+No TODO comments
 
-No duplicated JSX
+Readable names
 
-No duplicated business logic
+Small reusable functions
 
-No magic values
+Single Responsibility Principle
 
-Prefer constants
+SOLID Principles
 
-Prefer reusable functions
+Avoid deeply nested logic.
 
-Follow SOLID principles.
+======================================================================
+COMPONENT GUIDELINES
+======================================================================
 
----
+Components are responsible only for
 
-# FILE SAFETY
+Rendering
 
-Modify ONLY files approved in the sprint.
+User interaction
 
-If another file is required
+Calling hooks
 
-STOP
+Components must never
 
-Report
+Access Firestore
 
-Missing Dependency
+Contain business logic
 
-Required File
+Contain permission logic
 
-Reason
+======================================================================
+HOOK GUIDELINES
+======================================================================
 
-Recommended Solution
+Hooks coordinate UI.
 
-Wait for approval.
+Hooks call services.
 
-Never continue without approval.
+Hooks never access Firestore directly.
 
----
+======================================================================
+SERVICE GUIDELINES
+======================================================================
 
-# BUILD RULES
+Services contain business rules.
 
-Never assume code compiles.
+Services
 
-Before completion verify
+Validate
 
-- No TypeScript errors
-- No unused imports
-- No lint issues introduced
+Authorize
 
-Never execute
+Execute business logic
+
+Call repositories
+
+Trigger notifications
+
+Trigger audit
+
+======================================================================
+REPOSITORY GUIDELINES
+======================================================================
+
+Repositories perform only data access.
+
+Repositories never contain business logic.
+
+Repositories return strongly typed data.
+
+======================================================================
+PERMISSION ARCHITECTURE
+======================================================================
+
+PermissionService is the single source of truth.
+
+Never implement permission logic inside pages.
+
+Roles
+
+Employee
+
+Team Leader
+
+Admin
+
+Finance
+
+Super Admin
+
+======================================================================
+AUDIT
+======================================================================
+
+Every important business action must create
+an immutable audit log.
+
+Examples
+
+Create
+
+Update
+
+Archive
+
+Approve
+
+Reject
+
+Status Change
+
+Manual Adjustment
+
+======================================================================
+NOTIFICATIONS
+======================================================================
+
+Always use NotificationService.
+
+Never create module-specific notification implementations.
+
+Channels
+
+In-App
+
+Email
+
+======================================================================
+SOFT DELETE
+======================================================================
+
+Business records are archived.
+
+Never permanently delete business data.
+
+Standard fields
+
+isArchived
+
+archivedAt
+
+archivedBy
+
+======================================================================
+VALIDATION
+======================================================================
+
+Use
+
+React Hook Form
+
+Zod
+
+Validate
+
+Frontend
+
+Business Rules
+
+Permissions
+
+======================================================================
+ERROR HANDLING
+======================================================================
+
+Services
+
+try
+
+↓
+
+validate
+
+↓
+
+repository
+
+↓
+
+catch
+
+↓
+
+log
+
+↓
+
+throw user-friendly error
+
+Never expose Firestore errors directly to users.
+
+======================================================================
+GOOGLE DRIVE
+======================================================================
+
+Offer Letters
+
+Payslips
+
+Employee Documents
+
+Use centralized document services.
+
+Do not duplicate storage logic.
+
+======================================================================
+PERFORMANCE
+======================================================================
+
+Lazy loading
+
+Memoization
+
+Pagination
+
+Optimized Firestore queries
+
+Minimal re-renders
+
+Reusable components
+
+======================================================================
+TESTING
+======================================================================
+
+Before completing any sprint verify
+
+CRUD
+
+Permissions
+
+Validation
+
+Search
+
+Filters
+
+Sorting
+
+Audit
+
+Notifications
+
+Integrations
+
+Build
+
+======================================================================
+BUILD
+======================================================================
+
+Every sprint must end with
 
 npm run build
 
-The Product Owner executes builds.
+Fix all TypeScript errors.
 
----
+Fix all build errors.
 
-# GIT RULES
+A sprint is never complete with a failing build.
 
-Never execute
+======================================================================
+IMPLEMENTATION RULES
+======================================================================
 
-git add
+Do not redesign existing UI unless requested.
 
-git commit
+Do not rename Firestore collections.
 
-git push
+Do not modify authentication.
 
-git tag
+Do not change routing unless required.
 
-Git operations are performed only by the Product Owner.
+Do not introduce breaking changes.
 
----
+Preserve backwards compatibility.
 
-# SPRINT WORKFLOW
+======================================================================
+COMPLETION REPORT
+======================================================================
 
-1. Read this developer manual.
-
-2. Read the sprint definition.
-
-3. Verify dependencies.
-
-4. Verify approved scope.
-
-5. Implement only approved files.
-
-6. Self review.
-
-7. Report completion.
-
----
-
-# REPORT FORMAT
-
-Always finish with
+Every implementation must return
 
 Task Status
 
@@ -403,119 +527,31 @@ Files Modified
 
 Files Created
 
-Dependencies
+Files Deleted
+
+Build Status
 
 Warnings
 
+Future Recommendations
+
 Scope Violations
 
----
+======================================================================
+FINAL PRINCIPLE
+======================================================================
 
-# STOP RULE
+Always prioritize
 
-If implementation requires
+Correctness
 
-- modifying another file
-- changing architecture
-- installing another package
-- changing project configuration
+Maintainability
 
-STOP
+Consistency
 
-Report the dependency.
+Scalability
 
-Do not continue.
+over speed.
 
----
-
-# QUALITY CHECKLIST
-
-Before reporting completion verify
-
-✔ TypeScript strict
-
-✔ No any
-
-✔ No console.log
-
-✔ No alert()
-
-✔ No duplicated code
-
-✔ No duplicated JSX
-
-✔ Single Responsibility
-
-✔ Reusable implementation
-
-✔ No unused imports
-
-✔ Scope respected
-
----
-
-# PROJECT WORKFLOW
-
-Architecture
-
-↓
-
-Implementation
-
-↓
-
-Review
-
-↓
-
-Sprint Verification
-
-↓
-
-npm run build
-
-↓
-
-QA
-
-↓
-
-Git Commit
-
-↓
-
-Git Tag
-
----
-
-# PROJECT GOAL
-
-HireHuub ERP is intended to become a production-grade enterprise ERP.
-
-Every contribution should improve
-
-- Maintainability
-- Scalability
-- Reusability
-- Readability
-- Engineering quality
-
-Do not optimize for speed.
-
-Optimize for long-term maintainability.
-
----
-
-# FINAL RULE
-
-When uncertain
-
-STOP
-
-Ask for clarification.
-
-Never guess.
-
-Never invent.
-
-Never violate the architecture.
+Build software that another developer can understand,
+extend and maintain years from now.

@@ -1,483 +1,568 @@
 # Hire Huub ERP
-# Review Checklist v1.0
+# Code Review Checklist
+Version: 1.0
+Status: Approved
 
----
+======================================================================
+PURPOSE
+======================================================================
 
-# PURPOSE
+This document defines the mandatory review process for every
+implementation in the Hire Huub ERP project.
 
-This document defines the mandatory review process for every sprint.
+No implementation is considered complete until every applicable
+check has passed.
 
-Every implementation, whether written by a developer or an AI assistant,
-must pass every review before it can be committed.
+======================================================================
+REVIEW PHILOSOPHY
+======================================================================
 
-This document represents the Definition of Done (DoD) for Hire Huub ERP.
+The objective of code review is to ensure
 
----
+Correctness
 
-# REVIEW WORKFLOW
+Consistency
 
-Every sprint follows this sequence
+Maintainability
 
-```
-Architecture Review
-        │
-        ▼
-Code Quality Review
-        │
-        ▼
-Build Review
-        │
-        ▼
-Business Review
-        │
-        ▼
-Release Review
-```
+Scalability
 
-Never skip a review.
+Security
 
----
+Performance
 
-# REVIEW 1
+A passing build alone does NOT mean the implementation is complete.
 
+======================================================================
+PHASE 1
+SCOPE REVIEW
+======================================================================
+
+Confirm
+
+□ Only requested modules were modified.
+
+□ No unrelated files were changed.
+
+□ No unnecessary refactoring performed.
+
+□ Existing architecture preserved.
+
+□ Existing routing preserved.
+
+□ Existing authentication preserved.
+
+□ Existing business rules preserved.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 2
 ARCHITECTURE REVIEW
+======================================================================
 
-Goal
+Confirm
 
-Verify that the implementation follows the project architecture.
+□ Repository Pattern followed.
 
-Checklist
+□ UI → Hook → Service → Repository architecture preserved.
 
-□ Correct folder
+□ No Firestore calls inside UI.
 
-□ Correct module
+□ No business logic inside components.
 
-□ Correct layer
+□ Shared services reused.
 
-□ No architecture violations
+□ Shared components reused.
 
-□ No duplicated components
+□ No architecture violations.
 
-□ No duplicated services
-
-□ No duplicated hooks
-
-□ Correct dependency direction
-
-□ No circular dependencies
-
-□ Reusable implementation
-
-Pass
+PASS
 
 YES / NO
 
----
+======================================================================
+PHASE 3
+CODE QUALITY
+======================================================================
 
-# REVIEW 2
+Confirm
 
-CODE QUALITY REVIEW
+□ No duplicated code.
 
-Goal
+□ No dead code.
 
-Verify production quality.
+□ No console.log statements.
 
-Checklist
+□ No TODO comments.
 
-□ TypeScript Strict
+□ Strict TypeScript maintained.
 
-□ No any
+□ Meaningful naming conventions.
 
-□ No unknown misuse
+□ Small reusable functions.
 
-□ No console.log
+□ SOLID principles respected.
 
-□ No debugger
-
-□ No alert()
-
-□ No TODO left in code
-
-□ No FIXMEs
-
-□ No commented dead code
-
-□ Proper naming
-
-□ Small functions
-
-□ Readable code
-
-□ No duplicated logic
-
-□ SOLID respected
-
-Pass
+PASS
 
 YES / NO
 
----
-
-# REVIEW 3
-
+======================================================================
+PHASE 4
 COMPONENT REVIEW
+======================================================================
 
-Checklist
+Confirm
 
-□ Components are reusable
+□ Components only render UI.
 
-□ Components contain presentation only
+□ Components call hooks only.
 
-□ No business logic
+□ Components contain no business logic.
 
-□ Proper props
+□ Components remain reusable.
 
-□ Strong typing
+□ Loading state implemented.
 
-□ Proper file naming
+□ Empty state implemented.
 
-□ Proper folder
+□ Error state implemented.
 
-Pass
+PASS
 
 YES / NO
 
----
-
-# REVIEW 4
-
+======================================================================
+PHASE 5
 HOOK REVIEW
+======================================================================
 
-Checklist
+Confirm
 
-□ Hook orchestrates workflow
+□ Hooks manage page state.
 
-□ Loading handled
+□ Hooks call services.
 
-□ Error handled
+□ Hooks contain no Firestore logic.
 
-□ No UI rendering
+□ Hooks expose clean APIs.
 
-□ No business rules
-
-□ Calls services correctly
-
-Pass
+PASS
 
 YES / NO
 
----
-
-# REVIEW 5
-
+======================================================================
+PHASE 6
 SERVICE REVIEW
+======================================================================
 
-Checklist
+Confirm
 
-□ Promise based
+□ Services contain business logic.
 
-□ Reusable
+□ Validation implemented.
 
-□ Testable
+□ Permission checks implemented.
 
-□ No React dependency
+□ AuditService used.
 
-□ No JSX
+□ NotificationService used.
 
-□ Proper error handling
+□ Error handling implemented.
 
-□ Strong typing
-
-Pass
-
-YES / NO
-
----
-
-# REVIEW 6
-
-TYPE REVIEW
-
-Checklist
-
-□ Interfaces only
-
-□ Proper generics
-
-□ No duplicated types
-
-□ No business logic
-
-□ Clear naming
-
-Pass
+PASS
 
 YES / NO
 
----
+======================================================================
+PHASE 7
+REPOSITORY REVIEW
+======================================================================
 
-# REVIEW 7
+Confirm
 
-PDF REVIEW
+□ CRUD operations isolated.
 
-Applies only to PDF templates.
+□ Firestore queries optimized.
 
-Checklist
+□ Transactions used where required.
 
-□ Uses @react-pdf/renderer
+□ No business logic.
 
-□ Uses Document
-
-□ Uses Page
-
-□ Uses View
-
-□ Uses Text
-
-□ Uses StyleSheet
-
-□ No HTML
-
-□ No Tailwind
-
-□ Reusable layout
-
-□ Correct page size
-
-□ Correct margins
-
-Pass
+PASS
 
 YES / NO
 
----
+======================================================================
+PHASE 8
+PERMISSION REVIEW
+======================================================================
 
-# REVIEW 8
+Confirm
 
+□ PermissionService used.
+
+□ Employee permissions verified.
+
+□ Team Leader permissions verified.
+
+□ Admin permissions verified.
+
+□ Finance permissions verified.
+
+□ Super Admin permissions verified.
+
+□ No UI-only authorization.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 9
+AUDIT REVIEW
+======================================================================
+
+Confirm
+
+Audit records created for
+
+□ Create
+
+□ Update
+
+□ Archive
+
+□ Approval
+
+□ Rejection
+
+□ Status Change
+
+□ Manual Adjustment
+
+Audit records are immutable.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 10
+NOTIFICATION REVIEW
+======================================================================
+
+Confirm
+
+□ NotificationService reused.
+
+□ No duplicated notification logic.
+
+□ Correct notification events.
+
+□ Email notifications verified.
+
+□ In-App notifications verified.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 11
+VALIDATION REVIEW
+======================================================================
+
+Confirm
+
+□ React Hook Form used.
+
+□ Zod validation implemented.
+
+□ Business rules validated.
+
+□ Permission validation implemented.
+
+□ Duplicate validation implemented.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 12
+DATABASE REVIEW
+======================================================================
+
+Confirm
+
+□ Existing collections reused.
+
+□ No duplicate collections.
+
+□ No renamed collections.
+
+□ Firestore indexes respected.
+
+□ Server timestamps used.
+
+□ Soft delete strategy followed.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 13
+UI REVIEW
+======================================================================
+
+Confirm
+
+□ Design consistent.
+
+□ Existing UI preserved.
+
+□ Responsive.
+
+□ Accessible.
+
+□ Filters work.
+
+□ Search works.
+
+□ Sorting works.
+
+□ Pagination works.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 14
+MODULE REVIEW
+======================================================================
+
+Review the implemented module.
+
+Employees
+
+Attendance
+
+Leave
+
+Performance
+
+Confirm
+
+□ Business specification implemented.
+
+□ Technical specification followed.
+
+□ Architecture preserved.
+
+□ Cross-module integration verified.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 15
 PERFORMANCE REVIEW
+======================================================================
 
-Checklist
+Confirm
 
-□ No unnecessary renders
+□ Lazy loading used where applicable.
 
-□ No duplicated API calls
+□ Queries optimized.
 
-□ No unnecessary state
+□ No unnecessary renders.
 
-□ Proper memoization when needed
+□ Components memoized where needed.
 
-□ Lazy loading where appropriate
+□ No excessive Firestore reads.
 
-□ Reusable logic
-
-Pass
+PASS
 
 YES / NO
 
----
+======================================================================
+PHASE 16
+SECURITY REVIEW
+======================================================================
 
-# REVIEW 9
+Confirm
 
+□ Authentication preserved.
+
+□ Authorization enforced.
+
+□ No sensitive data exposed.
+
+□ Service-level permission checks.
+
+□ Firestore security respected.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 17
 BUILD REVIEW
+======================================================================
 
-Mandatory
+Confirm
 
-Run
+□ npm run build passed.
 
-```bash
-npm run build
-```
+□ No TypeScript errors.
 
-Checklist
+□ No ESLint errors.
 
-□ Build passes
+□ No broken imports.
 
-□ TypeScript passes
+□ No failed compilation.
 
-□ Vite passes
+PASS
 
-□ No compilation errors
+YES / NO
+
+======================================================================
+PHASE 18
+REGRESSION REVIEW
+======================================================================
+
+Confirm
+
+□ Existing functionality still works.
+
+□ Existing pages still render.
+
+□ Existing routes still work.
+
+□ Existing authentication still works.
+
+□ Existing modules unaffected.
+
+PASS
+
+YES / NO
+
+======================================================================
+PHASE 19
+IMPLEMENTATION REPORT
+======================================================================
+
+Every implementation must provide
+
+Task Status
+
+Files Modified
+
+Files Created
+
+Files Deleted
+
+Build Status
 
 Warnings
 
-Warnings are acceptable.
+Future Recommendations
 
-Errors are not.
+Scope Violations
 
-Pass
-
-YES / NO
-
----
-
-# REVIEW 10
-
-BUSINESS REVIEW
-
-Checklist
-
-□ Sprint objective completed
-
-□ Business requirements satisfied
-
-□ Scope completed
-
-□ No missing feature
-
-□ No unauthorized feature
-
-Pass
+PASS
 
 YES / NO
 
----
+======================================================================
+FINAL ACCEPTANCE
+======================================================================
 
-# REVIEW 11
+Implementation is APPROVED only if
 
-SECURITY REVIEW
+✓ Scope correct
 
-Checklist
+✓ Architecture preserved
 
-□ No secrets committed
+✓ Code quality acceptable
 
-□ No API keys
+✓ Permissions verified
 
-□ No passwords
+✓ Audit verified
 
-□ No credentials
+✓ Notifications verified
 
-□ No unsafe code
+✓ Validation verified
 
-□ No unnecessary permissions
+✓ Database verified
 
-Pass
+✓ UI verified
 
-YES / NO
+✓ Performance acceptable
 
----
+✓ Security verified
 
-# REVIEW 12
+✓ Build passed
 
-GIT REVIEW
+✓ Regression passed
 
-Checklist
+✓ Implementation report complete
 
-□ Conventional Commit
+======================================================================
+REJECTION CRITERIA
+======================================================================
 
-□ Correct branch
+Reject the implementation if
 
-□ No unrelated files
+✗ Build fails
 
-□ No temporary files
+✗ Architecture violated
 
-□ Build passed before commit
+✗ Business rules changed without approval
 
-□ Commit message follows standard
+✗ Duplicate implementations created
 
-Pass
+✗ Firestore accessed directly from UI
 
-YES / NO
+✗ Business logic placed inside components
 
----
+✗ Missing permission checks
 
-# RELEASE CHECKLIST
+✗ Missing audit records
 
-Before release
+✗ Missing notifications
 
-□ Architecture approved
+✗ Scope exceeded
 
-□ Code approved
+✗ TypeScript errors exist
 
-□ Build successful
+✗ Regression introduced
 
-□ QA approved
+======================================================================
+FINAL PRINCIPLE
+======================================================================
 
-□ Git committed
+Never approve code because it "works."
 
-□ Git pushed
+Approve code only when it
 
-□ Ready for next sprint
+Works correctly
 
----
+Follows the approved architecture
 
-# DEFINITION OF DONE
+Meets coding standards
 
-A sprint is Done only if
+Preserves existing functionality
 
-✅ Architecture Review passed
+Can be maintained long-term
 
-✅ Code Review passed
-
-✅ Component Review passed
-
-✅ Hook Review passed
-
-✅ Service Review passed
-
-✅ Type Review passed
-
-✅ Performance Review passed
-
-✅ Build Review passed
-
-✅ Business Review passed
-
-✅ Security Review passed
-
-✅ Git Review passed
-
----
-
-# FAILURE CONDITIONS
-
-A sprint is NOT complete if
-
-❌ Build fails
-
-❌ TypeScript errors exist
-
-❌ Architecture violated
-
-❌ Scope incomplete
-
-❌ Unauthorized files modified
-
-❌ Business requirements incomplete
-
-❌ Security issue exists
-
----
-
-# AI REVIEW POLICY
-
-Every AI-generated implementation
-
-must be reviewed before commit.
-
-Never commit AI-generated code without review.
-
-Review first.
-
-Build second.
-
-Commit third.
-
----
-
-# FINAL RULE
-
-Every sprint must improve
-
-Hire Huub ERP.
-
-Never sacrifice quality for speed.
-
-If any checklist item fails
-
-STOP
-
-Fix
-
-Review again
-
-Only then proceed to commit.
+Every implementation should leave the project
+better than it was before.

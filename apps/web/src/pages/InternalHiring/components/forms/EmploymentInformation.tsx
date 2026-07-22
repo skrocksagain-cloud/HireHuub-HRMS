@@ -1,7 +1,7 @@
 import type { Offer } from "../../../../types/Offer";
 import type { Department } from "../../../../types/Department";
 import type { Designation } from "../../../../types/Designation";
-import type { Employee } from "../../../../types/Employee";
+import type { Employee } from "../../../Employee/types/Employee";
 
 import Card from "../../../../ui/Card";
 import Input from "../../../../ui/Input";

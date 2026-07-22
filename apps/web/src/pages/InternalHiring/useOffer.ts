@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Offer } from "../../types/Offer";
 import type { Department } from "../../types/Department";
 import type { Designation } from "../../types/Designation";
-import type { Employee } from "../../types/Employee";
+import type { Employee } from "../Employee/types/Employee";
 
 import { DEFAULT_OFFER } from "../../constants/defaultOffer";
 
@@ -14,7 +14,7 @@ import {
 
 import { getDepartments } from "../../services/department/departmentService";
 import { getDesignations } from "../../services/designation/designationService";
-import { getEmployees } from "../../services/employee/employeeService";
+import { employeeService } from "../Employee/services/employeeService";
 
 interface UseOfferReturn {
   loading: boolean;
@@ -73,7 +73,7 @@ export default function useOffer(
       ] = await Promise.all([
         getDepartments(),
         getDesignations(),
-        getEmployees(),
+        employeeService.getEmployees(),
       ]);
 
       setDepartments(departmentData);
@@ -82,7 +82,7 @@ export default function useOffer(
 
       setManagers(
         employeeData.filter(
-          (employee) => employee.status === "Active"
+          (employee) => employee.employmentStatus === "Active"
         )
       );
 

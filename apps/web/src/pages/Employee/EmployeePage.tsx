@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -9,10 +11,22 @@ import EmployeeList from './components/EmployeeList';
 import EmployeeSearchBar from './components/EmployeeSearchBar';
 import { useEmployees } from './hooks/useEmployees';
 
-export default function EmployeePage() {
+interface EmployeePageProps {
+  initialPanel?: 'create';
+}
+
+export default function EmployeePage({ initialPanel }: EmployeePageProps) {
+  const hasInitializedCreatePanel = useRef(false);
   const {
     filteredEmployees, filter, departments, designations, summary, isLoading, isSaving, isDeleting, error, successMessage, selectedEmployee, employeePendingDeletion, activePanel, setFilter, openCreate, openEdit, openDetails, closePanel, saveEmployee, requestDelete, cancelDelete, removeEmployee,
   } = useEmployees();
+
+  useEffect(() => {
+    if (initialPanel === 'create' && !hasInitializedCreatePanel.current) {
+      hasInitializedCreatePanel.current = true;
+      openCreate();
+    }
+  }, [initialPanel, openCreate]);
 
   return (
     <div className="space-y-6">

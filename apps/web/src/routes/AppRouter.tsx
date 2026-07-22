@@ -6,11 +6,11 @@ import Dashboard from "../pages/Dashboard";
 import OrganizationPage from "../pages/Organization";
 
 import EmployeePage from '../pages/Employee/EmployeePage';
-import CreateEmployee from "../pages/Employees/Create";
 
 import OfferPage from "../pages/InternalHiring/OfferPage";
 import OfferForm from "../pages/InternalHiring/OfferForm";
 import DocumentDashboard from '../pages/DocumentCenter/DocumentDashboard';
+import AttendancePage from '../pages/Attendance';
 
 export default function AppRouter() {
   return (
@@ -43,7 +43,7 @@ export default function AppRouter() {
 
         <Route
           path="/employees/create"
-          element={<CreateEmployee />}
+          element={<EmployeePage initialPanel="create" />}
         />
 
         {/* ==========================================
@@ -74,6 +74,8 @@ export default function AppRouter() {
           path="/documents"
           element={<DocumentDashboard />}
         />
+
+        <Route path="/attendance" element={<AttendancePage />} />
 
         {/* Default Route */}
         <Route

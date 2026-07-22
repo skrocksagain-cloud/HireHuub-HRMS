@@ -1,411 +1,25 @@
 # Hire Huub ERP
-# Architecture Guide v1.0
+# System Architecture
+Version: 1.0
+Status: Approved
 
----
+======================================================================
+PURPOSE
+======================================================================
 
-# PURPOSE
+This document defines the architectural blueprint of the Hire Huub ERP.
 
-This document defines the architecture of the Hire Huub ERP application.
+Every implementation must follow this architecture.
 
-It is the single source of truth for:
+No implementation may bypass these rules without explicit approval.
 
-- Folder structure
-- Layer responsibilities
-- Module boundaries
-- Dependency direction
-- Engineering decisions
+======================================================================
+ARCHITECTURE PRINCIPLES
+======================================================================
 
-Every developer and AI assistant must follow this architecture.
+The ERP follows a layered architecture.
 
-Do not redesign the architecture without approval from the Solution Architect.
-
----
-
-# SYSTEM OVERVIEW
-
-Hire Huub ERP follows a modular architecture.
-
-Each module is independent and reusable.
-
-The application is built using:
-
-- React
-- TypeScript
-- Vite
-- Firebase
-- Tailwind CSS
-
-Architecture Style
-
-Feature-first
-
-Layered
-
-Modular
-
-Component-based
-
----
-
-# HIGH LEVEL ARCHITECTURE
-
-```
-Presentation Layer
-        │
-        ▼
-Hooks Layer
-        │
-        ▼
-Service Layer
-        │
-        ▼
-Firebase Layer
-        │
-        ▼
-Database
-```
-
-Dependencies always move downward.
-
-Never upward.
-
----
-
-# FOLDER STRUCTURE
-
-```
-src/
-
-assets/
-
-components/
-
-constants/
-
-contexts/
-
-hooks/
-
-layouts/
-
-pages/
-
-router/
-
-services/
-
-templates/
-
-types/
-
-utils/
-```
-
----
-
-# PAGE LAYER
-
-Location
-
-```
-src/pages/
-```
-
-Responsibilities
-
-- UI
-- User interaction
-- Routing
-- Component composition
-
-Pages must NOT contain
-
-- Business logic
-- Firestore queries
-- PDF generation
-- Complex calculations
-
-Pages coordinate hooks.
-
----
-
-# COMPONENT LAYER
-
-Location
-
-```
-src/components/
-```
-
-Responsibilities
-
-Reusable UI.
-
-Examples
-
-- Button
-- Modal
-- Table
-- Card
-- Badge
-- Avatar
-
-Components should be presentation only.
-
----
-
-# HOOK LAYER
-
-Location
-
-```
-src/hooks/
-
-or
-
-src/pages/<Module>/hooks/
-```
-
-Responsibilities
-
-Hooks orchestrate workflows.
-
-Hooks may
-
-- call services
-- manage loading
-- manage errors
-- expose actions
-
-Hooks must NOT
-
-- render UI
-- contain business rules
-
----
-
-# SERVICE LAYER
-
-Location
-
-```
-src/services/
-```
-
-Responsibilities
-
-Business logic.
-
-Examples
-
-- EmployeeService
-- PayrollService
-- DocumentService
-
-Services
-
-- reusable
-- Promise-based
-- framework independent
-
-Services never contain React.
-
----
-
-# TYPES
-
-Location
-
-```
-src/types/
-```
-
-Responsibilities
-
-Shared contracts.
-
-Only
-
-- interfaces
-- types
-- enums
-
-Never business logic.
-
----
-
-# UTILITIES
-
-Location
-
-```
-src/utils/
-```
-
-Reusable helper functions.
-
-Examples
-
-- formatCurrency
-- formatDate
-- validators
-
-Utilities never depend on React.
-
----
-
-# DOCUMENT GENERATION
-
-Location
-
-```
-src/templates/
-```
-
-Contains document templates.
-
----
-
-Browser Templates
-
-```
-src/templates/documents/
-```
-
-Technology
-
-React DOM
-
-Purpose
-
-Preview in browser.
-
----
-
-PDF Templates
-
-```
-src/templates/pdf/
-```
-
-Technology
-
-@react-pdf/renderer
-
-Purpose
-
-Generate downloadable PDF files.
-
-Never use HTML.
-
-Never use Tailwind.
-
-Only
-
-- Document
-- Page
-- View
-- Text
-- Image
-- StyleSheet
-
----
-
-PDF Components
-
-```
-src/templates/pdf/components/
-```
-
-Reusable components.
-
-Examples
-
-- DocumentLayoutPdf
-- CompanyHeaderPdf
-- CompanyFooterPdf
-- SignatureBlockPdf
-
-Shared by every PDF.
-
----
-
-DOCUMENT GENERATION FLOW
-
-```
-Business Data
-
-↓
-
-DocumentGenerationRequest
-
-↓
-
-React PDF Template
-
-↓
-
-pdfService
-
-↓
-
-ReactPdfEngine
-
-↓
-
-Browser Download
-```
-
-Current MVP
-
-- Local download
-- No Firebase Storage
-- No Email
-
----
-
-MODULE ARCHITECTURE
-
-Every feature module follows
-
-```
-pages/
-
-hooks/
-
-components/
-
-services/
-
-types/
-```
-
-Example
-
-```
-Employee/
-
-Attendance/
-
-Payroll/
-
-Recruitment/
-
-DocumentCenter/
-```
-
-Each module owns its own files.
-
-Avoid cross-module dependencies.
-
----
-
-DEPENDENCY RULES
-
-Allowed
-
-```
-Page
+UI
 
 ↓
 
@@ -417,179 +31,732 @@ Service
 
 ↓
 
-Firebase
-```
-
-Forbidden
-
-```
-Service
+Repository
 
 ↓
 
-React Component
-```
+Firestore
 
-Forbidden
+Each layer has a single responsibility.
 
-```
-Template
+======================================================================
+ARCHITECTURE GOALS
+======================================================================
 
-↓
+Maintainability
 
-Service
-```
+Scalability
 
-Forbidden
+Reusability
 
-```
-Utility
+Consistency
 
-↓
+Testability
+
+Loose Coupling
+
+High Cohesion
+
+======================================================================
+SYSTEM OVERVIEW
+======================================================================
+
+Frontend
 
 React
-```
 
----
+TypeScript
 
-NAMING CONVENTIONS
+Vite
 
-Pages
+TailwindCSS
 
-```
-EmployeePage.tsx
-```
+Backend
 
-Hooks
+Firebase Authentication
 
-```
-useEmployee.ts
-```
+Firestore Database
 
-Services
+Google Drive Integration
 
-```
-employeeService.ts
-```
+State Management
 
-Types
+TanStack Query
 
-```
-Employee.ts
-```
+Validation
 
-Templates
+React Hook Form
 
-```
-OfferLetterPdf.tsx
-```
+Zod
 
-Components
+======================================================================
+PROJECT STRUCTURE
+======================================================================
 
-```
-EmployeeCard.tsx
-```
+src/
 
----
+    components/
 
+    core/
+
+        audit/
+
+        auth/
+
+        config/
+
+        firebase/
+
+        notifications/
+
+        permissions/
+
+        repositories/
+
+        services/
+
+        types/
+
+        utils/
+
+    hooks/
+
+    layouts/
+
+    pages/
+
+    routes/
+
+    services/
+
+    types/
+
+    utils/
+
+======================================================================
+MODULE STRUCTURE
+======================================================================
+
+Every feature module follows
+
+pages/
+
+components/
+
+hooks/
+
+services/
+
+repositories/
+
+types/
+
+validation/
+
+constants/
+
+utils/
+
+index.ts
+
+Example
+
+pages/
+
+    Employee/
+
+        components/
+
+        hooks/
+
+        services/
+
+        repositories/
+
+        types/
+
+        validation/
+
+        constants/
+
+        utils/
+
+======================================================================
+ERP NAVIGATION
+======================================================================
+
+Dashboard
+
+HRMS
+
+    Employees
+
+    Attendance
+
+    Leave
+
+    Performance
+
+Workbench
+
+    Network
+
+    Recruitment
+
+    Workforce
+
+    Finance
+
+Admin / Settings
+
+======================================================================
+LAYER RESPONSIBILITIES
+======================================================================
+
+UI
+
+Responsible for
+
+Rendering
+
+User Interaction
+
+Calling Hooks
+
+Never
+
+Firestore
+
+Business Logic
+
+Permission Logic
+
+======================================================================
+
+HOOK
+
+Responsible for
+
+Managing page state
+
+Calling services
+
+Handling mutations
+
+Handling loading state
+
+Never
+
+Firestore
+
+======================================================================
+
+SERVICE
+
+Responsible for
+
+Business Rules
+
+Validation
+
+Permission Check
+
+Calling repositories
+
+Audit
+
+Notifications
+
+Transactions
+
+======================================================================
+
+REPOSITORY
+
+Responsible for
+
+Firestore
+
+Queries
+
+CRUD
+
+Transactions
+
+No business logic.
+
+======================================================================
+
+DATABASE
+
+Responsible for
+
+Storage
+
+Indexes
+
+Security Rules
+
+======================================================================
+FIRESTORE COLLECTIONS
+======================================================================
+
+employees
+
+attendance
+
+leaveRequests
+
+leaveBalances
+
+performanceLedger
+
+performanceTargets
+
+bigDayCampaigns
+
+holidays
+
+departments
+
+designations
+
+users
+
+roles
+
+notifications
+
+auditLogs
+
+Future
+
+clients
+
+subVendors
+
+vacancies
+
+crm
+
+activeBase
+
+billing
+
+transactions
+
+======================================================================
+MASTER DATA
+======================================================================
+
+Master Collections
+
+Departments
+
+Designations
+
+Roles
+
+Users
+
+Holidays
+
+All modules read from these collections.
+
+Never duplicate master data.
+
+======================================================================
+SERVICE ARCHITECTURE
+======================================================================
+
+Shared Services
+
+PermissionService
+
+NotificationService
+
+AuditService
+
+EmployeeIdService
+
+DocumentService
+
+Business Services
+
+EmployeeService
+
+AttendanceService
+
+LeaveService
+
+PerformanceService
+
+Future
+
+ClientService
+
+RecruitmentService
+
+PayrollService
+
+BillingService
+
+======================================================================
+REPOSITORY ARCHITECTURE
+======================================================================
+
+Every Service owns one Repository.
+
+EmployeeService
+
+↓
+
+EmployeeRepository
+
+AttendanceService
+
+↓
+
+AttendanceRepository
+
+LeaveService
+
+↓
+
+LeaveRepository
+
+PerformanceService
+
+↓
+
+PerformanceRepository
+
+Repositories never call other repositories.
+
+======================================================================
 STATE MANAGEMENT
+======================================================================
 
-Prefer
+Server State
 
-React Hooks
+TanStack Query
 
-Context
+Client State
+
+React Context
+
+Component State
+
+useState
 
 Avoid unnecessary global state.
 
-Introduce Redux/Zustand only when justified.
+======================================================================
+FORM ARCHITECTURE
+======================================================================
 
----
+React Hook Form
 
-ERROR HANDLING
++
 
-Services
+Zod
 
-Throw typed errors.
+Validation Layers
 
-Hooks
+Client Validation
 
-Capture errors.
+Business Validation
 
-Pages
+Permission Validation
 
-Display user-friendly messages.
+======================================================================
+PERMISSION ARCHITECTURE
+======================================================================
 
----
+Single Source of Truth
 
-FUTURE MODULES
+PermissionService
 
-Roadmap
+Roles
 
 Employee
 
+Team Leader
+
+Admin
+
+Finance
+
+Super Admin
+
+Never implement permissions inside UI.
+
+======================================================================
+AUDIT ARCHITECTURE
+======================================================================
+
+Single AuditService.
+
+Every important action records
+
+Module
+
+Action
+
+Record ID
+
+Previous Value
+
+New Value
+
+Performed By
+
+Role
+
+Department
+
+Timestamp
+
+Remarks
+
+Audit records are immutable.
+
+======================================================================
+NOTIFICATION ARCHITECTURE
+======================================================================
+
+Single NotificationService.
+
+Channels
+
+In-App
+
+Email
+
+Future
+
+SMS
+
+WhatsApp
+
+======================================================================
+FILE STORAGE
+======================================================================
+
+Google Drive
+
+Employee Documents
+
+Offer Letters
+
+Payslips
+
+Generated Documents
+
+Storage handled through DocumentService.
+
+======================================================================
+CROSS MODULE INTEGRATION
+======================================================================
+
+Employees
+
+↓
+
 Attendance
 
-Payroll
-
-Recruitment
+↓
 
 Leave
 
-Shift
-
-Asset
+↓
 
 Performance
 
-Reports
+↓
 
-Settings
+Payroll
 
-Audit Logs
+Performance
 
-AI Assistant
+↓
 
-Each module follows identical architecture.
+Active Base
 
----
+↓
 
-ENGINEERING PRINCIPLES
+Finance
 
-Single Responsibility
+Every module communicates through Services.
 
-Open / Closed
+Never directly update another module's data.
 
-Dependency Inversion
+======================================================================
+SOFT DELETE
+======================================================================
 
-Composition over inheritance
+Business records are archived.
 
-Reusable components
+Fields
 
-Strong typing
+isArchived
 
-Readable code
+archivedAt
 
-Maintainability over cleverness.
+archivedBy
 
----
+Archived records are hidden by default.
 
-ARCHITECTURE CHANGES
+======================================================================
+COMMON UI COMPONENTS
+======================================================================
 
-No developer or AI may redesign this architecture.
+DataTable
 
-Any architectural modification requires approval.
+SummaryCard
 
----
+SearchBar
 
+FilterBar
+
+StatusBadge
+
+Avatar
+
+Timeline
+
+Pagination
+
+Modal
+
+ConfirmationDialog
+
+LoadingState
+
+EmptyState
+
+ErrorState
+
+Every module must reuse these components.
+
+======================================================================
+ERROR HANDLING
+======================================================================
+
+Service Layer
+
+try
+
+↓
+
+validate
+
+↓
+
+repository
+
+↓
+
+catch
+
+↓
+
+log
+
+↓
+
+throw user-friendly error
+
+Repositories never display errors.
+
+======================================================================
+SECURITY
+======================================================================
+
+Authentication
+
+Firebase Authentication
+
+Authorization
+
+PermissionService
+
+Data
+
+Firestore Security Rules
+
+Never rely solely on frontend validation.
+
+======================================================================
+PERFORMANCE
+======================================================================
+
+Lazy Loading
+
+Code Splitting
+
+Memoization
+
+Pagination
+
+Optimized Queries
+
+Reusable Components
+
+Minimize unnecessary renders.
+
+======================================================================
+BUILD REQUIREMENTS
+======================================================================
+
+Every sprint must
+
+Pass TypeScript
+
+Pass ESLint
+
+Pass
+
+npm run build
+
+No broken imports.
+
+No duplicate implementations.
+
+======================================================================
+ARCHITECTURE PRINCIPLES
+======================================================================
+
+Single Source of Truth
+
+Reuse Before Create
+
+No Business Logic in UI
+
+Repository Pattern
+
+Centralized Permissions
+
+Centralized Audit
+
+Centralized Notifications
+
+Shared Components
+
+Shared Services
+
+Soft Delete First
+
+Build Must Pass
+
+======================================================================
 FINAL RULE
+======================================================================
 
-When uncertain
+Every implementation must preserve the architecture.
 
-STOP
+Architecture is considered stable.
 
-Review this document.
+Business rules may evolve.
 
-Never invent architecture.
-
-Always follow existing patterns.
+Architecture should not.
