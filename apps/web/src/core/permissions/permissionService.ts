@@ -30,6 +30,10 @@ class PermissionService {
   canManageLeaveBalances(role: string): boolean {
     return ['Admin', 'Super Admin'].includes(normalizeRole(role));
   }
+
+  canViewFinance(role: string): boolean {
+    return ['Finance', 'Super Admin'].includes(normalizeRole(role));
+  }
 }
 
 export const permissionService = new PermissionService();
