@@ -33,6 +33,8 @@ export type DocumentType =
   | "Relieving Letter"
   | "Warning Letter"
   | "Invoice"
+  | "Credit Note"
+  | "Payment Receipt"
   | "Payment Advice"
   | "Candidate Payroll"
   | "Other";

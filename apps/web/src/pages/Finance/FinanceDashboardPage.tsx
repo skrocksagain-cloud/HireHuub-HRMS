@@ -1,4 +1,5 @@
 import DashboardLayout from "../../layouts/DashboardLayout";
+import { Link } from "react-router-dom";
 import PageHeader from "../../ui/PageHeader";
 import {
   ComplianceCard,
@@ -66,6 +67,7 @@ export default function FinanceDashboardPage() {
       <PageHeader
         title="Finance Dashboard"
         description="Overview of financial activity and key metrics."
+        action={<Link to="/finance/reports" className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white">View Reports</Link>}
       />
 
       <div className="space-y-8">

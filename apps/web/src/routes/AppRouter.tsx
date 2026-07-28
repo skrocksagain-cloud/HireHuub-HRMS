@@ -22,6 +22,7 @@ const CreditNotesPage = lazy(() => import("../pages/Finance/billing/CreditNotesP
 const TransactionsPage = lazy(() => import("../pages/Finance/transactions/TransactionsPage"));
 const BankPaymentBatchPage = lazy(() => import("../pages/Finance/transactions/BankPaymentBatchPage"));
 const PaymentHistoryPage = lazy(() => import("../pages/Finance/transactions/PaymentHistoryPage"));
+const FinanceReportsPage = lazy(() => import("../pages/Finance/reports/FinanceReportsPage"));
 
 function FinanceSuspense({ children }: { children: React.ReactNode }) {
   return (
@@ -133,6 +134,10 @@ export default function AppRouter() {
         <Route
           path="/finance/transactions/payment-history"
           element={<FinanceSuspense><PaymentHistoryPage /></FinanceSuspense>}
+        />
+        <Route
+          path="/finance/reports"
+          element={<FinanceSuspense><FinanceReportsPage /></FinanceSuspense>}
         />
 
         {/* Default Route */}
