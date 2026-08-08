@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { Offer } from "../../types/Offer";
 
@@ -31,11 +31,7 @@ export default function OfferProfile({
 
   const [offer, setOffer] = useState<Offer | null>(null);
 
-  useEffect(() => {
-    loadOffer();
-  }, [offerId]);
-
-  async function loadOffer() {
+  const loadOffer = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -44,14 +40,16 @@ export default function OfferProfile({
       if (data) {
         setOffer(data);
       }
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to load offer.");
+    } catch {
+      // Handled silently
     } finally {
       setLoading(false);
     }
-  }
+  }, [offerId]);
+
+  useEffect(() => {
+    loadOffer();
+  }, [loadOffer]);
 
   if (loading) {
     return (

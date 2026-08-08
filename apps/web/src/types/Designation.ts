@@ -5,6 +5,8 @@ export interface Designation {
   name: string;
   code: string;
   description: string;
+  departmentId?: string;
+  departmentName?: string;
 
   // Status
   status: "Active" | "Inactive";

@@ -120,8 +120,21 @@ export const useEmployees = (): UseEmployeesResult => {
     });
   }, [employees, filter]);
 
-  const departments = useMemo(() => [...new Set(employees.map(({ department }) => department).filter(Boolean))], [employees]);
-  const designations = useMemo(() => [...new Set(employees.map(({ designation }) => designation).filter(Boolean))], [employees]);
+  const departments = useMemo(() => {
+    const list = [...new Set(employees.map(({ department }) => department).filter(Boolean))];
+    const defaults = ['Recruitment', 'Operations', 'Finance', 'Sales'];
+    return [...new Set([...defaults, ...list])];
+  }, [employees]);
+  const designations = useMemo(() => {
+    const list = [...new Set(employees.map(({ designation }) => designation).filter(Boolean))];
+    const defaults = [
+      'Recruitment Manager', 'Senior Recruitment Executive', 'Recruitment Executive',
+      'Operation Manager', 'Business Development Executive', 'MIS', 'Marketing Executive',
+      'Finance Manager', 'Payroll Executive', 'Accounts Executive',
+      'Sales Manager', 'Senior Sales Executive', 'Sales Executive'
+    ];
+    return [...new Set([...defaults, ...list])];
+  }, [employees]);
   const summary = useMemo<EmployeeSummary>(() => ({
     total: employees.length,
     active: employees.filter(({ employmentStatus }) => employmentStatus === 'Active').length,

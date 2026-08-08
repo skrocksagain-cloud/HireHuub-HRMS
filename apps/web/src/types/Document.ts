@@ -1,7 +1,7 @@
 /**
  * ============================================================
  * HireHuub ERP
- * Universal Document Model
+ * Universal Document Model (Sprint 02.9.5 Document Center Specification)
  * ============================================================
  */
 
@@ -22,18 +22,57 @@ export type DocumentCategory =
   | "Operations"
   | "System";
 
+export type TargetType =
+  | "Employee"
+  | "Department"
+  | "Company"
+  | "Client"
+  | "Candidate"
+  | "Finance";
+
 export type DocumentType =
   | "Offer Letter"
   | "Appointment Letter"
-  | "Joining Form"
+  | "Confirmation Letter"
+  | "Promotion Letter"
   | "Increment Letter"
-  | "Payslip"
-  | "Salary Certificate"
   | "Experience Letter"
   | "Relieving Letter"
   | "Warning Letter"
-  | "Invoice"
+  | "Show Cause Notice"
+  | "NDA"
+  | "Joining Form"
+  | "Aadhaar"
+  | "PAN"
+  | "Bank Details"
+  | "Education Documents"
+  | "SOP"
+  | "Training Material"
+  | "HR Policy"
+  | "Recruitment Process"
+  | "Finance Process"
+  | "Sales Material"
+  | "Marketing Material"
+  | "Employee Handbook"
+  | "Holiday Calendar"
+  | "Company Policies"
+  | "Circular"
+  | "Notice"
+  | "Forms"
+  | "Agreement"
+  | "Purchase Order"
+  | "Work Order"
+  | "Invoice Copy"
   | "Credit Note"
+  | "Resume"
+  | "Joining Documents"
+  | "Invoice"
+  | "Expense Bill"
+  | "GST Report"
+  | "Bank Statement"
+  | "Report"
+  | "Payslip"
+  | "Salary Certificate"
   | "Payment Receipt"
   | "Payment Advice"
   | "Candidate Payroll"
@@ -48,197 +87,60 @@ export type DocumentStatus =
   | "Archived";
 
 export interface Document {
-  // ==================================================
-  // Firestore
-  // ==================================================
-
-  /**
-   * Firestore Document ID
-   */
   id?: string;
-
-  /**
-   * Human Readable Document Number
-   * Example:
-   * DOC000001
-   */
   documentId: string;
-
-  // ==================================================
-  // Organization
-  // ==================================================
-
   companyId: string;
-
   branchId: string;
 
-  // ==================================================
-  // Document Information
-  // ==================================================
-
-  /**
-   * HR
-   * Payroll
-   * Finance
-   */
   category: DocumentCategory;
-
-  /**
-   * Offer
-   * Employee
-   * Payroll
-   */
   module: DocumentModule;
-
-  /**
-   * Offer Letter
-   * Payslip
-   * Invoice
-   */
   documentType: DocumentType;
-
-  /**
-   * Related Record ID
-   *
-   * Example
-   * OFF000001
-   * HH000001
-   */
   referenceId: string;
-
-  /**
-   * Display Title
-   */
   title: string;
-
-  /**
-   * Generated File Name
-   */
   fileName: string;
-
-  /**
-   * Document Version
-   */
   version: number;
-
-  /**
-   * Current Status
-   */
   status: DocumentStatus;
 
-  // ==================================================
-  // Storage
-  // ==================================================
-
-  /**
-   * Firebase Storage Path
-   */
   storagePath: string;
-
-  /**
-   * Download URL
-   */
   downloadUrl: string;
-
-  /**
-   * File Size (Bytes)
-   */
   fileSize: number;
-
-  /**
-   * application/pdf
-   */
   mimeType: string;
 
-  // ==================================================
-  // Signature
-  // ==================================================
-
-  /**
-   * Whether signature is required
-   */
   requiresSignature: boolean;
-
-  /**
-   * Whether document is signed
-   */
   isSigned: boolean;
-
-  /**
-   * Signed By
-   */
   signedBy: string;
-
-  /**
-   * Signed Date
-   */
   signedAt?: unknown;
 
-  // ==================================================
-  // QR Verification
-  // ==================================================
-
-  /**
-   * QR Verification URL
-   */
   qrCodeUrl: string;
 
-  // ==================================================
-  // Security
-  // ==================================================
-
-  /**
-   * Lock document after approval
-   */
   isLocked: boolean;
-
   lockedAt?: unknown;
 
-  // ==================================================
-  // Generated Details
-  // ==================================================
-
   generatedBy: string;
-
   generatedAt?: unknown;
 
-  // ==================================================
-  // Email
-  // ==================================================
-
   emailed: boolean;
-
   emailedTo: string;
-
   emailedAt?: unknown;
 
-  // ==================================================
-  // Download
-  // ==================================================
-
   downloadCount: number;
-
   lastDownloadedAt?: unknown;
 
-  // ==================================================
-  // Archive
-  // ==================================================
-
   archived: boolean;
-
   archivedAt?: unknown;
 
-  // ==================================================
-  // Audit
-  // ==================================================
+  // Assignment & Master Ownership (Sprint 02.9.5)
+  targetType?: TargetType;
+  sharedWith?: string;
+  assignedToId?: string;
+  description?: string;
+  tags?: string[];
+  effectiveDate?: string;
+  expiryDate?: string;
 
   remarks: string;
-
   createdBy: string;
-
   updatedBy: string;
-
   createdAt?: unknown;
-
   updatedAt?: unknown;
 }

@@ -1,88 +1,44 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-
-import { db } from "../../firebase/firebase";
 import type { Designation } from "../../types/Designation";
+import { adminService } from "../admin/adminService";
 
-const COLLECTION = "designations";
-
-/**
- * Get all designations
- */
 export async function getDesignations(): Promise<Designation[]> {
-  try {
-    const q = query(
-      collection(db, COLLECTION),
-      orderBy("name")
-    );
-
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map((item) => ({
-      id: item.id,
-      ...(item.data() as Omit<Designation, "id">),
-    }));
-  } catch (error) {
-    console.error("Error loading designations:", error);
-    throw error;
-  }
+  const desigs = await adminService.getDesignations();
+  return desigs.map((d) => ({
+    id: d.id,
+    name: d.name,
+    departmentId: d.departmentId,
+    departmentName: d.departmentName,
+    isActive: d.isActive,
+  })) as unknown as Designation[];
 }
 
-/**
- * Create designation
- */
-export async function createDesignation(
-  designation: Designation
-): Promise<void> {
-  try {
-    await addDoc(collection(db, COLLECTION), {
-      ...designation,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Create Designation Error:", error);
-    throw error;
-  }
+export async function createDesignation(designation: Designation): Promise<void> {
+  await adminService.saveDesignation(
+    {
+      id: designation.id || designation.name.toLowerCase().replace(/\s+/g, '-'),
+      name: designation.name,
+      departmentId: designation.departmentId || '',
+      departmentName: designation.departmentName || '',
+      isActive: true,
+    },
+    'system',
+    'System Integration'
+  );
 }
 
-/**
- * Update designation
- */
-export async function updateDesignation(
-  id: string,
-  designation: Designation
-): Promise<void> {
-  try {
-    await updateDoc(doc(db, COLLECTION, id), {
-      ...designation,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Update Designation Error:", error);
-    throw error;
-  }
+export async function updateDesignation(id: string, designation: Designation): Promise<void> {
+  await adminService.updateDesignation(
+    id,
+    {
+      name: designation.name,
+      departmentId: designation.departmentId,
+      departmentName: designation.departmentName,
+    },
+    'system',
+    'System Integration'
+  );
 }
 
-/**
- * Delete designation
- */
-export async function deleteDesignation(
-  id: string
-): Promise<void> {
-  try {
-    await deleteDoc(doc(db, COLLECTION, id));
-  } catch (error) {
-    console.error("Delete Designation Error:", error);
-    throw error;
-  }
+export async function deleteDesignation(id: string): Promise<void> {
+  await adminService.updateDesignation(id, { isActive: false }, 'system', 'System Integration');
 }

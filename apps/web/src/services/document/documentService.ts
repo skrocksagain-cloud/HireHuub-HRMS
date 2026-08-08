@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -26,6 +25,7 @@ export interface DocumentMetadataService {
   getByModule(module: Document['module']): Promise<Document[]>;
   getByReference(referenceId: string): Promise<Document[]>;
   archive(id: string): Promise<void>;
+  assign(id: string, assignedToId: string, sharedWith: string): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
@@ -48,6 +48,13 @@ const requireIdentifier = (value: string, label: string): string => {
   }
 
   return value;
+};
+
+const getMillis = (value: unknown): number => {
+  if (value && typeof value === 'object' && 'toMillis' in value && typeof (value as { toMillis: () => number }).toMillis === 'function') {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  return 0;
 };
 
 export const documentService: DocumentMetadataService = {
@@ -103,9 +110,9 @@ export const documentService: DocumentMetadataService = {
 
   async getAll() {
     try {
-      const snapshot = await getDocs(query(documentsCollection, orderBy('createdAt', 'desc')));
-
-      return snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      const snapshot = await getDocs(documentsCollection);
+      const docs = snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      return docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
     } catch (error) {
       throw createDocumentError('fetch all', error);
     }
@@ -114,10 +121,10 @@ export const documentService: DocumentMetadataService = {
   async getByModule(module) {
     try {
       const snapshot = await getDocs(
-        query(documentsCollection, where('module', '==', module), orderBy('createdAt', 'desc')),
+        query(documentsCollection, where('module', '==', module)),
       );
-
-      return snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      const docs = snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      return docs.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
     } catch (error) {
       throw createDocumentError('fetch by module', error);
     }
@@ -129,11 +136,10 @@ export const documentService: DocumentMetadataService = {
         query(
           documentsCollection,
           where('referenceId', '==', requireIdentifier(referenceId, 'Reference ID')),
-          orderBy('version', 'desc'),
         ),
       );
-
-      return snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      const docs = snapshot.docs.map((item) => toDocument(item.id, item.data()));
+      return docs.sort((a, b) => (b.version ?? 1) - (a.version ?? 1));
     } catch (error) {
       throw createDocumentError('fetch by reference', error);
     }
@@ -149,6 +155,19 @@ export const documentService: DocumentMetadataService = {
       });
     } catch (error) {
       throw createDocumentError('archive', error);
+    }
+  },
+
+  async assign(id: string, assignedToId: string, sharedWith: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, COLLECTION_NAME, requireIdentifier(id, 'Document ID')), {
+        assignedToId,
+        referenceId: assignedToId,
+        sharedWith,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      throw createDocumentError('assign', error);
     }
   },
 
@@ -169,4 +188,5 @@ export const getDocuments = documentService.getAll;
 export const getDocumentsByModule = documentService.getByModule;
 export const getDocumentsByReference = documentService.getByReference;
 export const archiveDocument = documentService.archive;
+export const assignDocument = documentService.assign;
 export const deleteDocument = documentService.delete;

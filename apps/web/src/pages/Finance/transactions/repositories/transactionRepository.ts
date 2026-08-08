@@ -7,13 +7,48 @@ const EXPENSE_TRANSACTIONS_COLLECTION = 'expenseTransactions';
 const EXPENSE_LEDGER_COLLECTION = 'expenseLedger';
 const expenseCategoriesCollection = collection(db, 'settings', 'finance', 'expenseCategories');
 const paymentSourcesCollection = collection(db, 'settings', 'finance', 'paymentSources');
-// Network owns these records. Transactions only reads them to resolve an expense reference.
 const associatePartnersCollection = collection(db, 'associatePartners');
 const timestamp = (value: unknown): Timestamp => value instanceof Timestamp ? value : Timestamp.now();
 
 const expenseTransactionFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): ExpenseTransaction => {
   const data = snapshot.data();
-  return { id: snapshot.id, transactionNumber: String(data.transactionNumber ?? ''), transactionDate: String(data.transactionDate ?? ''), expenseCategoryId: String(data.expenseCategoryId ?? ''), expenseCategoryName: String(data.expenseCategoryName ?? ''), associatePartnerId: data.associatePartnerId === undefined ? undefined : String(data.associatePartnerId), associatePartnerName: data.associatePartnerName === undefined ? undefined : String(data.associatePartnerName), paidFromId: String(data.paidFromId ?? ''), paidFromName: String(data.paidFromName ?? ''), amount: Number(data.amount ?? 0), description: String(data.description ?? ''), referenceNumber: String(data.referenceNumber ?? ''), notes: String(data.notes ?? ''), status: data.status as ExpenseTransactionStatus, statusHistory: (data.statusHistory ?? []).map((entry: ExpenseTransactionStatusHistoryEntry) => ({ ...entry, changedAt: timestamp(entry.changedAt) })), createdBy: String(data.createdBy ?? ''), createdAt: timestamp(data.createdAt), updatedAt: timestamp(data.updatedAt) };
+  return {
+    id: snapshot.id,
+    expenseNumber: String(data.expenseNumber ?? data.transactionNumber ?? `HHEXP2026-${snapshot.id.slice(0, 4)}`),
+    transactionNumber: String(data.transactionNumber ?? ''),
+    transactionDate: String(data.transactionDate ?? ''),
+
+    expenseCategoryId: String(data.expenseCategoryId ?? ''),
+    expenseCategoryName: String(data.expenseCategoryName ?? ''),
+    expenseType: String(data.expenseType ?? data.expenseCategoryName ?? 'Miscellaneous'),
+
+    paidFromId: String(data.paidFromId ?? ''),
+    paidFromName: String(data.paidFromName ?? ''),
+    paidFrom: String(data.paidFrom ?? data.paidFromAccount ?? data.paidFromName ?? 'HDFC Current Account'),
+
+    paidById: data.paidById ? String(data.paidById) : undefined,
+    paidByName: data.paidByName ? String(data.paidByName) : undefined,
+
+    beneficiary: String(data.beneficiary ?? 'Vendor'),
+    paymentMethod: data.paymentMethod ?? 'NEFT',
+
+    associatePartnerId: data.associatePartnerId === undefined ? undefined : String(data.associatePartnerId),
+    associatePartnerName: data.associatePartnerName === undefined ? undefined : String(data.associatePartnerName),
+
+    amount: Number(data.amount ?? 0),
+    description: String(data.description ?? ''),
+    referenceNumber: String(data.referenceNumber ?? ''),
+    notes: String(data.notes ?? ''),
+
+    attachmentName: data.attachmentName ? String(data.attachmentName) : undefined,
+    attachmentUrl: data.attachmentUrl ? String(data.attachmentUrl) : undefined,
+
+    status: data.status as ExpenseTransactionStatus,
+    statusHistory: (data.statusHistory ?? []).map((entry: ExpenseTransactionStatusHistoryEntry) => ({ ...entry, changedAt: timestamp(entry.changedAt) })),
+    createdBy: String(data.createdBy ?? ''),
+    createdAt: timestamp(data.createdAt),
+    updatedAt: timestamp(data.updatedAt),
+  };
 };
 
 const categoryFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): ExpenseCategory => {
@@ -33,7 +68,23 @@ const paymentSourceFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): Payme
 
 const ledgerEntryFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): ExpenseLedgerEntry => {
   const data = snapshot.data();
-  return { id: snapshot.id, transactionId: String(data.transactionId ?? ''), transactionNumber: String(data.transactionNumber ?? ''), date: String(data.date ?? ''), expenseCategoryId: String(data.expenseCategoryId ?? ''), expenseCategoryName: String(data.expenseCategoryName ?? ''), amount: Number(data.amount ?? 0), paidFromId: String(data.paidFromId ?? ''), paidFromName: String(data.paidFromName ?? ''), description: String(data.description ?? ''), createdAt: timestamp(data.createdAt) };
+  return {
+    id: snapshot.id,
+    transactionId: String(data.transactionId ?? ''),
+    transactionNumber: String(data.transactionNumber ?? ''),
+    expenseNumber: String(data.expenseNumber ?? data.transactionNumber ?? ''),
+    date: String(data.date ?? ''),
+    expenseCategoryId: String(data.expenseCategoryId ?? ''),
+    expenseCategoryName: String(data.expenseCategoryName ?? ''),
+    amount: Number(data.amount ?? 0),
+    paidFromId: String(data.paidFromId ?? ''),
+    paidFromName: String(data.paidFromName ?? ''),
+    paidFrom: String(data.paidFrom ?? ''),
+    paidByName: data.paidByName ? String(data.paidByName) : undefined,
+    beneficiary: String(data.beneficiary ?? ''),
+    description: String(data.description ?? ''),
+    createdAt: timestamp(data.createdAt),
+  };
 };
 
 export interface TransactionRepository {
@@ -78,11 +129,15 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   async createDraftExpense(transaction: Omit<ExpenseTransaction, 'id' | 'status' | 'statusHistory' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const draftStatus: ExpenseTransactionStatus = 'Draft';
-    const { associatePartnerId, associatePartnerName, ...transactionFields } = transaction;
+    const { associatePartnerId, associatePartnerName, attachmentName, attachmentUrl, paidById, paidByName, ...transactionFields } = transaction;
     const result = await addDoc(collection(db, EXPENSE_TRANSACTIONS_COLLECTION), {
       ...transactionFields,
       ...(associatePartnerId === undefined ? {} : { associatePartnerId }),
       ...(associatePartnerName === undefined ? {} : { associatePartnerName }),
+      ...(attachmentName === undefined ? {} : { attachmentName }),
+      ...(attachmentUrl === undefined ? {} : { attachmentUrl }),
+      ...(paidById === undefined ? {} : { paidById }),
+      ...(paidByName === undefined ? {} : { paidByName }),
       status: draftStatus,
       statusHistory: [{ status: draftStatus, changedAt: Timestamp.now(), changedBy: transaction.createdBy, remarks: 'Expense transaction recorded.' }],
       createdAt: serverTimestamp(),

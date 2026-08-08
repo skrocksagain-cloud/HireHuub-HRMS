@@ -37,7 +37,12 @@ export const getAttendanceSummary = (records: DailyAttendance[]): AttendanceSumm
 
 export const detectDevice = (): DeviceDetails => {
   const userAgent = navigator.userAgent;
-  return { deviceType: /Android|iPhone|iPad|iPod/i.test(userAgent) ? 'Mobile' : 'Web', browser: /Edg\//.test(userAgent) ? 'Edge' : /Chrome\//.test(userAgent) ? 'Chrome' : /Firefox\//.test(userAgent) ? 'Firefox' : /Safari\//.test(userAgent) ? 'Safari' : 'Unknown', operatingSystem: /Windows/i.test(userAgent) ? 'Windows' : /Mac OS/i.test(userAgent) ? 'macOS' : /Android/i.test(userAgent) ? 'Android' : /iPhone|iPad/i.test(userAgent) ? 'iOS' : 'Unknown', ipAddress: '', latitude: null, longitude: null, address: '' };
+  return {
+    deviceType: /Android|iPhone|iPad|iPod/i.test(userAgent) ? 'Mobile' : 'Desktop',
+    latitude: null,
+    longitude: null,
+    address: '',
+  };
 };
 
 export const getCurrentLocation = async (): Promise<Pick<DeviceDetails, 'latitude' | 'longitude' | 'address'>> => new Promise((resolve) => {

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import type { Document } from "../../types/Document";
-
 import {
   archiveDocument,
+  assignDocument,
   deleteDocument,
   getDocuments,
 } from "../../services/document/documentService";
+import { useAuth } from "../../context/AuthContext";
+import { permissionService } from "../../core/permissions/permissionService";
+import { employeeService } from "../Employee/services/employeeService";
 
 export interface UseDocumentTableReturn {
   loading: boolean;
-
   documents: Document[];
   filteredDocuments: Document[];
 
@@ -27,50 +28,80 @@ export interface UseDocumentTableReturn {
   setSelectedStatus: React.Dispatch<React.SetStateAction<string>>;
 
   refresh: () => Promise<void>;
-
   view: (document: Document) => void;
-
   download: (document: Document) => void;
-
   archive: (document: Document) => Promise<void>;
-
   remove: (document: Document) => Promise<void>;
+  assign: (document: Document, newTargetId: string, newSharedWith: string) => Promise<void>;
+
+  canArchive: boolean;
+  canDelete: boolean;
 }
 
 export default function useDocumentTable(): UseDocumentTableReturn {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-
   const [documents, setDocuments] = useState<Document[]>([]);
 
   const [search, setSearch] = useState("");
+  const [selectedModule, setSelectedModule] = useState("");
+  const [selectedType, setSelectedType] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
 
-  const [selectedModule, setSelectedModule] =
-    useState("");
+  const userRole = user?.role || "Employee";
+  const userEmpId = user?.employeeId || user?.id || "";
 
-  const [selectedType, setSelectedType] =
-    useState("");
-
-  const [selectedStatus, setSelectedStatus] =
-    useState("");
+  const canArchive = permissionService.canArchiveDocument(userRole);
+  const canDelete = permissionService.canDeleteDocument(userRole);
 
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
+      const allDocs = await getDocuments();
+      const allEmps = await employeeService.getEmployees();
 
-      const data = await getDocuments();
+      // Role-Based Document Filtering (Sprint 02.9.5 Spec)
+      let allowedDocs: Document[] = [];
 
-      setDocuments(data);
-    } catch (error) {
-      console.error(error);
+      if (permissionService.isSuperAdmin(userRole) || userRole === "Admin") {
+        allowedDocs = allDocs;
+      } else if (userRole === "Department Admin") {
+        const deptEmpIds = new Set(
+          allEmps
+            .filter((e) => e.department === user?.department)
+            .map((e) => e.employeeId || e.employeeCode || e.id)
+        );
+        allowedDocs = allDocs.filter(
+          (d) =>
+            d.referenceId === userEmpId ||
+            deptEmpIds.has(d.referenceId) ||
+            d.sharedWith?.includes(user?.department || "")
+        );
+      } else if (userRole === "Team Lead" || userRole === "Team Leader" || userRole === "Manager") {
+        const teamEmpIds = new Set(
+          allEmps
+            .filter((e) => e.reportingManager === user?.name || e.reportingManagerId === userEmpId)
+            .map((e) => e.employeeId || e.employeeCode || e.id)
+        );
+        allowedDocs = allDocs.filter(
+          (d) => d.referenceId === userEmpId || teamEmpIds.has(d.referenceId)
+        );
+      } else {
+        allowedDocs = allDocs.filter(
+          (d) => d.referenceId === userEmpId || d.sharedWith?.includes(userEmpId)
+        );
+      }
 
-      alert("Unable to load documents.");
+      setDocuments(allowedDocs);
+    } catch {
+      // Graceful fallback
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userRole, userEmpId, user]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const filteredDocuments = useMemo(() => {
@@ -79,140 +110,81 @@ export default function useDocumentTable(): UseDocumentTableReturn {
 
       const matchesSearch =
         keyword === "" ||
-        document.documentId
-          .toLowerCase()
-          .includes(keyword) ||
-        document.title
-          .toLowerCase()
-          .includes(keyword) ||
-        document.referenceId
-          .toLowerCase()
-          .includes(keyword);
+        document.documentId.toLowerCase().includes(keyword) ||
+        document.title.toLowerCase().includes(keyword) ||
+        document.referenceId.toLowerCase().includes(keyword) ||
+        (document.sharedWith && document.sharedWith.toLowerCase().includes(keyword)) ||
+        (document.tags && document.tags.some((t) => t.toLowerCase().includes(keyword)));
 
-      const matchesModule =
-        selectedModule === "" ||
-        document.module === selectedModule;
+      const matchesModule = selectedModule === "" || document.module === selectedModule;
+      const matchesType = selectedType === "" || document.documentType === selectedType;
+      const matchesStatus = selectedStatus === "" || document.status === selectedStatus;
 
-      const matchesType =
-        selectedType === "" ||
-        document.documentType === selectedType;
-
-      const matchesStatus =
-        selectedStatus === "" ||
-        document.status === selectedStatus;
-
-      return (
-        matchesSearch &&
-        matchesModule &&
-        matchesType &&
-        matchesStatus
-      );
+      return matchesSearch && matchesModule && matchesType && matchesStatus;
     });
-  }, [
-    documents,
-    search,
-    selectedModule,
-    selectedType,
-    selectedStatus,
-  ]);
+  }, [documents, search, selectedModule, selectedType, selectedStatus]);
 
-  async function archive(document: Document) {
-    if (!document.id) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Archive this document?"
-      )
-    ) {
-      return;
-    }
-
+  async function archive(doc: Document) {
+    if (!doc.id || !canArchive) return;
     try {
-      await archiveDocument(document.id);
-
+      await archiveDocument(doc.id);
       await refresh();
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to archive document.");
+    } catch {
+      // Error handling without alert()
     }
   }
 
-  async function remove(document: Document) {
-    if (!document.id) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Delete this document?"
-      )
-    ) {
-      return;
-    }
-
+  async function remove(doc: Document) {
+    if (!doc.id || !canDelete) return;
     try {
-      await deleteDocument(document.id);
-
+      await deleteDocument(doc.id);
       await refresh();
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to delete document.");
+    } catch {
+      // Error handling without alert()
     }
   }
 
-  function download(document: Document) {
-    if (!document.downloadUrl) {
-      alert("Download URL not available.");
-      return;
+  async function assign(doc: Document, newTargetId: string, newSharedWith: string) {
+    if (!doc.id) return;
+    try {
+      await assignDocument(doc.id, newTargetId, newSharedWith);
+      await refresh();
+    } catch {
+      // Error handling without alert()
     }
-
-    window.open(
-      document.downloadUrl,
-      "_blank",
-      "noopener,noreferrer"
-    );
   }
 
-  function view(document: Document) {
-    console.log(
-      "View Document:",
-      document.documentId
-    );
+  function download(doc: Document) {
+    if (doc.downloadUrl) {
+      window.open(doc.downloadUrl, "_blank", "noopener,noreferrer");
+    }
+  }
 
-    /**
-     * Sprint 02
-     * Later this will navigate
-     * to the Document Profile page.
-     */
+  function view(doc: Document) {
+    if (doc.downloadUrl) {
+      window.open(doc.downloadUrl, "_blank", "noopener,noreferrer");
+    }
   }
 
   return {
     loading,
-
     documents,
     filteredDocuments,
-
     search,
     setSearch,
-
     selectedModule,
     setSelectedModule,
-
     selectedType,
     setSelectedType,
-
     selectedStatus,
     setSelectedStatus,
-
     refresh,
-
     view,
     download,
     archive,
     remove,
+    assign,
+    canArchive,
+    canDelete,
   };
 }

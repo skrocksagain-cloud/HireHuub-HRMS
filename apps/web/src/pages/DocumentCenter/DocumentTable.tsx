@@ -1,10 +1,7 @@
 import { DataTable } from "../../ui/DataTable";
 import Card from "../../ui/Card";
-
 import useDocumentTable from "./useDocumentTable";
-
 import { getDocumentColumns } from "./components/tables/DocumentColumns";
-
 import {
   DOCUMENT_MODULES,
   DOCUMENT_TYPES,
@@ -15,25 +12,21 @@ export default function DocumentTable() {
   const {
     loading,
     filteredDocuments,
-
     search,
     setSearch,
-
     selectedModule,
     setSelectedModule,
-
     selectedType,
     setSelectedType,
-
     selectedStatus,
     setSelectedStatus,
-
     refresh,
-
     view,
     download,
     archive,
     remove,
+    canArchive,
+    canDelete,
   } = useDocumentTable();
 
   const columns = getDocumentColumns({
@@ -41,86 +34,70 @@ export default function DocumentTable() {
     onDownload: download,
     onArchive: archive,
     onDelete: remove,
+    canArchive,
+    canDelete,
   });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-
       <div>
         <h1 className="text-3xl font-bold text-slate-800">
-          Documents
+          Documents Repository
         </h1>
-
-        <p className="mt-2 text-slate-500">
-          Manage all ERP documents from one place.
+        <p className="mt-2 text-slate-500 text-xs">
+          Manage, search, and track all ERP documents across Employee, Department, Company, Client, Candidate, and Finance domains.
         </p>
       </div>
 
       {/* Filters */}
-
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search by title, ref ID, shared with, tags..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:border-emerald-500"
           />
 
           {/* Module */}
-
           <select
             value={selectedModule}
             onChange={(e) => setSelectedModule(e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:border-emerald-500 font-semibold"
           >
             <option value="">All Modules</option>
-
             {DOCUMENT_MODULES.map((module) => (
-              <option
-                key={module}
-                value={module}
-              >
+              <option key={module} value={module}>
                 {module}
               </option>
             ))}
           </select>
 
           {/* Type */}
-
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:border-emerald-500 font-semibold"
           >
-            <option value="">All Types</option>
-
+            <option value="">All Document Types</option>
             {DOCUMENT_TYPES.map((type) => (
-              <option
-                key={type}
-                value={type}
-              >
+              <option key={type} value={type}>
                 {type}
               </option>
             ))}
           </select>
 
           {/* Status */}
-
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3"
+            className="rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:border-emerald-500 font-semibold"
           >
-            <option value="">All Status</option>
-
+            <option value="">All Statuses</option>
             {DOCUMENT_STATUSES.map((status) => (
-              <option
-                key={status}
-                value={status}
-              >
+              <option key={status} value={status}>
                 {status}
               </option>
             ))}
@@ -129,7 +106,6 @@ export default function DocumentTable() {
       </Card>
 
       {/* Table */}
-
       <DataTable
         data={filteredDocuments}
         columns={columns}
@@ -137,7 +113,7 @@ export default function DocumentTable() {
         searchable={false}
         onRefresh={refresh}
         emptyTitle="No Documents Found"
-        emptyDescription="No documents match the selected filters."
+        emptyDescription="No documents match the selected filters or assigned visibility."
       />
     </div>
   );

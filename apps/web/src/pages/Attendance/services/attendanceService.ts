@@ -3,7 +3,7 @@ import { notificationService } from '../../../core/notifications/notificationSer
 import { permissionService } from '../../../core/permissions/permissionService';
 import { MINIMUM_HALF_DAY_WORK_MINUTES } from '../constants/attendance';
 import { attendanceRepository } from '../repositories/attendanceRepository';
-import { getAttendanceStatusForLogin, getLocalAttendanceDate, getMonthBounds, getNonWorkingStatus } from '../utils/attendance';
+import { getAttendanceStatusForLogin, getLocalAttendanceDate, getMonthBounds } from '../utils/attendance';
 import { validateAttendanceDecision, validateAttendanceRequest } from '../validation/attendanceValidation';
 import type { AttendanceActor, AttendanceApprovalInput, AttendanceDashboardData, AttendanceRequestType, DeviceDetails } from '../types/attendance';
 
@@ -27,9 +27,6 @@ class AttendanceService {
     const existing = await attendanceRepository.getDaily(actor.employeeId, attendanceDate);
     if (existing?.loginTime) throw new Error('Attendance has already been started for today.');
     if (existing?.isLocked) throw new Error('Attendance for this date is locked.');
-    const [isHoliday, hasLeave] = await Promise.all([attendanceRepository.isHoliday(attendanceDate), attendanceRepository.hasApprovedLeave(actor.employeeId, attendanceDate)]);
-    const nonWorkingStatus = getNonWorkingStatus(now, isHoliday, hasLeave);
-    if (nonWorkingStatus) throw new Error(`Attendance cannot be started because today is marked as ${nonWorkingStatus}.`);
     await attendanceRepository.createDaily({ documentType: 'daily', employeeId: actor.employeeId, employeeName: actor.name, department: actor.department, attendanceDate, status: getAttendanceStatusForLogin(now), loginTime: null, logoutTime: null, totalWorkMinutes: 0, isLocked: false, ...device });
     await auditService.record({ module: 'Attendance', action: 'Login', recordId: `${actor.employeeId}:${attendanceDate}`, performedBy: actor.employeeId, role: actor.role, remarks: 'Attendance session started.' });
     await notificationService.send({ recipientEmployeeId: actor.employeeId, title: 'Attendance started', message: 'Your attendance login was recorded successfully.', module: 'Attendance', type: 'success' });

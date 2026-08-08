@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, Timestamp, updateDoc, where, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, limit, query, serverTimestamp, Timestamp, updateDoc, where, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '../../../firebase/firebase';
 import { ATTENDANCE_COLLECTION, HOLIDAYS_COLLECTION, LEAVE_REQUESTS_COLLECTION } from '../constants/attendance';
@@ -40,23 +40,27 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   async getDailyForEmployee(employeeId: string, from: string, to: string): Promise<DailyAttendance[]> {
-    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily'), where('employeeId', '==', employeeId), where('attendanceDate', '>=', from), where('attendanceDate', '<=', to), orderBy('attendanceDate', 'desc')));
-    return result.docs.map(dailyFrom);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily'), where('employeeId', '==', employeeId)));
+    const list = result.docs.map(dailyFrom).filter((item) => item.attendanceDate >= from && item.attendanceDate <= to);
+    return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
   }
 
   async getDailyForOrganization(from: string, to: string): Promise<DailyAttendance[]> {
-    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily'), where('attendanceDate', '>=', from), where('attendanceDate', '<=', to), orderBy('attendanceDate', 'desc')));
-    return result.docs.map(dailyFrom);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily')));
+    const list = result.docs.map(dailyFrom).filter((item) => item.attendanceDate >= from && item.attendanceDate <= to);
+    return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
   }
 
   async getRequestsForEmployee(employeeId: string): Promise<AttendanceRequest[]> {
-    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('employeeId', '==', employeeId), orderBy('createdAt', 'desc')));
-    return result.docs.map(requestFrom);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('employeeId', '==', employeeId)));
+    const list = result.docs.map(requestFrom);
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }
 
   async getPendingRequests(): Promise<AttendanceRequest[]> {
-    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('status', '==', 'Pending'), orderBy('createdAt', 'desc')));
-    return result.docs.map(requestFrom);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('status', '==', 'Pending')));
+    const list = result.docs.map(requestFrom);
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }
 
   async createDaily(record: Omit<DailyAttendance, 'id' | 'createdAt' | 'updatedAt'> & DeviceDetails): Promise<DailyAttendance> {

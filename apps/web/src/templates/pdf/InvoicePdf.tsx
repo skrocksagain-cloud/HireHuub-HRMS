@@ -12,6 +12,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', textAlign: 'right' },
   companyName: { fontSize: 13, fontWeight: 'bold', color: '#0F172A' },
   text: { fontSize: 9, color: '#475569', lineHeight: 1.45 },
+  boldText: { fontSize: 9, fontWeight: 'bold', color: '#0F172A' },
   section: { marginBottom: 14 },
   label: { fontSize: 9, fontWeight: 'bold', color: '#0F172A', marginBottom: 3 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -22,12 +23,14 @@ const styles = StyleSheet.create({
   description: { width: '40%' },
   quantity: { width: '12%', textAlign: 'right' },
   amount: { width: '16%', textAlign: 'right' },
-  totals: { marginLeft: '55%', marginTop: 12 },
+  totals: { marginLeft: '50%', marginTop: 12 },
   total: { fontSize: 11, fontWeight: 'bold', color: '#0F172A', marginTop: 4 },
+  wordsBox: { marginTop: 10, padding: 6, backgroundColor: '#F8FAFC', borderRadius: 4, borderWidth: 1, borderColor: '#E2E8F0' },
   footer: { marginTop: 24, borderTopWidth: 1, borderTopColor: '#CBD5E1', paddingTop: 10 },
 });
 
-const formatAddress = (address: InvoiceSnapshot['company']['registeredAddress']): string => [address.line1, address.line2, address.city, address.state, address.postalCode, address.country].filter(Boolean).join(', ');
+const formatAddress = (address: InvoiceSnapshot['company']['registeredAddress']): string =>
+  [address.line1, address.line2, address.city, address.state, address.postalCode, address.country].filter(Boolean).join(', ');
 const formatCurrency = (value: number): string => `₹${value.toFixed(2)}`;
 
 export default function InvoicePdf({ invoice }: InvoicePdfProps) {
@@ -41,7 +44,10 @@ export default function InvoicePdf({ invoice }: InvoicePdfProps) {
         <Text style={styles.text}>{companyAddress}</Text>
         <Text style={styles.text}>GSTIN: {invoice.company.gstin} | PAN: {invoice.company.pan}</Text>
         <Text style={styles.title}>TAX INVOICE</Text>
-        <Text style={styles.text}>Invoice No: {invoice.invoiceNumber} | Date: {invoice.invoiceDate}</Text>
+        <Text style={styles.text}>
+          Invoice No: {invoice.invoiceNumber} | Date: {invoice.invoiceDate}
+          {invoice.poNumber ? ` | PO No: ${invoice.poNumber}` : ''}
+        </Text>
       </View>
 
       <View style={styles.section}>
@@ -69,15 +75,53 @@ export default function InvoicePdf({ invoice }: InvoicePdfProps) {
       ))}
 
       <View style={styles.totals}>
-        <View style={styles.row}><Text style={styles.text}>Taxable Amount</Text><Text style={styles.text}>{formatCurrency(invoice.taxableAmount)}</Text></View>
-        {invoice.gst.type === 'CGST_SGST' ? <><View style={styles.row}><Text style={styles.text}>CGST</Text><Text style={styles.text}>{formatCurrency(invoice.gst.cgstAmount)}</Text></View><View style={styles.row}><Text style={styles.text}>SGST</Text><Text style={styles.text}>{formatCurrency(invoice.gst.sgstAmount)}</Text></View></> : <View style={styles.row}><Text style={styles.text}>IGST</Text><Text style={styles.text}>{formatCurrency(invoice.gst.igstAmount)}</Text></View>}
-        <View style={styles.row}><Text style={styles.total}>Grand Total</Text><Text style={styles.total}>{formatCurrency(invoice.grandTotal)}</Text></View>
+        <View style={styles.row}>
+          <Text style={styles.text}>Taxable Amount</Text>
+          <Text style={styles.text}>{formatCurrency(invoice.taxableAmount)}</Text>
+        </View>
+        {invoice.gst.type === 'CGST_SGST' ? (
+          <>
+            <View style={styles.row}>
+              <Text style={styles.text}>CGST</Text>
+              <Text style={styles.text}>{formatCurrency(invoice.gst.cgstAmount)}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.text}>SGST</Text>
+              <Text style={styles.text}>{formatCurrency(invoice.gst.sgstAmount)}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.row}>
+            <Text style={styles.text}>IGST</Text>
+            <Text style={styles.text}>{formatCurrency(invoice.gst.igstAmount)}</Text>
+          </View>
+        )}
+        <View style={styles.row}>
+          <Text style={styles.total}>Grand Total</Text>
+          <Text style={styles.total}>{formatCurrency(invoice.grandTotal)}</Text>
+        </View>
       </View>
+
+      {invoice.amountInWords && (
+        <View style={styles.wordsBox}>
+          <Text style={styles.boldText}>Amount in Words: {invoice.amountInWords}</Text>
+        </View>
+      )}
+
+      {invoice.remarks && (
+        <View style={{ marginTop: 8 }}>
+          <Text style={styles.text}>Remarks: {invoice.remarks}</Text>
+        </View>
+      )}
 
       <View style={styles.footer}>
         <Text style={styles.label}>Bank Details</Text>
-        <Text style={styles.text}>{invoice.company.bankDetails.accountHolderName} | {invoice.company.bankDetails.bankName}</Text>
-        <Text style={styles.text}>A/C: {invoice.company.bankDetails.accountNumber} | IFSC: {invoice.company.bankDetails.ifscCode}</Text>
+        <Text style={styles.text}>
+          {invoice.company.bankDetails.accountHolderName} | {invoice.company.bankDetails.bankName}
+        </Text>
+        <Text style={styles.text}>
+          A/C: {invoice.company.bankDetails.accountNumber} | IFSC: {invoice.company.bankDetails.ifscCode}
+        </Text>
         <Text style={styles.text}>Authorized Signatory: {invoice.company.authorizedSignatory}</Text>
       </View>
     </DocumentLayoutPdf>

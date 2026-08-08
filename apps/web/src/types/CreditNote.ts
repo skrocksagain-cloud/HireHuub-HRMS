@@ -62,7 +62,9 @@ export interface CreditNoteDocumentStorage {
 
 export interface CreditNote {
   id: string;
+  creditNoteNumber?: string;
   originalInvoiceId: string;
+  originalInvoiceNumber?: string;
   creditType: CreditNoteType;
   creditDate: string;
   reason: string;

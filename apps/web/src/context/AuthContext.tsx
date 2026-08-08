@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 
 export interface Employee {
   employeeId: string;
+  id?: string;
   name: string;
   designation: string;
   role: string;
+  department?: string;
 }
 
 interface AuthContextType {

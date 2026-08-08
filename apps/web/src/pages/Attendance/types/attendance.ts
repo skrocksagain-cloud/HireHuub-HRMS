@@ -12,10 +12,7 @@ export interface AttendanceActor {
 }
 
 export interface DeviceDetails {
-  deviceType: 'Web' | 'Mobile';
-  browser: string;
-  operatingSystem: string;
-  ipAddress: string;
+  deviceType: 'Mobile' | 'Desktop';
   latitude: number | null;
   longitude: number | null;
   address: string;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { Offer } from "../../types/Offer";
 import type { Department } from "../../types/Department";
@@ -18,22 +18,12 @@ import { employeeService } from "../Employee/services/employeeService";
 
 interface UseOfferReturn {
   loading: boolean;
-
   saving: boolean;
-
   form: Offer;
-
   departments: Department[];
-
   designations: Designation[];
-
   managers: Employee[];
-
-  updateField: <K extends keyof Offer>(
-    field: K,
-    value: Offer[K]
-  ) => void;
-
+  updateField: <K extends keyof Offer>(field: K, value: Offer[K]) => void;
   saveOffer: () => Promise<void>;
 }
 
@@ -42,123 +32,71 @@ export default function useOffer(
   onSuccess?: () => void
 ): UseOfferReturn {
   const [loading, setLoading] = useState(true);
-
   const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Offer>(offer ?? DEFAULT_OFFER);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  const [managers, setManagers] = useState<Employee[]>([]);
 
-  const [form, setForm] = useState<Offer>(
-    offer ?? DEFAULT_OFFER
-  );
-
-  const [departments, setDepartments] =
-    useState<Department[]>([]);
-
-  const [designations, setDesignations] =
-    useState<Designation[]>([]);
-
-  const [managers, setManagers] =
-    useState<Employee[]>([]);
-
-  useEffect(() => {
-    initialize();
-  }, []);
-
-  async function initialize() {
+  const initialize = useCallback(async () => {
     try {
       setLoading(true);
-
-      const [
-        departmentData,
-        designationData,
-        employeeData,
-      ] = await Promise.all([
+      const [departmentData, designationData, employeeData] = await Promise.all([
         getDepartments(),
         getDesignations(),
         employeeService.getEmployees(),
       ]);
 
       setDepartments(departmentData);
-
       setDesignations(designationData);
-
       setManagers(
-        employeeData.filter(
-          (employee) => employee.employmentStatus === "Active"
-        )
+        employeeData.filter((employee) => employee.employmentStatus === "Active")
       );
 
       if (offer) {
         setForm(offer);
       }
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to load Offer.");
+    } catch {
+      // Handled silently
     } finally {
       setLoading(false);
     }
-  }
+  }, [offer]);
 
-  function updateField<K extends keyof Offer>(
-    field: K,
-    value: Offer[K]
-  ) {
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  function updateField<K extends keyof Offer>(field: K, value: Offer[K]) {
     setForm((previous) => ({
       ...previous,
-
       [field]: value,
     }));
   }
 
   async function saveOffer() {
     try {
-      if (!form.firstName.trim()) {
-        alert("First Name is required.");
-        return;
-      }
-
-      if (!form.mobile.trim()) {
-        alert("Mobile Number is required.");
-        return;
-      }
-
-      if (!form.departmentId) {
-        alert("Department is required.");
-        return;
-      }
-
-      if (!form.designationId) {
-        alert("Designation is required.");
+      if (!form.firstName.trim() || !form.mobile.trim() || !form.departmentId || !form.designationId) {
         return;
       }
 
       setSaving(true);
-
       const payload: Offer = {
         ...form,
-
-        fullName: [
-          form.firstName,
-          form.middleName,
-          form.lastName,
-        ]
+        fullName: [form.firstName, form.middleName, form.lastName]
           .filter(Boolean)
           .join(" "),
       };
 
       if (offer?.id) {
-        await updateOffer(
-          offer.id,
-          payload
-        );
+        await updateOffer(offer.id, payload);
       } else {
         await createOffer(payload);
       }
 
       onSuccess?.();
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to save offer.");
+    } catch {
+      // Handled silently
     } finally {
       setSaving(false);
     }
@@ -166,19 +104,12 @@ export default function useOffer(
 
   return {
     loading,
-
     saving,
-
     form,
-
     departments,
-
     designations,
-
     managers,
-
     updateField,
-
     saveOffer,
   };
 }

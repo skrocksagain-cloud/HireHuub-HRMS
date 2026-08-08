@@ -50,6 +50,7 @@ export interface BillingRepository {
   createBillingCompany(company: BillingCompanyInput): Promise<string>;
   updateBillingCompany(id: string, company: BillingCompanyInput): Promise<void>;
   nextInvoiceSequence(billingCompanyId: string, financialYear: string): Promise<number>;
+  getCurrentInvoiceSequence(billingCompanyId: string, financialYear: string): Promise<number>;
   nextCreditNoteSequence(billingCompanyId: string, financialYear: string): Promise<number>;
   nextTransactionSequence(billingCompanyId: string, financialYear: string): Promise<number>;
 }
@@ -83,6 +84,19 @@ class FirestoreBillingRepository implements BillingRepository {
 
   async nextInvoiceSequence(billingCompanyId: string, financialYear: string): Promise<number> {
     return this.nextSequence(billingCompanyId, financialYear, 'invoice');
+  }
+
+  async getCurrentInvoiceSequence(billingCompanyId: string, financialYear: string): Promise<number> {
+    const counterId = `${billingCompanyId}_invoice_${financialYear}`;
+    try {
+      const counter = await getDoc(doc(db, BILLING_COUNTERS_COLLECTION, counterId));
+      if (counter.exists()) {
+        return Number(counter.data()?.lastSequence ?? 0);
+      }
+    } catch {
+      // Fallback
+    }
+    return 0;
   }
 
   async nextCreditNoteSequence(billingCompanyId: string, financialYear: string): Promise<number> {

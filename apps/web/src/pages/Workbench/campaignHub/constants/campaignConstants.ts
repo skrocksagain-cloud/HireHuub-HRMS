@@ -1,0 +1,190 @@
+import type {
+  CampaignSource,
+  CampaignType,
+  CampaignStatus,
+  OfflineMaterialType,
+  CampaignMaster,
+} from '../types/campaign';
+
+export const CAMPAIGN_SOURCES: CampaignSource[] = [
+  'Facebook',
+  'Instagram',
+  'WorkIndia',
+  'Apna',
+  'Indeed',
+  'Referral',
+  'Website',
+  'Walk-in',
+  'Advertisement',
+  'Poster',
+  'Pamphlet',
+  'Job Fair',
+  'College Drive',
+  'Other',
+];
+
+export const CAMPAIGN_TYPES: CampaignType[] = ['Online', 'Offline'];
+
+export const CAMPAIGN_STATUSES: CampaignStatus[] = [
+  'Draft',
+  'Running',
+  'Completed',
+  'Cancelled',
+  'Archived',
+];
+
+export const OFFLINE_MATERIAL_TYPES: OfflineMaterialType[] = [
+  'Poster',
+  'Pamphlet',
+  'Banner',
+  'Advertisement',
+  'Hoarding',
+  'College Drive',
+  'Job Fair',
+  'Newspaper',
+];
+
+export const SAMPLE_LOCATION_MASTER: Record<string, Record<string, string[]>> = {
+  'West Bengal': {
+    Kolkata: ['Kasba', 'Behala', 'Tollygunge', 'Salt Lake', 'New Town', 'Howrah'],
+    Siliguri: ['Matigara', 'Pradhan Nagar', 'Bhakti Nagar'],
+  },
+  Maharashtra: {
+    Mumbai: ['Andheri', 'Bandra', 'Kurlas', 'Thane'],
+    Pune: ['Hinjewadi', 'Viman Nagar', 'Kothrud'],
+  },
+  Karnataka: {
+    Bengaluru: ['Whitefield', 'Electronic City', 'Koramangala', 'HSR Layout'],
+  },
+  Delhi: {
+    Delhi: ['Connaught Place', 'Dwarka', 'Nehru Place', 'Saket'],
+  },
+};
+
+export const MOCK_CAMPAIGNS: CampaignMaster[] = [
+  {
+    id: 'HHCMP000001',
+    campaignNumber: 'HHCMP000001',
+    campaignName: 'Kolkata Q3 Staffing Drive',
+    campaignType: 'Offline',
+    campaignSource: 'Poster',
+    owner: 'Rahul Sharma',
+    description: 'Mass hiring poster campaign across Kasba and Behala hubs for retail staffing.',
+    startDate: '2026-07-01',
+    endDate: '2026-08-31',
+    plannedBudget: 45000,
+    actualSpend: 42000,
+    expectedLeads: 500,
+    actualLeads: 480,
+    expectedJoins: 80,
+    actualJoins: 72,
+    activeCandidatesCount: 65,
+    retainedCandidatesCount: 58,
+    conversionRate: 15,
+    costPerLead: 87.5,
+    costPerJoin: 583.33,
+    offlineDetails: {
+      materialType: 'Poster',
+      vendor: 'Pragati Printers Kolkata',
+      quantity: 2500,
+    },
+    locations: [
+      {
+        state: 'West Bengal',
+        city: 'Kolkata',
+        areas: ['Kasba', 'Behala', 'Tollygunge'],
+        leads: 480,
+        joined: 72,
+        active: 65,
+        conversionRate: 15,
+      },
+    ],
+    primaryState: 'West Bengal',
+    primaryCity: 'Kolkata',
+    primaryArea: 'Kasba',
+    marketingNotes: 'Printed high-visibility vinyl posters deployed in industrial clusters.',
+    campaignOutcome: 'Successfully generated high-density local walk-ins exceeding 90% target.',
+    documentIds: ['DOC-CAMP-001', 'DOC-BILL-104'],
+    sourceAnalytics: [
+      { source: 'Poster', leads: 320, joined: 50, active: 45, conversionRate: 15.6 },
+      { source: 'Pamphlet', leads: 160, joined: 22, active: 20, conversionRate: 13.75 },
+    ],
+    stagePerformances: [
+      { stage: 'Lead', count: 480, percentage: 100 },
+      { stage: 'Interested', count: 320, percentage: 66.67 },
+      { stage: 'Interview', count: 180, percentage: 37.5 },
+      { stage: 'Selected', count: 95, percentage: 19.79 },
+      { stage: 'Joined', count: 72, percentage: 15 },
+      { stage: 'Active', count: 65, percentage: 13.54 },
+      { stage: 'Retained', count: 58, percentage: 12.08 },
+    ],
+    status: 'Running',
+    auditHistory: {
+      createdBy: 'Rahul Sharma (MKT001)',
+      createdDate: '2026-06-25 10:30 AM',
+    },
+  },
+  {
+    id: 'HHCMP000002',
+    campaignNumber: 'HHCMP000002',
+    campaignName: 'Social Media Tech Hiring Drive',
+    campaignType: 'Online',
+    campaignSource: 'Facebook',
+    owner: 'Priya Verma',
+    description: 'Targeted Facebook & Instagram campaign for associate partners and recruiters.',
+    startDate: '2026-06-01',
+    endDate: '2026-07-15',
+    plannedBudget: 60000,
+    actualSpend: 58500,
+    expectedLeads: 800,
+    actualLeads: 920,
+    expectedJoins: 120,
+    actualJoins: 110,
+    activeCandidatesCount: 98,
+    retainedCandidatesCount: 90,
+    conversionRate: 11.95,
+    costPerLead: 63.58,
+    costPerJoin: 531.81,
+    onlineDetails: {
+      platform: 'Meta Ads Manager',
+      campaignUrl: 'https://facebook.com/ads/hirehuub-tech-drive',
+    },
+    locations: [
+      {
+        state: 'Karnataka',
+        city: 'Bengaluru',
+        areas: ['Whitefield', 'HSR Layout'],
+        leads: 920,
+        joined: 110,
+        active: 98,
+        conversionRate: 11.95,
+      },
+    ],
+    primaryState: 'Karnataka',
+    primaryCity: 'Bengaluru',
+    primaryArea: 'Whitefield',
+    marketingNotes: 'Lead gen forms integrated directly with Facebook Meta SDK.',
+    campaignOutcome: 'Highest candidate throughput for Q2 tech roles.',
+    documentIds: ['DOC-CAMP-002'],
+    sourceAnalytics: [
+      { source: 'Facebook', leads: 600, joined: 70, active: 62, conversionRate: 11.66 },
+      { source: 'Instagram', leads: 320, joined: 40, active: 36, conversionRate: 12.5 },
+    ],
+    stagePerformances: [
+      { stage: 'Lead', count: 920, percentage: 100 },
+      { stage: 'Interested', count: 540, percentage: 58.7 },
+      { stage: 'Interview', count: 290, percentage: 31.52 },
+      { stage: 'Selected', count: 140, percentage: 15.22 },
+      { stage: 'Joined', count: 110, percentage: 11.95 },
+      { stage: 'Active', count: 98, percentage: 10.65 },
+      { stage: 'Retained', count: 90, percentage: 9.78 },
+    ],
+    status: 'Completed',
+    auditHistory: {
+      createdBy: 'Priya Verma (MKT002)',
+      createdDate: '2026-05-28 02:15 PM',
+      updatedBy: 'Rahul Sharma (MKT001)',
+      updatedDate: '2026-07-16 11:00 AM',
+    },
+  },
+];

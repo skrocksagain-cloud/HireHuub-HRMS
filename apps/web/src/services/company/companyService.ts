@@ -1,38 +1,48 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../../firebase/firebase";
 import type { Company } from "../../types/Company";
-
-const COMPANY_ID = "hirehuub";
+import { adminService } from "../admin/adminService";
 
 export async function getCompany(): Promise<Company | null> {
-  const docRef = doc(db, "company", COMPANY_ID);
-
-  const snapshot = await getDoc(docRef);
-
-  console.log("Exists:", snapshot.exists());
-  console.log("Data:", snapshot.data());
-
-  if (!snapshot.exists()) {
+  try {
+    const adminCompany = await adminService.getCompanySettings();
+    return {
+      companyName: adminCompany.companyName,
+      legalName: adminCompany.companyName,
+      shortName: adminCompany.brandName,
+      gstin: adminCompany.gstin,
+      pan: adminCompany.pan,
+      cin: adminCompany.cin,
+      address: adminCompany.address,
+      website: adminCompany.website,
+      email: adminCompany.email,
+      phone: adminCompany.phone,
+      logoUrl: adminCompany.logoUrl,
+      stampUrl: adminCompany.stampUrl,
+    } as unknown as Company;
+  } catch {
     return null;
   }
-
-  return snapshot.data() as Company;
 }
 
-export async function updateCompany(
-  company: Company
-): Promise<void> {
-  const docRef = doc(db, "company", COMPANY_ID);
-
-  await setDoc(docRef, company, {
-    merge: true,
-  });
+export async function updateCompany(company: Company): Promise<void> {
+  const current = await adminService.getCompanySettings();
+  await adminService.updateCompanySettings(
+    {
+      ...current,
+      companyName: company.companyName || current.companyName,
+      gstin: company.gstin || current.gstin,
+      pan: company.pan || current.pan,
+      cin: company.cin || current.cin,
+      address: company.address || current.address,
+      website: company.website || current.website,
+      email: company.email || current.email,
+      phone: company.phone || current.phone,
+      logoUrl: company.logoUrl || current.logoUrl,
+    },
+    'system',
+    'System Integration'
+  );
 }
 
-export async function createCompany(
-  company: Company
-): Promise<void> {
-  const docRef = doc(db, "company", COMPANY_ID);
-
-  await setDoc(docRef, company);
+export async function createCompany(company: Company): Promise<void> {
+  await updateCompany(company);
 }

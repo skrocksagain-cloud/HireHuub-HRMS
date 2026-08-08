@@ -1,53 +1,120 @@
-import type { Employee } from '../types/Employee';
-import Button from '../../../ui/Button';
-import Card from '../../../ui/Card';
+import { Eye, Edit3, Building2, Calendar, User, MoreVertical } from "lucide-react";
+import StatusBadge from "../../../ui/StatusBadge";
+import type { Employee } from "../types/Employee";
 
 interface EmployeeCardProps {
   employee: Employee;
   onView: (employee: Employee) => void;
   onEdit: (employee: Employee) => void;
+  onDeactivate?: (employee: Employee) => void;
 }
 
-const STATUS_CLASS_NAMES: Record<Employee['employmentStatus'], string> = {
-  Active: 'bg-green-100 text-green-700',
-  Inactive: 'bg-slate-100 text-slate-700',
-  'Notice Period': 'bg-amber-100 text-amber-700',
-  Terminated: 'bg-red-100 text-red-700',
-};
+export default function EmployeeCard({
+  employee,
+  onView,
+  onEdit,
+  onDeactivate,
+}: EmployeeCardProps) {
+  const initials =
+    (employee.firstName?.charAt(0) || "") + (employee.lastName?.charAt(0) || "");
 
-export default function EmployeeCard({ employee, onView, onEdit }: EmployeeCardProps) {
   return (
-    <Card className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between space-y-4 group">
+      
+      {/* Header Info */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {employee.photoUrl ? (
-            <img className="h-12 w-12 rounded-full object-cover" src={employee.photoUrl} alt="" />
+            <img
+              src={employee.photoUrl}
+              alt={employee.fullName}
+              className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shrink-0"
+            />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 font-semibold text-green-700">
-              {employee.firstName.slice(0, 1)}{employee.lastName.slice(0, 1)}
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white font-extrabold flex items-center justify-center text-sm shadow-xs shrink-0">
+              {initials.toUpperCase() || "EE"}
             </div>
           )}
           <div className="min-w-0">
-            <h3 className="truncate font-semibold text-slate-800">{employee.fullName}</h3>
-            <p className="truncate text-sm text-slate-500">{employee.employeeCode}</p>
+            <h3 className="font-bold text-slate-900 text-sm truncate group-hover:text-emerald-600 transition">
+              {employee.fullName}
+            </h3>
+            <p className="text-[11px] font-mono text-slate-500 truncate">
+              {employee.employeeCode || employee.employeeId}
+            </p>
           </div>
         </div>
-        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${STATUS_CLASS_NAMES[employee.employmentStatus]}`}>
-          {employee.employmentStatus}
-        </span>
+
+        <div className="shrink-0">
+          <StatusBadge status={employee.employmentStatus} />
+        </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div><dt className="text-slate-500">Department</dt><dd className="mt-1 font-medium text-slate-800">{employee.department}</dd></div>
-        <div><dt className="text-slate-500">Designation</dt><dd className="mt-1 font-medium text-slate-800">{employee.designation}</dd></div>
-        <div><dt className="text-slate-500">Location</dt><dd className="mt-1 font-medium text-slate-800">{employee.workLocation}</dd></div>
-        <div><dt className="text-slate-500">Joining Date</dt><dd className="mt-1 font-medium text-slate-800">{employee.joiningDate}</dd></div>
-      </dl>
+      {/* Details Grid */}
+      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100/80">
+        <div>
+          <span className="text-[10px] text-slate-500 font-medium block">Department</span>
+          <span className="font-semibold text-slate-800 truncate block flex items-center gap-1 mt-0.5">
+            <Building2 size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate">{employee.department}</span>
+          </span>
+        </div>
 
-      <div className="flex gap-3 border-t border-slate-100 pt-4">
-        <Button className="flex-1" onClick={() => onView(employee)}>View</Button>
-        <Button className="flex-1 bg-slate-700 hover:bg-slate-800" onClick={() => onEdit(employee)}>Edit</Button>
+        <div>
+          <span className="text-[10px] text-slate-500 font-medium block">Designation</span>
+          <span className="font-semibold text-slate-800 truncate block mt-0.5">
+            {employee.designation}
+          </span>
+        </div>
+
+        <div className="pt-1">
+          <span className="text-[10px] text-slate-500 font-medium block">Reporting Manager</span>
+          <span className="font-medium text-slate-700 truncate block flex items-center gap-1 mt-0.5">
+            <User size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate">{employee.reportingManager || "Unassigned"}</span>
+          </span>
+        </div>
+
+        <div className="pt-1">
+          <span className="text-[10px] text-slate-500 font-medium block">Joining Date</span>
+          <span className="font-medium text-slate-700 truncate block flex items-center gap-1 mt-0.5">
+            <Calendar size={12} className="text-slate-400 shrink-0" />
+            <span>{employee.joiningDate}</span>
+          </span>
+        </div>
       </div>
-    </Card>
+
+      {/* Action Toolbar */}
+      <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => onView(employee)}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs rounded-xl transition"
+        >
+          <Eye size={14} />
+          <span>View</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onEdit(employee)}
+          className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition"
+          title="Edit Details"
+        >
+          <Edit3 size={14} />
+        </button>
+
+        {onDeactivate && (
+          <button
+            type="button"
+            onClick={() => onDeactivate(employee)}
+            className="py-2 px-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+            title="More Options"
+          >
+            <MoreVertical size={16} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

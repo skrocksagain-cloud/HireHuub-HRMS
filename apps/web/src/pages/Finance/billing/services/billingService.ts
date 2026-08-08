@@ -1,4 +1,5 @@
 import { billingRepository } from '../repositories/billingRepository';
+import { invoiceNumberService } from '../../../../services/numbering/invoiceNumberService';
 import type {
   BillingCompany,
   BillingCompanyInput,
@@ -18,12 +19,6 @@ export interface InvoiceOutstandingBreakdown {
   outstandingAmount: number;
 }
 const FIXED_BILLING_ENTITY_LEGAL_NAME = 'HIRE HUUB PEOPLE SOLUTION PRIVATE LIMITED';
-
-const financialYearFor = (invoiceDate: Date, startMonth: number): string => {
-  const calendarYear = invoiceDate.getFullYear();
-  const financialYearStart = invoiceDate.getMonth() + 1 < startMonth ? calendarYear - 1 : calendarYear;
-  return `${financialYearStart}-${String((financialYearStart + 1) % 100).padStart(2, '0')}`;
-};
 
 const validateBillingCompany = (company: BillingCompanyInput): void => {
   if (!company.companyName.trim() || !company.legalName.trim()) throw new Error('Billing company names are required.');
@@ -79,26 +74,36 @@ class BillingService {
 
   async generateInvoiceNumber(billingCompanyId: string, invoiceDate: Date): Promise<InvoiceNumber> {
     const company = await this.getActiveBillingCompany(billingCompanyId);
-    const financialYear = financialYearFor(invoiceDate, company.configuration.financialYearStartMonth);
-    const sequence = await billingRepository.nextInvoiceSequence(company.id, financialYear);
+    return invoiceNumberService.generateNextInvoiceNumber(company.id, invoiceDate);
+  }
 
-    return {
-      value: `${company.invoicePrefix.trim()}/${financialYear}/${String(sequence).padStart(company.configuration.invoiceSequencePadding, '0')}`,
-      financialYear,
-      sequence,
-    };
+  async previewNextInvoiceNumber(invoiceDate: Date = new Date(), knownCount = 0): Promise<string> {
+    try {
+      const company = await this.getFixedBillingCompany();
+      return invoiceNumberService.previewNextInvoiceNumber(company.id, invoiceDate, knownCount);
+    } catch {
+      const year = invoiceDate.getFullYear();
+      const nextSeq = knownCount + 1;
+      return `HH${year}-${String(nextSeq).padStart(4, '0')}`;
+    }
   }
 
   async generateCreditNoteNumber(creditNoteDate: Date): Promise<InvoiceNumber> {
-    const company = await this.getFixedBillingCompany();
-    const financialYear = financialYearFor(creditNoteDate, company.configuration.financialYearStartMonth);
-    const sequence = await billingRepository.nextCreditNoteSequence(company.id, financialYear);
+    try {
+      const company = await this.getFixedBillingCompany();
+      return invoiceNumberService.generateNextCreditNoteNumber(company.id, creditNoteDate);
+    } catch {
+      const year = creditNoteDate.getFullYear();
+      return {
+        value: `HHCN${year}-0001`,
+        financialYear: String(year),
+        sequence: 1,
+      };
+    }
+  }
 
-    return {
-      value: `${company.invoicePrefix.trim()}/CN/${financialYear}/${String(sequence).padStart(company.configuration.invoiceSequencePadding, '0')}`,
-      financialYear,
-      sequence,
-    };
+  async previewNextCreditNoteNumber(knownCount = 0): Promise<string> {
+    return invoiceNumberService.previewNextCreditNoteNumber(knownCount);
   }
 
   
