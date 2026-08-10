@@ -8,12 +8,15 @@ import {
   Layers,
   ShieldAlert,
   FileCheck,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 
 import DashboardLayout from '../../../layouts/DashboardLayout';
 import SectionHeader from '../../../ui/SectionHeader';
 import StatusBadge from '../../../ui/StatusBadge';
 import Drawer from '../../../ui/Drawer';
+import InvoiceTemplateLibraryDrawer from './components/InvoiceTemplateLibraryDrawer';
 import { useInvoices } from './hooks/useInvoices';
 import { useAuth } from '../../../context/AuthContext';
 import type { CreateInvoiceDraftInput } from '../../../types/Invoice';
@@ -47,6 +50,7 @@ export default function InvoicesPage() {
   // Modals & Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState<boolean>(false);
   const [showLedgerModal, setShowLedgerModal] = useState<boolean>(false);
+  const [showTemplateDrawer, setShowTemplateDrawer] = useState<boolean>(false);
   const [ledgerClientId, setLedgerClientId] = useState<string>('');
 
   // Editable Form Inputs per PO Directive
@@ -183,6 +187,15 @@ export default function InvoicesPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowTemplateDrawer(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold transition"
+            >
+              <FileSpreadsheet size={14} className="text-emerald-600" />
+              <span>Template Library</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowLedgerModal(true)}
@@ -339,6 +352,19 @@ export default function InvoicesPage() {
                             <Eye size={13} />
                             <span>View Profile</span>
                           </button>
+
+                          {inv.document?.downloadUrl && (
+                            <a
+                              href={inv.document.downloadUrl}
+                              target="_blank"
+                              download={inv.document.fileName || `Invoice-${inv.invoiceNumber}.pdf`}
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold transition"
+                            >
+                              <Download size={13} />
+                              <span>Download</span>
+                            </a>
+                          )}
 
                           {hasWriteAccess && inv.status === 'Draft' && (
                             <button
@@ -672,6 +698,12 @@ export default function InvoicesPage() {
             </div>
           </div>
         )}
+
+        <InvoiceTemplateLibraryDrawer
+          isOpen={showTemplateDrawer}
+          onClose={() => setShowTemplateDrawer(false)}
+          actorName={user?.name || 'Finance Admin'}
+        />
       </div>
     </DashboardLayout>
   );

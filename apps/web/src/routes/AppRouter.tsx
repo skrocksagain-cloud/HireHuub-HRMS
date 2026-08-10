@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
@@ -20,6 +21,8 @@ const WorkforceProfilePage = lazy(() => import("../pages/Workbench/workforce/pag
 const CampaignHubPage = lazy(() => import("../pages/Workbench/campaignHub/pages/CampaignHubPage"));
 const CampaignProfilePage = lazy(() => import("../pages/Workbench/campaignHub/pages/CampaignProfilePage"));
 const ManagementPage = lazy(() => import("../pages/Management/ManagementPage"));
+const CalendarEventsPage = lazy(() => import("../pages/Administration/Calendar/CalendarEventsPage"));
+const AnnouncementsPage = lazy(() => import("../pages/Administration/Announcements/AnnouncementsPage"));
 
 // Finance – lazy loaded
 const InvoicesPage = lazy(() => import("../pages/Finance/billing/InvoicesPage"));
@@ -43,6 +46,11 @@ function PageSuspense({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PayrollPage = lazy(() => import("../pages/Payroll"));
+const ReportsPage = lazy(() => import("../pages/Reports"));
+const SettingsPage = lazy(() => import("../pages/Settings"));
+const RecruitmentPage = lazy(() => import("../pages/Recruitment"));
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -52,50 +60,61 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
 
         {/* Dashboard */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<ProtectedRoute moduleKey="dashboard"><Dashboard /></ProtectedRoute>} />
 
         {/* People */}
-        <Route path="/employees" element={<EmployeePage />} />
-        <Route path="/employees/create" element={<EmployeePage initialPanel="create" />} />
-        <Route path="/people/employees/:employeeId" element={<PageSuspense><EmployeeProfilePage /></PageSuspense>} />
-        <Route path="/employees/:employeeId" element={<PageSuspense><EmployeeProfilePage /></PageSuspense>} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/leave" element={<LeavePage />} />
-        <Route path="/performance" element={<PageSuspense><PerformancePage /></PageSuspense>} />
-        <Route path="/documents" element={<DocumentDashboard />} />
+        <Route path="/people" element={<Navigate to="/employees" replace />} />
+        <Route path="/people/employees" element={<Navigate to="/employees" replace />} />
+        <Route path="/employees" element={<ProtectedRoute moduleKey="employees"><EmployeePage /></ProtectedRoute>} />
+        <Route path="/employees/create" element={<ProtectedRoute moduleKey="employees"><EmployeePage initialPanel="create" /></ProtectedRoute>} />
+        <Route path="/people/employees/:employeeId" element={<ProtectedRoute moduleKey="employees"><PageSuspense><EmployeeProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/employees/:employeeId" element={<ProtectedRoute moduleKey="employees"><PageSuspense><EmployeeProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute moduleKey="employees"><AttendancePage /></ProtectedRoute>} />
+        <Route path="/leave" element={<ProtectedRoute moduleKey="employees"><LeavePage /></ProtectedRoute>} />
+        <Route path="/performance" element={<ProtectedRoute moduleKey="employees"><PageSuspense><PerformancePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/documents" element={<ProtectedRoute moduleKey="documents"><DocumentDashboard /></ProtectedRoute>} />
 
         {/* Internal Hiring & Legacy Organization */}
-        <Route path="/organization" element={<OrganizationPage />} />
-        <Route path="/internal-hiring" element={<OfferPage />} />
-        <Route path="/internal-hiring/create" element={<OfferForm />} />
-        <Route path="/internal-hiring/edit/:id" element={<OfferForm />} />
-        <Route path="/internal-hiring/view/:id" element={<OfferForm />} />
+        <Route path="/organization" element={<ProtectedRoute moduleKey="management"><OrganizationPage /></ProtectedRoute>} />
+        <Route path="/recruitment" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><RecruitmentPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/recruitment" element={<Navigate to="/recruitment" replace />} />
+        <Route path="/internal-hiring" element={<ProtectedRoute moduleKey="recruitment"><OfferPage /></ProtectedRoute>} />
+        <Route path="/internal-hiring/create" element={<ProtectedRoute moduleKey="recruitment"><OfferForm /></ProtectedRoute>} />
+        <Route path="/internal-hiring/edit/:id" element={<ProtectedRoute moduleKey="recruitment"><OfferForm /></ProtectedRoute>} />
+        <Route path="/internal-hiring/view/:id" element={<ProtectedRoute moduleKey="recruitment"><OfferForm /></ProtectedRoute>} />
 
         {/* Workbench */}
-        <Route path="/workbench/network/clients" element={<PageSuspense><ClientsPage /></PageSuspense>} />
-        <Route path="/workbench/network/clients/:id" element={<PageSuspense><ClientProfilePage /></PageSuspense>} />
-        <Route path="/workbench/network/associate-partners" element={<PageSuspense><AssociatePartnersPage /></PageSuspense>} />
-        <Route path="/workbench/network/associate-partners/:id" element={<PageSuspense><AssociatePartnerProfilePage /></PageSuspense>} />
-        <Route path="/workbench/staffing-hub" element={<PageSuspense><StaffingHubPage /></PageSuspense>} />
-        <Route path="/workbench/staffing-hub/openings" element={<PageSuspense><OpeningsPage /></PageSuspense>} />
-        <Route path="/workbench/staffing-hub/openings/:id" element={<PageSuspense><OpeningDetailsPage /></PageSuspense>} />
-        <Route path="/workbench/staffing-hub/crm" element={<PageSuspense><StaffingHubPage /></PageSuspense>} />
-        <Route path="/workbench/workforce" element={<PageSuspense><WorkforcePage /></PageSuspense>} />
-        <Route path="/workbench/workforce/:id" element={<PageSuspense><WorkforceProfilePage /></PageSuspense>} />
-        <Route path="/workbench/campaign-hub" element={<PageSuspense><CampaignHubPage /></PageSuspense>} />
-        <Route path="/workbench/campaign-hub/:campaignId" element={<PageSuspense><CampaignProfilePage /></PageSuspense>} />
+        <Route path="/workbench/network/clients" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><ClientsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/network/clients/:id" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><ClientProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/network/associate-partners" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><AssociatePartnersPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/network/associate-partners/:id" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><AssociatePartnerProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/staffing-hub" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><StaffingHubPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/staffing-hub/openings" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><OpeningsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/staffing-hub/openings/:id" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><OpeningDetailsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/staffing-hub/crm" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><StaffingHubPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/workforce" element={<ProtectedRoute moduleKey="employees"><PageSuspense><WorkforcePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/workforce/:id" element={<ProtectedRoute moduleKey="employees"><PageSuspense><WorkforceProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/campaign-hub" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><CampaignHubPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/workbench/campaign-hub/:campaignId" element={<ProtectedRoute moduleKey="recruitment"><PageSuspense><CampaignProfilePage /></PageSuspense></ProtectedRoute>} />
 
         {/* Finance Workspaces */}
-        <Route path="/finance/billing/invoices" element={<PageSuspense><InvoicesPage /></PageSuspense>} />
-        <Route path="/finance/billing/invoices/:invoiceId" element={<PageSuspense><InvoiceProfilePage /></PageSuspense>} />
-        <Route path="/finance/billing/credit-notes" element={<PageSuspense><CreditNotesPage /></PageSuspense>} />
-        <Route path="/finance/transactions" element={<PageSuspense><TransactionsPage /></PageSuspense>} />
+        <Route path="/finance" element={<Navigate to="/finance/transactions" replace />} />
+        <Route path="/payroll" element={<ProtectedRoute moduleKey="finance"><PageSuspense><PayrollPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute moduleKey="management"><PageSuspense><ReportsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute moduleKey="management"><PageSuspense><SettingsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/finance/billing/invoices" element={<ProtectedRoute moduleKey="finance"><PageSuspense><InvoicesPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/finance/billing/invoices/:invoiceId" element={<ProtectedRoute moduleKey="finance"><PageSuspense><InvoiceProfilePage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/finance/billing/credit-notes" element={<ProtectedRoute moduleKey="finance"><PageSuspense><CreditNotesPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/finance/transactions" element={<ProtectedRoute moduleKey="finance"><PageSuspense><TransactionsPage /></PageSuspense></ProtectedRoute>} />
 
-        {/* Management */}
-        <Route path="/management" element={<PageSuspense><ManagementPage /></PageSuspense>} />
+        {/* Management & Administration */}
+        <Route path="/management" element={<ProtectedRoute moduleKey="management"><PageSuspense><ManagementPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/administration/calendar" element={<ProtectedRoute moduleKey="management"><PageSuspense><CalendarEventsPage /></PageSuspense></ProtectedRoute>} />
+        <Route path="/administration/announcements" element={<ProtectedRoute moduleKey="management"><PageSuspense><AnnouncementsPage /></PageSuspense></ProtectedRoute>} />
 
         {/* Default Fallback */}
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<ProtectedRoute moduleKey="dashboard"><Dashboard /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
       </Routes>
     </BrowserRouter>

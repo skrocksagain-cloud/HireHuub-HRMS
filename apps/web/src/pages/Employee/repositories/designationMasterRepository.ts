@@ -8,7 +8,7 @@ export interface DesignationMasterRecord {
   hierarchyLevel?: number;
 }
 
-const DESIGNATION_MASTER_COLLECTION = 'designationMaster';
+const DESIGNATION_MASTER_COLLECTION = 'admin_designations';
 
 export interface DesignationMasterRepository {
   getDesignations(): Promise<DesignationMasterRecord[]>;

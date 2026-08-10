@@ -29,7 +29,7 @@ export interface AuditRepository {
 class FirestoreAuditRepository implements AuditRepository {
   async create(entry: AuditEntry): Promise<void> {
     const sanitizedEntry = sanitizeForFirestore(entry);
-    await addDoc(collection(db, 'auditLogs'), { ...sanitizedEntry, createdAt: serverTimestamp() });
+    await addDoc(collection(db, 'admin_audit_logs'), { ...sanitizedEntry, createdAt: serverTimestamp() });
   }
 }
 

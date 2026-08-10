@@ -96,7 +96,7 @@ class TransactionService {
     return partners.filter((partner) => partner.isActive);
   }
 
-  previewNextExpenseNumber(knownCount = 0): string {
+  async previewNextExpenseNumber(knownCount = 0): Promise<string> {
     return invoiceNumberService.previewNextExpenseNumber(knownCount);
   }
 
@@ -105,7 +105,7 @@ class TransactionService {
     if (!createdBy.trim()) throw new Error('Transaction creator is required.');
 
     const dateObj = new Date(`${input.transactionDate}T00:00:00`);
-    const expenseNumber = input.expenseNumber || invoiceNumberService.previewNextExpenseNumber(0, dateObj);
+    const expenseNumber = input.expenseNumber || await invoiceNumberService.previewNextExpenseNumber(0, dateObj);
     const isManagement = input.paidFrom === 'Management';
 
     return transactionRepository.createDraftExpense({

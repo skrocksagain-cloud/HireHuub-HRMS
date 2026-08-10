@@ -9,7 +9,7 @@ export interface NotificationRepository {
 
 class FirestoreNotificationRepository implements NotificationRepository {
   async create(entry: NotificationEntry): Promise<void> {
-    await addDoc(collection(db, 'notifications'), { ...entry, isRead: false, createdAt: serverTimestamp() });
+    await addDoc(collection(db, 'admin_notifications'), { ...entry, isRead: false, createdAt: serverTimestamp() });
   }
 }
 

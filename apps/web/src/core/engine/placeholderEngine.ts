@@ -62,61 +62,69 @@ class PlaceholderEngine {
 
     const dict: Record<string, string> = {
       // Company & Branding Placeholders
-      company_name: comp.companyName || 'Hire Huub Pvt Ltd',
-      brand_name: comp.brandName || 'Hire Huub One',
-      company_address: comp.address || 'Suite 401, Apex Tech Hub, Baner, Pune, MH 411045',
-      gstin: comp.gstin || '27AAAAA0000A1Z5',
-      pan: comp.pan || 'AAAAA0000A',
-      cin: comp.cin || 'U72900PN2026PTC000000',
-      company_email: comp.email || 'contact@hirehuub.com',
-      company_phone: comp.phone || '+91 98765 43210',
-      website: comp.website || 'https://hirehuub.com',
-      bank_name: comp.bankDetails?.bankName || 'HDFC Bank',
-      account_number: comp.bankDetails?.accountNumber || '50200012345678',
-      ifsc: comp.bankDetails?.ifscCode || 'HDFC0000123',
-      branch_name: comp.bankDetails?.branchName || 'Baner Branch',
+      company_name: comp.companyName || '', brand_name: comp.brandName || '', company_address: comp.address || '',
+      gstin: comp.gstin || '', pan: comp.pan || '', cin: comp.cin || '', company_email: comp.email || '',
+      company_phone: comp.phone || '', website: comp.website || '', bank_name: comp.bankDetails?.bankName || '',
+      account_number: comp.bankDetails?.accountNumber || '', ifsc: comp.bankDetails?.ifscCode || '', branch_name: comp.bankDetails?.branchName || '',
       logo: comp.logoUrl || '',
       stamp: comp.stampUrl || '',
       signature: comp.signatures?.[0]?.signatureUrl || '',
 
       // Employee & HR Placeholders
-      employee_name: emp.fullName || [emp.firstName, emp.lastName].filter(Boolean).join(' ') || 'Valued Team Member',
-      employee_id: emp.employeeId || 'HH0001',
-      designation: emp.designation || 'Senior Software Engineer',
-      department: emp.department || 'Engineering',
-      reporting_manager: emp.reportingManager || 'Rahul Sharma (VP Staffing)',
-      joining_date: emp.joiningDate || new Date().toLocaleDateString(),
-      employment_type: emp.employmentType || 'Full-Time',
-      salary: emp.ctc ? String(emp.ctc) : '12,00,000 INR',
-      basic_pay: emp.basicPay ? String(emp.basicPay) : '50,000 INR',
-      net_pay: emp.netPay ? String(emp.netPay) : '85,000 INR',
+      employee_name: emp.fullName || [emp.firstName, emp.lastName].filter(Boolean).join(' '), employee_id: emp.employeeId || '',
+      designation: emp.designation || '', department: emp.department || '', reporting_manager: emp.reportingManager || '',
+      joining_date: emp.joiningDate || '', employment_type: emp.employmentType || '', salary: emp.ctc ? String(emp.ctc) : '',
+      basic_pay: emp.basicPay ? String(emp.basicPay) : '', net_pay: emp.netPay ? String(emp.netPay) : '',
       date: new Date().toLocaleDateString(),
 
       // Recruitment & Candidate Placeholders
-      candidate_name: cand.name || 'Candidate Name',
-      candidate_email: cand.email || 'candidate@example.com',
-      candidate_phone: cand.phone || '+91 98765 00000',
-      interview_date: cand.interviewDate || new Date().toLocaleDateString(),
-      interview_time: cand.interviewTime || '11:00 AM IST',
-      recruiter_name: cand.recruiterName || 'HR Talent Acquisition',
+      candidate_name: cand.name || '', candidate_email: cand.email || '', candidate_phone: cand.phone || '',
+      interview_date: cand.interviewDate || '', interview_time: cand.interviewTime || '', recruiter_name: cand.recruiterName || '',
 
       // Client & Finance Placeholders
-      client_name: cli.name || 'Valued Client',
-      client_brand: cli.brandName || cli.name || 'Valued Client',
-      client_gstin: cli.gstin || '27BBBBB0000B1Z5',
-      client_address: cli.address || 'Corporate Office',
-      invoice_number: fin.invoiceNumber || 'HH2026-0001',
-      invoice_date: fin.invoiceDate || new Date().toLocaleDateString(),
-      invoice_amount: fin.invoiceAmount ? String(fin.invoiceAmount) : '1,00,000',
-      gst_amount: fin.gstAmount ? String(fin.gstAmount) : '18,000',
-      grand_total: fin.grandTotal ? String(fin.grandTotal) : '1,18,000',
-      amount_in_words: fin.amountInWords || 'One Lakh Eighteen Thousand Rupees Only',
-      credit_note_number: fin.creditNoteNumber || 'CN2026-0001',
+      client_name: cli.name || '', client_brand: cli.brandName || cli.name || '', client_gstin: cli.gstin || '', client_address: cli.address || '',
+      invoice_number: fin.invoiceNumber || '', invoice_date: fin.invoiceDate || '', invoice_amount: fin.invoiceAmount ? String(fin.invoiceAmount) : '',
+      gst_amount: fin.gstAmount ? String(fin.gstAmount) : '', grand_total: fin.grandTotal ? String(fin.grandTotal) : '',
+      amount_in_words: fin.amountInWords || '', credit_note_number: fin.creditNoteNumber || '',
+
+      // PascalCase invoice template tokens (match {{Key}} in uploaded Excel templates)
+      InvoiceNumber: fin.invoiceNumber || '',
+      InvoiceDate: fin.invoiceDate || '',
+      PONumber: '',
+      ClientName: cli.name || '',
+      ClientGSTIN: cli.gstin || '',
+      ClientGST: cli.gstin || '',
+      ClientAddress: cli.address || '',
+      ClientState: '',
+      BillingAddress: cli.address || '',
+      BillingName: cli.name || '',
+      CompanyName: comp.companyName || '',
+      CompanyGSTIN: comp.gstin || '',
+      CompanyGST: comp.gstin || '',
+      CompanyPAN: comp.pan || '',
+      CompanyCIN: comp.cin || '',
+      CompanyAddress: comp.address || '',
+      TaxableAmount: fin.invoiceAmount ? String(fin.invoiceAmount) : '',
+      Subtotal: fin.invoiceAmount ? String(fin.invoiceAmount) : '',
+      CGST: '',
+      SGST: '',
+      IGST: '',
+      GSTAmount: fin.gstAmount ? String(fin.gstAmount) : '', GrandTotal: fin.grandTotal ? String(fin.grandTotal) : '',
+      AmountInWords: fin.amountInWords || '', BankName: comp.bankDetails?.bankName || '',
+      AccountNumber: comp.bankDetails?.accountNumber || '', AccountHolderName: comp.companyName || '',
+      IFSC: comp.bankDetails?.ifscCode || '', BranchName: comp.bankDetails?.branchName || '',
+      AuthorisedSignatory: comp.signatures?.[0]?.name || '', AuthorizedSignatory: comp.signatures?.[0]?.name || '',
+      GSTType: '',
+      QRCode: '',
+      CompanyLogo: comp.logoUrl || '',
+      LineItems: '',
     };
 
     // Merge any custom module placeholders dynamically
     Object.entries(add).forEach(([key, val]) => {
       dict[key.toLowerCase()] = String(val);
+      // Also register as-is to support PascalCase invoice template tokens
+      dict[key] = String(val);
     });
 
     return dict;

@@ -8,8 +8,7 @@ const timestamp = (value: unknown): Timestamp => value instanceof Timestamp ? va
 
 const creditNoteFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): CreditNote => {
   const data = snapshot.data();
-  const year = data.creditDate ? new Date(`${data.creditDate}T00:00:00`).getFullYear() : new Date().getFullYear();
-  const creditNoteNumber = data.creditNoteNumber ? String(data.creditNoteNumber) : (data.snapshot?.creditNoteNumber ? String(data.snapshot.creditNoteNumber) : `HHCN${year}-${snapshot.id.slice(0, 4).toUpperCase()}`);
+  const creditNoteNumber = data.creditNoteNumber ? String(data.creditNoteNumber) : String(data.snapshot?.creditNoteNumber ?? '');
   const originalInvoiceNumber = data.originalInvoiceNumber ? String(data.originalInvoiceNumber) : (data.snapshot?.originalInvoiceNumber ? String(data.snapshot.originalInvoiceNumber) : data.originalInvoiceId);
 
   return {

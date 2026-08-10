@@ -50,7 +50,41 @@ class AdminStorageService {
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       return { url, path };
-    } catch (err) {
+    } catch {
+      const dataUrl = await fileToDataUrl(file);
+      return { url: dataUrl, path };
+    }
+  }
+
+  /**
+   * Upload Top Letterhead Image to /company/letterhead/
+   */
+  async uploadLetterheadImage(file: File, profileId = 'default'): Promise<{ url: string; path: string }> {
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `company/letterhead/top_letterhead_${profileId}_${Date.now()}.${ext}`;
+    try {
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      return { url, path };
+    } catch {
+      const dataUrl = await fileToDataUrl(file);
+      return { url: dataUrl, path };
+    }
+  }
+
+  /**
+   * Upload Bottom Letter Footer Image to /company/letterfooter/
+   */
+  async uploadLetterFooterImage(file: File, profileId = 'default'): Promise<{ url: string; path: string }> {
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `company/letterfooter/bottom_footer_${profileId}_${Date.now()}.${ext}`;
+    try {
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      return { url, path };
+    } catch {
       const dataUrl = await fileToDataUrl(file);
       return { url: dataUrl, path };
     }

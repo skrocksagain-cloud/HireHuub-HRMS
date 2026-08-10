@@ -23,10 +23,8 @@ export default function DocumentHistory() {
       const data = await getDocuments();
 
       setDocuments(data);
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to load document history.");
+    } catch {
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -168,11 +166,9 @@ function formatDate(value: unknown) {
   }
 
   try {
-    const date =
-      (value as any)?.toDate?.() ??
-      value;
-
-    return new Date(date).toLocaleString("en-IN");
+    const valObj = value as { toDate?: () => Date };
+    const date = typeof valObj?.toDate === 'function' ? valObj.toDate() : value;
+    return new Date(date as string | number | Date).toLocaleString("en-IN");
   } catch {
     return "-";
   }

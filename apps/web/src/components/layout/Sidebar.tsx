@@ -25,6 +25,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import hLogo from "../../assets/logo/h-logo.png";
+import { usePermissions } from "../../hooks/usePermissions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,10 +137,15 @@ const navigationItems: SidebarItem[] = [
     ],
   },
   {
-    kind: "flat",
-    name: "Management",
-    path: "/management",
+    kind: "group",
+    name: "Administration",
+    basePath: "/administration",
     icon: <ShieldCheck size={18} />,
+    children: [
+      { kind: "leaf", name: "Management Control", path: "/management", icon: <ShieldCheck size={16} /> },
+      { kind: "leaf", name: "Calendar & Events", path: "/administration/calendar", icon: <CalendarCheck size={16} /> },
+      { kind: "leaf", name: "Announcements", path: "/administration/announcements", icon: <Megaphone size={16} /> },
+    ],
   },
 ];
 
@@ -327,6 +333,20 @@ function GroupSection({
 export default function Sidebar() {
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { canAccessModule, simulatedRole } = usePermissions();
+
+  const filteredNavigation = navigationItems.filter((item) => {
+    if (item.kind === "flat") {
+      if (item.path === "/dashboard") return canAccessModule("dashboard");
+      if (item.path === "/management") return canAccessModule("management");
+      return true;
+    }
+    if (item.basePath === "/people") return canAccessModule("employees");
+    if (item.basePath === "/workbench") return canAccessModule("recruitment") || canAccessModule("employees");
+    if (item.basePath === "/finance") return canAccessModule("finance");
+    if (item.name === "Administration") return canAccessModule("management");
+    return true;
+  });
 
   return (
     <aside
@@ -334,7 +354,7 @@ export default function Sidebar() {
         isCollapsed ? "w-18" : "w-64"
       }`}
     >
-      {/* Top Sidebar Branding */}
+      {/* Top Sidebar Branding & Simulation Badge */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
         <div className="flex items-center gap-3 overflow-hidden">
           <img
@@ -343,9 +363,16 @@ export default function Sidebar() {
             className="h-8 w-auto shrink-0 object-contain"
           />
           {!isCollapsed && (
-            <span className="font-bold text-sm tracking-tight text-white leading-none whitespace-nowrap">
-              Hire Huub One
-            </span>
+            <div>
+              <span className="font-bold text-sm tracking-tight text-white leading-none block whitespace-nowrap">
+                Hire Huub One
+              </span>
+              {simulatedRole && (
+                <span className="text-[10px] text-amber-400 font-mono font-bold block truncate">
+                  Simulating: {simulatedRole.name}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -361,7 +388,7 @@ export default function Sidebar() {
 
       {/* Navigation List */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4 custom-scrollbar">
-        {navigationItems.map((item) => {
+        {filteredNavigation.map((item) => {
           if (item.kind === "flat") {
             return (
               <NavLink

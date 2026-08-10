@@ -75,12 +75,11 @@ const exportPdf = (requests: LeaveRequest[]): void => {
 export default function LeavePage() {
   const { user } = useAuth();
 
-  // Fallback actor context
   const actor: LeaveActor = {
-    employeeId: user?.employeeId || user?.id || 'HH0001',
-    name: user?.name || 'Authorized User',
-    role: user?.role || 'Super Admin',
-    department: user?.department || 'Operations',
+    employeeId: user?.employeeId || user?.id || '',
+    name: user?.name || '',
+    role: user?.role || '',
+    department: user?.department || '',
   };
 
   const leave = useLeave(actor);

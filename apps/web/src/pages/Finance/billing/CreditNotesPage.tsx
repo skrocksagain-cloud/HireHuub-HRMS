@@ -31,9 +31,9 @@ export default function CreditNotesPage() {
   const [showPreviewDrawer, setShowPreviewDrawer] = useState<boolean>(false);
 
   // Create Form State
-  const [previewCreditNoteNum, setPreviewCreditNoteNum] = useState<string>("HHCN2026-0001");
-  const [originalInvoiceId, setOriginalInvoiceId] = useState<string>("HH2026-0001");
-  const [reason, setReason] = useState<string>("Service Rate Adjustment / Discount");
+  const [previewCreditNoteNum, setPreviewCreditNoteNum] = useState<string>("");
+  const [originalInvoiceId, setOriginalInvoiceId] = useState<string>("");
+  const [reason, setReason] = useState<string>("");
   const [creating, setCreating] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>("");
   const [actionSuccess, setActionSuccess] = useState<string>("");
@@ -44,8 +44,8 @@ export default function CreditNotesPage() {
 
   useEffect(() => {
     if (showCreateDrawer) {
-      billingService.previewNextCreditNoteNumber(creditNotes.length).then((num) => {
-        setPreviewCreditNoteNum(num);
+      billingService.previewNextCreditNoteNumber(creditNotes.length).then(setPreviewCreditNoteNum).catch((error: unknown) => {
+        setActionError(error instanceof Error ? error.message : 'Unable to generate a credit note number.');
       });
     }
   }, [showCreateDrawer, creditNotes.length]);
@@ -55,8 +55,9 @@ export default function CreditNotesPage() {
     try {
       const data = await creditNoteService.getCreditNoteHistory();
       setCreditNotes(data);
-    } catch {
-      setCreditNotes(getSampleCreditNotes());
+    } catch (error: unknown) {
+      setCreditNotes([]);
+      setActionError(error instanceof Error ? error.message : 'Unable to load credit notes.');
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,7 @@ export default function CreditNotesPage() {
           <div>
             <SectionHeader
               title="Credit Notes Workspace"
-              subtitle="Enterprise Numbering (HHCN2026-0001), Invoice Mapping, Adjustment Records, and Lifecycle Approvals."
+              subtitle="Administration-managed numbering, invoice mapping, adjustment records, and lifecycle approvals."
             />
           </div>
 
@@ -220,7 +221,7 @@ export default function CreditNotesPage() {
                   </tr>
                 ) : (
                   filteredCreditNotes.map((cn) => {
-                    const amount = cn.snapshot?.grandTotal ?? 5000;
+                    const amount = cn.snapshot?.grandTotal ?? 0;
                     const displayCnNum = cn.snapshot?.creditNoteNumber || cn.creditNoteNumber || cn.id;
                     const displayInvNum = cn.snapshot?.originalInvoiceNumber || cn.originalInvoiceNumber || cn.originalInvoiceId;
                     return (
@@ -350,46 +351,4 @@ export default function CreditNotesPage() {
       </div>
     </DashboardLayout>
   );
-}
-
-function getSampleCreditNotes(): CreditNote[] {
-  return [
-    {
-      id: "HHCN2026-0001",
-      originalInvoiceId: "HH2026-0001",
-      creditType: "Full",
-      creditDate: "2026-08-02",
-      reason: "Volume Discount Adjustment for July Placements",
-      selections: [],
-      status: "Applied",
-      statusHistory: [],
-      createdBy: "Somnath (Admin)",
-      createdAt: { seconds: 1785500000, nanoseconds: 0 } as any,
-      updatedAt: { seconds: 1785500000, nanoseconds: 0 } as any,
-      snapshot: {
-        creditNoteNumber: "HHCN2026-0001",
-        creditDate: "2026-08-02",
-        reason: "Volume Discount Adjustment for July Placements",
-        creditType: "Full",
-        generatedBy: "Somnath (Admin)",
-        originalInvoiceNumber: "HH2026-0001",
-        originalInvoiceSnapshot: {
-          invoiceNumber: "HH2026-0001",
-          invoiceDate: "2026-08-01",
-          company: { companyName: "Hire Huub", legalName: "Hire Huub People Solution Pvt Ltd", gstin: "27AAAAA0000A1Z5", pan: "AAAAA0000A", registeredAddress: { line1: "Warje", city: "Pune", state: "Maharashtra", postalCode: "411058", country: "India" }, bankDetails: { accountHolderName: "Hire Huub", bankName: "HDFC", accountNumber: "123456789", ifscCode: "HDFC0001234", branchName: "Warje" }, authorizedSignatory: "Director" },
-          client: { clientId: "client-001", clientName: "Elastic Run", gstin: "27AAAAA0000A1Z5", billingState: "Maharashtra", billingAddress: { line1: "Warje Industrial Estate", city: "Pune", state: "Maharashtra", postalCode: "411058", country: "India" } },
-          lineItems: [],
-          taxableAmount: 5000,
-          gst: { type: "CGST_SGST", cgstAmount: 450, sgstAmount: 450, igstAmount: 0, totalGstAmount: 900 },
-          grandTotal: 5900,
-          template: { templateId: "default", templateVersion: 1 },
-        },
-        lineItems: [{ invoiceLineIndex: 0, description: "Volume Commercial Adjustment", originalQuantity: 1, creditedQuantity: 1, taxableAmount: 5000, gstAmount: 900, totalAmount: 5900 }],
-        taxableAmount: 5000,
-        gst: { type: "CGST_SGST", cgstAmount: 450, sgstAmount: 450, igstAmount: 0, totalGstAmount: 900 },
-        grandTotal: 5900,
-        template: { templateId: "default", templateVersion: 1 },
-      },
-    },
-  ];
 }

@@ -32,13 +32,6 @@ interface ClientPayoutImportModalProps {
 
 type Step = 'upload' | 'preview' | 'mapping' | 'validation' | 'history';
 
-// Sample raw file data representing an Excel upload for Elastic Run / DeliveryX
-const MOCK_EXCEL_IMPORT_PAYLOAD = [
-  { rawEmployeeId: 'EMP-ER-9912', rawName: 'Ramesh Kumar', rawEarnings: 25500, rawOrders: 0 },
-  { rawEmployeeId: 'EMP-ER-9913', rawName: 'Rahul Verma', rawEarnings: 24000, rawOrders: 0 },
-  { rawEmployeeId: 'EMP-DEL-7741', rawName: 'Meena Bhosale', rawEarnings: 39000, rawOrders: 195 },
-];
-
 export default function ClientPayoutImportModal({
   isOpen,
   onClose,
@@ -57,6 +50,7 @@ export default function ClientPayoutImportModal({
   const [importMonth, setImportMonth] = useState<string>('2026-07');
   const [fileUploaded, setFileUploaded] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
+  const [parsedRawRows] = useState<unknown[]>([]);
 
   // Column Mapping state saved by Client ID
   const [salaryColHeader, setSalaryColHeader] = useState<string>('Net Salary');
@@ -110,8 +104,15 @@ export default function ClientPayoutImportModal({
   };
 
   const handleValidateImport = () => {
+    const rawPayload = (parsedRawRows.length > 0 ? parsedRawRows : workforce.map((w) => ({
+      rawEmployeeId: w.id,
+      rawName: w.candidateName,
+      rawEarnings: w.totalEarnings || 0,
+      rawOrders: w.totalOrders || 0,
+    }))) as Array<{ rawEmployeeId: string; rawName: string; rawEarnings: number; rawOrders: number }>;
+
     const { validationSummary, processedRows: rows } = PayoutAggregationService.validateImportRows(
-      MOCK_EXCEL_IMPORT_PAYLOAD,
+      rawPayload,
       workforce
     );
 

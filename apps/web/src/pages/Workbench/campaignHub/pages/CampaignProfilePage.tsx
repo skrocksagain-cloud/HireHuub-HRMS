@@ -118,7 +118,6 @@ export default function CampaignProfilePage() {
 
               <button
                 type="button"
-                onClick={() => alert(`Editing Campaign ${campaign.campaignNumber}`)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition text-xs shadow-xs"
               >
                 <Edit2 size={14} />

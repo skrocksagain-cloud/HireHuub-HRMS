@@ -17,6 +17,7 @@ import type {
 } from '../../types/Admin';
 import { adminStorageService } from './adminStorageService';
 import { adminRepository } from './repositories/adminRepository';
+import { permissionService } from '../../core/permissions/permissionService';
 
 const slugify = (text: string) =>
   text
@@ -93,6 +94,76 @@ class AdminService {
         ...current,
         stampUrl: '',
         stampStoragePath: '',
+      },
+      actorId,
+      actorName
+    );
+  }
+
+  async uploadLetterheadImage(file: File, profileId = 'default', actorId: string, actorName: string): Promise<string> {
+    const current = await this.getCompanySettings();
+    if (current.letterheadStoragePath) {
+      await adminStorageService.deleteFile(current.letterheadStoragePath);
+    }
+
+    const { url, path } = await adminStorageService.uploadLetterheadImage(file, profileId);
+    await this.updateCompanySettings(
+      {
+        ...current,
+        letterheadUrl: url,
+        letterheadStoragePath: path,
+      },
+      actorId,
+      actorName
+    );
+    return url;
+  }
+
+  async deleteLetterheadImage(actorId: string, actorName: string): Promise<void> {
+    const current = await this.getCompanySettings();
+    if (current.letterheadStoragePath) {
+      await adminStorageService.deleteFile(current.letterheadStoragePath);
+    }
+    await this.updateCompanySettings(
+      {
+        ...current,
+        letterheadUrl: '',
+        letterheadStoragePath: '',
+      },
+      actorId,
+      actorName
+    );
+  }
+
+  async uploadLetterFooterImage(file: File, profileId = 'default', actorId: string, actorName: string): Promise<string> {
+    const current = await this.getCompanySettings();
+    if (current.letterFooterStoragePath) {
+      await adminStorageService.deleteFile(current.letterFooterStoragePath);
+    }
+
+    const { url, path } = await adminStorageService.uploadLetterFooterImage(file, profileId);
+    await this.updateCompanySettings(
+      {
+        ...current,
+        letterFooterUrl: url,
+        letterFooterStoragePath: path,
+      },
+      actorId,
+      actorName
+    );
+    return url;
+  }
+
+  async deleteLetterFooterImage(actorId: string, actorName: string): Promise<void> {
+    const current = await this.getCompanySettings();
+    if (current.letterFooterStoragePath) {
+      await adminStorageService.deleteFile(current.letterFooterStoragePath);
+    }
+    await this.updateCompanySettings(
+      {
+        ...current,
+        letterFooterUrl: '',
+        letterFooterStoragePath: '',
       },
       actorId,
       actorName
@@ -242,6 +313,7 @@ class AdminService {
 
   async saveRole(role: RoleItem, actorId: string, actorName: string): Promise<void> {
     await adminRepository.saveRole(role);
+    permissionService.invalidateCache();
     await this.logAudit({
       whoId: actorId,
       whoName: actorName,
@@ -255,6 +327,7 @@ class AdminService {
 
   async updateRole(id: string, updates: Partial<RoleItem>, actorId: string, actorName: string): Promise<void> {
     await adminRepository.updateRole(id, updates);
+    permissionService.invalidateCache();
     await this.logAudit({
       whoId: actorId,
       whoName: actorName,
@@ -322,11 +395,34 @@ class AdminService {
 
   // 7. Document Templates (Single Collection & Versioning)
   async getDocumentTemplates(): Promise<DocumentTemplateConfig[]> {
-    return adminRepository.getDocumentTemplates();
+    let list = await adminRepository.getDocumentTemplates();
+    if (list.length === 0) {
+      list = await this.seedDefaultDocumentTemplates();
+    }
+    return list;
   }
 
   async getDocumentTemplateByType(type: string): Promise<DocumentTemplateConfig | null> {
-    return adminRepository.getDocumentTemplateByType(type);
+    const list = await this.getDocumentTemplatesByType(type);
+    return list.length > 0 ? list[0] : adminRepository.getDocumentTemplateByType(type);
+  }
+
+  async getDocumentTemplatesByType(type: string): Promise<DocumentTemplateConfig[]> {
+    const list = await this.getDocumentTemplates();
+    return list.filter((t) => (t.type || (t as { documentType?: string }).documentType)?.toLowerCase() === type.toLowerCase());
+  }
+
+  async deleteDocumentTemplate(id: string, actorId = 'admin', actorName = 'Super Admin'): Promise<void> {
+    await adminRepository.deleteDocumentTemplate(id);
+    await this.logAudit({
+      whoId: actorId,
+      whoName: actorName,
+      whatAction: 'DELETE_DOCUMENT_TEMPLATE',
+      entityName: 'DocumentTemplateConfig',
+      entityId: id,
+      oldValue: id,
+      newValue: '',
+    });
   }
 
   async uploadTemplateFile(
@@ -562,9 +658,226 @@ class AdminService {
     });
   }
 
+  private async seedDefaultDocumentTemplates(): Promise<DocumentTemplateConfig[]> {
+    const seeds: Partial<DocumentTemplateConfig>[] = [
+      {
+        id: 'tmpl-hirehuub-standard-inv',
+        templateId: 'tmpl-hirehuub-standard-inv',
+        templateName: 'Hire Huub Standard Invoice',
+        type: 'Invoice',
+        clientName: 'Hire Huub People Solution Private Limited',
+        companyName: 'Hire Huub People Solution Private Limited',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/HireHuub_Standard_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/HireHuub_Standard_Invoice_v1.xlsx',
+        fileName: 'HireHuub_Standard_Invoice_v1.xlsx',
+        fileSize: 1048576,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'System Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-blinkit-inv',
+        templateId: 'tmpl-blinkit-inv',
+        templateName: 'Blinkit Invoice',
+        type: 'Invoice',
+        clientName: 'Blinkit Technologies Private Limited',
+        companyName: 'Blinkit Technologies Private Limited',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/Blinkit_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/Blinkit_Invoice_v1.xlsx',
+        fileName: 'Blinkit_Invoice_v1.xlsx',
+        fileSize: 524288,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'Finance Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-elasticrun-inv',
+        templateId: 'tmpl-elasticrun-inv',
+        templateName: 'ElasticRun Invoice',
+        type: 'Invoice',
+        clientName: 'Ntex Transportation Services Private Limited (ElasticRun)',
+        companyName: 'Ntex Transportation Services Private Limited',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/ElasticRun_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/ElasticRun_Invoice_v1.xlsx',
+        fileName: 'ElasticRun_Invoice_v1.xlsx',
+        fileSize: 614400,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'Finance Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-bigbasket-inv',
+        templateId: 'tmpl-bigbasket-inv',
+        templateName: 'BigBasket Invoice',
+        type: 'Invoice',
+        clientName: 'Supermarket Grocery Supplies Private Limited (BigBasket)',
+        companyName: 'Supermarket Grocery Supplies Private Limited',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/BigBasket_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/BigBasket_Invoice_v1.xlsx',
+        fileName: 'BigBasket_Invoice_v1.xlsx',
+        fileSize: 491520,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'Finance Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-zepto-inv',
+        templateId: 'tmpl-zepto-inv',
+        templateName: 'Zepto Invoice',
+        type: 'Invoice',
+        clientName: 'KIRANAKART TECHNOLOGIES PRIVATE LIMITED (Zepto)',
+        companyName: 'KIRANAKART TECHNOLOGIES PRIVATE LIMITED',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/Zepto_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/Zepto_Invoice_v1.xlsx',
+        fileName: 'Zepto_Invoice_v1.xlsx',
+        fileSize: 589824,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'Finance Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-amazon-inv',
+        templateId: 'tmpl-amazon-inv',
+        templateName: 'Amazon Invoice',
+        type: 'Invoice',
+        clientName: 'Amazon Transportation Services Private Limited',
+        companyName: 'Amazon Transportation Services Private Limited',
+        category: 'Finance',
+        format: 'XLSX',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/Amazon_Invoice_v1.xlsx',
+        templateStoragePath: 'templates/invoices/Amazon_Invoice_v1.xlsx',
+        fileName: 'Amazon_Invoice_v1.xlsx',
+        fileSize: 720896,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
+        uploadedBy: 'Finance Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-standard-offer-letter',
+        templateId: 'tmpl-standard-offer-letter',
+        templateName: 'Standard Offer Letter',
+        type: 'Offer Letter',
+        category: 'HR',
+        format: 'PDF',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/OfferLetter_v1.pdf',
+        templateStoragePath: 'templates/offers/OfferLetter_v1.pdf',
+        fileName: 'OfferLetter_v1.pdf',
+        fileSize: 1048576,
+        mimeType: 'application/pdf',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['candidate_name', 'designation', 'ctc', 'joining_date'],
+        uploadedBy: 'HR Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tmpl-standard-payslip',
+        templateId: 'tmpl-standard-payslip',
+        templateName: 'Standard Payslip',
+        type: 'Payslip',
+        category: 'Payroll',
+        format: 'PDF',
+        activeVersion: 'v1.0',
+        version: 1,
+        status: 'Active',
+        isActive: true,
+        templateFileUrl: '/templates/Payslip_v1.pdf',
+        templateStoragePath: 'templates/payslips/Payslip_v1.pdf',
+        fileName: 'Payslip_v1.pdf',
+        fileSize: 1048576,
+        mimeType: 'application/pdf',
+        defaultSignatureId: 'sig-1',
+        includeStamp: true,
+        previousVersions: [],
+        placeholders: ['employee_name', 'month', 'basic_pay', 'net_pay'],
+        uploadedBy: 'Payroll Admin',
+        uploadedAt: new Date().toISOString(),
+      },
+    ];
+
+    const resultList: DocumentTemplateConfig[] = [];
+    for (const seed of seeds) {
+      try {
+        const fullConfig = seed as DocumentTemplateConfig;
+        await adminRepository.saveDocumentTemplate(fullConfig);
+        resultList.push(fullConfig);
+      } catch {
+        // Ignore duplicate errors during seed
+      }
+    }
+    return resultList;
+  }
+
   // 12. Audit Logs
   async getAuditLogs(): Promise<AdminAuditEntry[]> {
     return adminRepository.getAuditLogs();
+  }
+
+  async logAuditEntry(entry: Omit<AdminAuditEntry, 'id' | 'timestamp'>): Promise<void> {
+    await this.logAudit(entry);
   }
 
   private async logAudit(entry: Omit<AdminAuditEntry, 'id' | 'timestamp'>): Promise<void> {

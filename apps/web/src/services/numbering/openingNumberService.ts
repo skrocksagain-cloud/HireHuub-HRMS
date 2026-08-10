@@ -1,14 +1,23 @@
+import { adminService } from '../admin/adminService';
 import type { Opening } from '../../types/Opening';
 
 export class OpeningNumberService {
-  private static PREFIX = 'HHOP';
-  private static PADDING_DIGITS = 4;
+  private async getPrefix(): Promise<string> {
+    const company = await adminService.getCompanySettings();
+    if (!company.openingPrefix?.trim()) throw new Error('Administration → Company Settings is missing the opening prefix.');
+    return company.openingPrefix;
+  }
+
+  async generateNextNumber(openings: Partial<Opening>[]): Promise<string> {
+    const prefix = await this.getPrefix();
+    return this.calculateNextNumber(openings, prefix);
+  }
 
   /**
    * Generates the next sequential Opening Number.
-   * Approved Format: HHOP0001, HHOP0002, HHOP0003, ...
+   * Format: HHOP0001, HHOP0002... (Prefix dynamically derived from Administration)
    */
-  calculateNextNumber(openings: Partial<Opening>[]): string {
+  calculateNextNumber(openings: Partial<Opening>[], prefix: string): string {
     let maxSequence = 0;
 
     for (const opening of openings) {
@@ -20,12 +29,12 @@ export class OpeningNumberService {
     }
 
     const nextSequence = maxSequence + 1;
-    return `${OpeningNumberService.PREFIX}${String(nextSequence).padStart(OpeningNumberService.PADDING_DIGITS, '0')}`;
+    return `${prefix}${String(nextSequence).padStart(4, '0')}`;
   }
 
   private extractSequenceNumber(identifier: string): number {
     if (!identifier) return 0;
-    const match = identifier.match(/HHOP(\d+)/i) || identifier.match(/(\d+)/);
+    const match = identifier.match(/(\d+)/);
     if (match && match[1]) {
       const parsed = parseInt(match[1], 10);
       if (!Number.isNaN(parsed)) {

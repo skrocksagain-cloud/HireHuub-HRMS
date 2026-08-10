@@ -1,12 +1,12 @@
-import { createElement } from 'react';
 import { Timestamp } from 'firebase/firestore';
 
-import { DocumentGenerationService } from '../../../../services/documentGeneration/DocumentGenerationService';
 import { documentService } from '../../../../services/document/documentService';
 import { storageService } from '../../../../services/document/storageService';
 import { auditService } from '../../../../core/audit/auditService';
 import { numberToWordsRupees } from '../../../../utils/amountInWords';
-import InvoicePdf from '../../../../templates/pdf/InvoicePdf';
+import { templateRenderer } from '../../../../services/engine/templateRenderer';
+import { invoiceTemplateService } from './invoiceTemplateService';
+import { clientService } from '../../../Workbench/Network/clients/services/clientService';
 import type { BillingCompany } from '../../../../types/BillingCompany';
 import type {
   CreateInvoiceDraftInput,
@@ -116,10 +116,9 @@ class InvoiceService {
   async updateDraft(invoiceId: string, input: CreateInvoiceDraftInput, updatedBy = 'Finance Admin'): Promise<void> {
     validateDraft(input);
     const invoice = await this.requireInvoice(invoiceId);
-    if (invoice.isLocked || invoice.status === 'Paid') {
-      throw new Error('Invoice is locked and cannot be edited.');
+    if (invoice.isLocked || invoice.status === 'Approved' || invoice.status === 'Paid') {
+      throw new Error('Invoice is locked after approval and cannot be edited.');
     }
-    if (invoice.status !== 'Draft') throw new Error('Generated invoices are immutable and cannot be edited.');
 
     const calculatedLines = input.lineItems.map((item) => this.calculateLineItem(item));
     const taxableAmount = roundMoney(calculatedLines.reduce((total, item) => total + item.taxableAmount, 0));
@@ -144,15 +143,18 @@ class InvoiceService {
 
   async generate(invoiceId: string, client: WorkbenchClientInvoiceData, generatedBy: string): Promise<InvoiceDocumentStorage> {
     const invoice = await this.requireInvoice(invoiceId);
-    if (invoice.status !== 'Draft') throw new Error('Only draft invoices can be generated.');
+    if (invoice.isLocked || invoice.status === 'Approved' || invoice.status === 'Paid') {
+      throw new Error('Invoice is locked after approval and cannot be regenerated.');
+    }
     if (!generatedBy.trim()) throw new Error('Invoice generator is required.');
     validateDraft({ clientId: invoice.clientId, invoiceDate: invoice.invoiceDate, lineItems: invoice.lineItems });
     validateClient(client, invoice.clientId);
 
     const billingCompany = await billingService.getFixedBillingCompany();
     const gstResolution = await billingService.resolveGst(billingCompany.id, client.billingState);
-    const invoiceNumber = await billingService.generateInvoiceNumber(billingCompany.id, new Date(`${invoice.invoiceDate}T00:00:00`));
-    const template = await billingService.resolveInvoiceTemplate(billingCompany.id);
+    const invoiceNumber = invoice.snapshot?.invoiceNumber
+      ? { value: invoice.snapshot.invoiceNumber, financialYear: '', sequence: 0 }
+      : await billingService.generateInvoiceNumber(billingCompany.id, new Date(`${invoice.invoiceDate}T00:00:00`));
     const lineItems = invoice.lineItems.map((item) => this.calculateLineItem(item));
     const taxableAmount = roundMoney(lineItems.reduce((total, item) => total + item.taxableAmount, 0));
     const totalGstAmount = roundMoney(lineItems.reduce((total, item) => total + item.gstAmount, 0));
@@ -160,8 +162,27 @@ class InvoiceService {
     const gst = gstResolution.type === 'CGST_SGST'
       ? { type: gstResolution.type, cgstAmount: roundMoney(totalGstAmount / 2), sgstAmount: roundMoney(totalGstAmount / 2), igstAmount: 0, totalGstAmount }
       : { type: gstResolution.type, cgstAmount: 0, sgstAmount: 0, igstAmount: totalGstAmount, totalGstAmount };
-
     const amountInWords = numberToWordsRupees(grandTotal);
+
+    // ── Resolve the client-assigned invoice template ─────────────────────────
+    // Priority: client.invoiceConfig.templateReference → document_templates → fallback React-PDF
+    let assignedTemplateId = 'default-react-pdf';
+    let assignedTemplateVersion = 1;
+    try {
+      const fullClient = await clientService.getClientById(invoice.clientId);
+      const templateRef = fullClient?.invoiceConfig?.templateReference
+        || fullClient?.invoiceConfig?.templateId
+        || '';
+      if (templateRef) {
+        const resolved = await invoiceTemplateService.resolveTemplateForClient(templateRef);
+        if (resolved) {
+          assignedTemplateId = resolved.templateId || resolved.id;
+          assignedTemplateVersion = resolved.version;
+        }
+      }
+    } catch {
+      // Template resolution failed — will fall back to React-PDF default
+    }
 
     const snapshot: InvoiceSnapshot = {
       invoiceNumber: invoiceNumber.value,
@@ -172,28 +193,25 @@ class InvoiceService {
       taxableAmount,
       gst,
       grandTotal,
-      template: { templateId: template.templateId, templateVersion: template.templateVersion },
+      template: { templateId: assignedTemplateId, templateVersion: assignedTemplateVersion },
       poNumber: invoice.poNumber || '',
       remarks: invoice.remarks || '',
       amountInWords,
     };
 
-    const documentVersion = 1;
-    const fileName = `${safeInvoiceFileName(snapshot.invoiceNumber)}.pdf`;
-    const generation = await DocumentGenerationService.generate({
-      documentType: 'Invoice',
-      module: 'Finance',
-      referenceId: invoice.id,
-      fileName,
-      version: documentVersion,
-      generatedBy,
-      payload: snapshot,
-      template: createElement(InvoicePdf, { invoice: snapshot }),
-      metadata: { templateId: template.templateId, templateVersion: String(template.templateVersion) },
-    });
+    // ── Render PDF via TemplateRenderer ──────────────────────────────────────
+    // Uses the uploaded XLSX template when one is assigned; falls back to InvoicePdf.tsx.
+    const renderResult = await templateRenderer.renderInvoice(
+      invoice.clientId,
+      assignedTemplateId,
+      snapshot
+    );
 
-    if (!generation.success || !generation.document) throw new Error(generation.error ?? 'Unable to generate invoice PDF.');
-    const upload = await storageService.upload(generation.document, `finance/invoices/${invoice.id}/v${documentVersion}/${fileName}`);
+    const documentVersion = (invoice.document?.documentVersion ?? 0) + 1;
+    const fileName = `${safeInvoiceFileName(snapshot.invoiceNumber)}_v${documentVersion}.pdf`;
+    const year = new Date(invoice.invoiceDate).getFullYear() || new Date().getFullYear();
+    const storagePath = `generated/finance/invoices/${year}/${safeInvoiceFileName(snapshot.invoiceNumber)}/v${documentVersion}.pdf`;
+    const upload = await storageService.upload(renderResult.blob, storagePath);
     const generatedAt = Timestamp.now();
 
     // Register PDF in Document Center (Single Source of Truth)
@@ -205,7 +223,7 @@ class InvoiceService {
       module: 'Finance',
       documentType: 'Invoice',
       referenceId: invoice.id,
-      title: `Invoice ${snapshot.invoiceNumber}`,
+      title: `Invoice ${snapshot.invoiceNumber} (v${documentVersion})`,
       fileName,
       version: documentVersion,
       status: 'Generated',
@@ -217,7 +235,7 @@ class InvoiceService {
       isSigned: false,
       signedBy: '',
       qrCodeUrl: '',
-      isLocked: true,
+      isLocked: false,
       lockedAt: generatedAt,
       generatedBy,
       generatedAt,
@@ -225,13 +243,13 @@ class InvoiceService {
       emailedTo: '',
       downloadCount: 0,
       archived: false,
-      remarks: `Template ${template.templateId} v${template.templateVersion}`,
+      remarks: `Template ${renderResult.templateId} v${renderResult.templateVersion} (via ${renderResult.renderedWith})`,
       createdBy: generatedBy,
       updatedBy: generatedBy,
     });
 
     const document: InvoiceDocumentStorage = { documentId, documentVersion, storagePath: upload.storagePath, downloadUrl: upload.downloadUrl, fileSize: upload.fileSize, mimeType: upload.mimeType, generatedAt };
-    const statusHistory = [...invoice.statusHistory, this.statusEntry('Generated', generatedBy, 'Invoice generated and registered in Document Center.')];
+    const statusHistory = [...invoice.statusHistory, this.statusEntry('Generated', generatedBy, `Invoice PDF v${documentVersion} generated.`)];
     await invoiceRepository.completeGeneration(invoice.id, snapshot, document, statusHistory);
 
     await auditService.record({
@@ -240,38 +258,66 @@ class InvoiceService {
       recordId: invoice.id,
       performedBy: generatedBy,
       role: 'Finance',
-      newValue: { invoiceNumber: snapshot.invoiceNumber, downloadUrl: upload.downloadUrl, fileSize: upload.fileSize },
-      remarks: `Invoice ${snapshot.invoiceNumber} PDF generated.`,
+      newValue: { invoiceNumber: snapshot.invoiceNumber, documentVersion, downloadUrl: upload.downloadUrl, fileSize: upload.fileSize },
+      remarks: `Invoice ${snapshot.invoiceNumber} PDF v${documentVersion} generated.`,
     });
 
     return document;
   }
 
+  async approveInvoice(invoiceId: string, approvedBy: string): Promise<void> {
+    const invoice = await this.requireInvoice(invoiceId);
+    if (invoice.isLocked || invoice.status === 'Approved') {
+      throw new Error('Invoice is already approved and locked.');
+    }
+    if (!approvedBy.trim()) throw new Error('Approver name is required.');
+
+    const statusHistory = [
+      ...invoice.statusHistory,
+      this.statusEntry('Approved', approvedBy, 'Invoice officially approved and locked.'),
+    ];
+
+    await invoiceRepository.approveInvoice(invoice.id, approvedBy, statusHistory);
+
+    await auditService.record({
+      module: 'Finance',
+      action: 'Approve Invoice',
+      recordId: invoiceId,
+      performedBy: approvedBy,
+      role: 'Finance',
+      newValue: { status: 'Approved', isLocked: true },
+      remarks: `Invoice ${invoice.invoiceNumber} officially approved and locked.`,
+    });
+  }
+
   /**
    * Record Client Payment (Immutable Append-Only Ledger Workflow)
-   * Formula rules:
-   * - TDS = 2% of Invoice Amount (snapshot.grandTotal)
+   * Formula rules per Indian Accounting Standards:
+   * - Taxable Amount = Basic Amount (excluding GST)
+   * - TDS = 2% of Taxable Basic Amount
+   * - Net Receivable = Invoice Total (grandTotal) - TDS
    * - Settlement Value = Amount Received + TDS
    * - Revenue = Amount Received - Candidate Pay
-   * - Outstanding Amount = Invoice Amount - Total Settlement Value
-   * - Withheld Amount = Invoice Amount - Total Settlement Value
+   * - Outstanding Amount = Invoice Total - Total Settlement Value
+   * - Withheld Amount = Invoice Total - Total Settlement Value
    */
   async recordClientPayment(invoiceId: string, input: RecordClientPaymentInput, actorName: string, role = 'Finance Admin'): Promise<void> {
     const invoice = await this.requireInvoice(invoiceId);
-    if (invoice.isLocked || invoice.status === 'Paid') {
-      throw new Error('Invoice is locked and fully paid. No further payment entries allowed.');
+    if (invoice.status === 'Paid') {
+      throw new Error('Invoice is fully paid. No further payment entries allowed.');
     }
     if (!input.amountReceived || input.amountReceived <= 0) {
       throw new Error('Amount received must be greater than zero.');
     }
 
-    const invoiceAmount = invoice.snapshot?.grandTotal ?? 0;
+    const invoiceAmount = invoice.snapshot?.grandTotal ?? invoice.grandTotal ?? 0;
     if (invoiceAmount <= 0) {
       throw new Error('Invoice amount is zero. Payment cannot be recorded.');
     }
 
-    // TDS is automatically 2% of Invoice Amount
-    const tdsAmount = roundMoney(invoiceAmount * 0.02);
+    // TDS is strictly 2% of Taxable Basic Amount (excluding GST)
+    const taxableAmount = invoice.snapshot?.taxableAmount ?? invoice.taxableAmount ?? 0;
+    const tdsAmount = roundMoney(taxableAmount * 0.02);
     const amountReceived = roundMoney(input.amountReceived);
     const candidatePay = roundMoney(input.candidatePay ?? 0);
     const settlementValue = roundMoney(amountReceived + tdsAmount);

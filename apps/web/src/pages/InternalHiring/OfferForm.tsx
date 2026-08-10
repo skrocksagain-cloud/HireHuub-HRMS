@@ -83,12 +83,6 @@ export default function OfferForm({
         loading={saving}
         onSave={saveOffer}
         onCancel={() => onSuccess?.()}
-        onPreview={() => {
-          console.log("Preview PDF");
-        }}
-        onGenerate={() => {
-          console.log("Generate Offer");
-        }}
       />
 
     </div>

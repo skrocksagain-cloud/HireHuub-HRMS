@@ -37,7 +37,7 @@ export interface ExpenseTransactionStatusHistoryEntry {
 
 export interface ExpenseTransaction {
   id: string;
-  expenseNumber: string; // Format: HHEXP2026-0001
+  expenseNumber: string;
   transactionNumber: string;
   transactionDate: string;
 

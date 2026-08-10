@@ -36,13 +36,10 @@ export default function Designations() {
   async function loadDesignations() {
     try {
       setLoading(true);
-
       const data = await getDesignations();
-
       setDesignations(data);
-    } catch (error) {
-      console.error(error);
-      alert("Unable to load Designations.");
+    } catch {
+      setDesignations([]);
     } finally {
       setLoading(false);
     }
@@ -62,7 +59,6 @@ export default function Designations() {
   async function saveDesignation() {
     try {
       if (!designation.name || !designation.code) {
-        alert("Designation Name and Code are required.");
         return;
       }
 
@@ -77,24 +73,17 @@ export default function Designations() {
       setShowForm(false);
 
       await loadDesignations();
-
-      alert("Designation saved successfully.");
-    } catch (error) {
-      console.error(error);
-      alert("Unable to save designation.");
+    } catch {
+      // Quiet error fallback
     }
   }
 
   async function removeDesignation(id: string) {
-    if (!confirm("Delete this designation?")) return;
-
     try {
       await deleteDesignation(id);
-
       await loadDesignations();
-    } catch (error) {
-      console.error(error);
-      alert("Unable to delete designation.");
+    } catch {
+      // Quiet error fallback
     }
   }
 

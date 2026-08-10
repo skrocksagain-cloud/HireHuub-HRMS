@@ -90,12 +90,11 @@ const downloadPdf = (records: DailyAttendance[]): void => {
 export default function AttendancePage() {
   const { user } = useAuth();
 
-  // Always provide fallback actor context so workspace is never blank or blocked
   const actor: AttendanceActor = {
-    employeeId: user?.employeeId || user?.id || 'HH0001',
-    name: user?.name || 'Authorized User',
-    role: user?.role || 'Super Admin',
-    department: user?.department || 'Operations',
+    employeeId: user?.employeeId || user?.id || '',
+    name: user?.name || '',
+    role: user?.role || '',
+    department: user?.department || '',
   };
 
   const attendance = useAttendance(actor);

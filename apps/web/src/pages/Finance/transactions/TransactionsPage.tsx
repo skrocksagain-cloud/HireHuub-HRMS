@@ -59,7 +59,7 @@ export default function TransactionsPage() {
   const [actionError, setActionError] = useState<string>('');
 
   // Approved Expense Form State (Single Paid From Field + Conditional Paid By Field)
-  const [expenseNumber, setExpenseNumber] = useState<string>('HHEXP2026-0001');
+  const [expenseNumber, setExpenseNumber] = useState<string>('');
   const [expenseType, setExpenseType] = useState<string>('Office Rent');
   const [transactionDate, setTransactionDate] = useState<string>(
     new Date().toISOString().split('T')[0]
@@ -80,8 +80,9 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (showExpenseDrawer) {
-      const num = transactionService.previewNextExpenseNumber(expenses.length);
-      setExpenseNumber(num);
+      void transactionService.previewNextExpenseNumber(expenses.length)
+        .then(setExpenseNumber)
+        .catch((error: unknown) => setActionError(error instanceof Error ? error.message : 'Unable to generate an expense number.'));
     }
   }, [showExpenseDrawer, expenses.length]);
 
@@ -501,7 +502,6 @@ export default function TransactionsPage() {
                   <span className="font-bold text-slate-900 text-xs">All Financial Receipts & Discrepancies</span>
                   <button
                     type="button"
-                    onClick={() => alert('Exporting Payment History to CSV…')}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition"
                   >
                     <Download size={13} />

@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -63,8 +64,10 @@ export interface AdminRepository {
 
   getDocumentTemplates(): Promise<DocumentTemplateConfig[]>;
   getDocumentTemplateByType(type: string): Promise<DocumentTemplateConfig | null>;
+  getDocumentTemplatesByType(type: string): Promise<DocumentTemplateConfig[]>;
   saveDocumentTemplate(template: DocumentTemplateConfig): Promise<void>;
   updateDocumentTemplate(id: string, updates: Partial<DocumentTemplateConfig>): Promise<void>;
+  deleteDocumentTemplate(id: string): Promise<void>;
 
   getBigDays(): Promise<BigDayConfig[]>;
   saveBigDay(config: BigDayConfig): Promise<void>;
@@ -93,51 +96,46 @@ class FirestoreAdminRepository implements AdminRepository {
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
-      return snap.data() as CompanySettings;
+      const data = snap.data() as CompanySettings;
+      return {
+        ...data,
+      };
     }
 
     const defaultCompany: CompanySettings = {
       id: COMPANY_DOC_ID,
-      companyName: 'Hire Huub Pvt Ltd',
-      brandName: 'Hire Huub One',
-      gstin: '27AAAAA0000A1Z5',
-      pan: 'AAAAA0000A',
-      cin: 'U72900PN2026PTC000000',
-      address: 'Suite 401, Apex Tech Hub, Baner, Pune, Maharashtra 411045',
+      companyName: '',
+      brandName: '',
+      gstin: '',
+      pan: '',
+      cin: '',
+      address: '',
+      registeredState: '',
+      registeredCity: '',
+      postalCode: '',
+      invoicePrefix: '',
+      creditNotePrefix: '',
+      employeeCodePrefix: '',
+      offerPrefix: '',
+      documentPrefix: '',
+      expensePrefix: '',
+      campaignPrefix: '',
+      openingPrefix: '',
+      financialYearStartMonth: undefined,
+      defaultGstRate: undefined,
+      defaultTdsRate: undefined,
       bankDetails: {
-        bankName: 'HDFC Bank',
-        accountNumber: '50200012345678',
-        ifscCode: 'HDFC0000123',
-        branchName: 'Baner Branch',
+        bankName: '',
+        accountNumber: '',
+        ifscCode: '',
+        branchName: '',
       },
-      website: 'https://hirehuub.com',
-      email: 'contact@hirehuub.com',
-      phone: '+91 98765 43210',
-      logoUrl: '/logo/h-logo.png',
+      website: '',
+      email: '',
+      phone: '',
+      logoUrl: '',
       stampUrl: '',
-      signatures: [
-        {
-          id: 'sig-director',
-          name: 'Rahul Sharma',
-          designation: 'Managing Director / Founder',
-          signatureUrl: '',
-          isActive: true,
-        },
-        {
-          id: 'sig-hr',
-          name: 'Sneha Roy',
-          designation: 'HR Head',
-          signatureUrl: '',
-          isActive: true,
-        },
-        {
-          id: 'sig-finance',
-          name: 'Priya Mehta',
-          designation: 'VP Finance / Finance Head',
-          signatureUrl: '',
-          isActive: true,
-        },
-      ],
+      signatures: [],
       updatedAt: new Date().toISOString(),
     };
 
@@ -378,30 +376,55 @@ class FirestoreAdminRepository implements AdminRepository {
   }
 
   async getDocumentTemplates(): Promise<DocumentTemplateConfig[]> {
-    const snap = await getDocs(collection(db, 'admin_document_templates'));
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<DocumentTemplateConfig, 'id'>) }));
+    try {
+      const snap = await getDocs(collection(db, 'document_templates'));
+      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<DocumentTemplateConfig, 'id'>) }));
+    } catch {
+      return [];
+    }
   }
 
   async getDocumentTemplateByType(type: string): Promise<DocumentTemplateConfig | null> {
-    const docRef = doc(db, 'admin_document_templates', slugify(type));
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as DocumentTemplateConfig;
+    try {
+      const list = await this.getDocumentTemplatesByType(type);
+      if (list.length > 0) return list[0];
+      const docRef = doc(db, 'document_templates', slugify(type));
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { id: snap.id, ...(snap.data() as Omit<DocumentTemplateConfig, 'id'>) };
+      }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
+  }
+
+  async getDocumentTemplatesByType(type: string): Promise<DocumentTemplateConfig[]> {
+    try {
+      const list = await this.getDocumentTemplates();
+      return list.filter(
+        (t) => (t.type || (t as { documentType?: string }).documentType)?.toLowerCase() === type.toLowerCase()
+      );
+    } catch {
+      return [];
+    }
   }
 
   async saveDocumentTemplate(template: DocumentTemplateConfig): Promise<void> {
-    const id = template.id || slugify(template.type);
-    const docRef = doc(db, 'admin_document_templates', id);
+    const id = template.id || slugify(`${template.type}-${template.templateName || Date.now()}`);
+    const docRef = doc(db, 'document_templates', id);
     await setDoc(docRef, { ...template, id, createdAt: new Date().toISOString() });
   }
 
   async updateDocumentTemplate(id: string, updates: Partial<DocumentTemplateConfig>): Promise<void> {
-    await updateDoc(doc(db, 'admin_document_templates', id), {
+    await updateDoc(doc(db, 'document_templates', id), {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  async deleteDocumentTemplate(id: string): Promise<void> {
+    await deleteDoc(doc(db, 'document_templates', id));
   }
 
   async getBigDays(): Promise<BigDayConfig[]> {

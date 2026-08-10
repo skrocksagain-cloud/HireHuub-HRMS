@@ -146,55 +146,102 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
         <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200/80">
           <div
             style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-            className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-12 shadow-xl border border-slate-300 rounded-lg flex flex-col justify-between transition-all"
+            className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-10 shadow-xl border border-slate-300 rounded-lg flex flex-col justify-between transition-all"
           >
-            {/* Header Banner */}
-            <div className="border-b-2 border-slate-900 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {result.logoUrl ? (
-                  <img src={result.logoUrl} alt="Logo" className="h-12 object-contain" />
+            {/* HR Letterhead Top Image (If HR Category or letterheadUrl present) */}
+            {result.category === 'HR' || result.format === 'DOCX' || result.letterheadUrl ? (
+              <div className="border-b border-slate-200 pb-3">
+                {result.letterheadUrl ? (
+                  <img src={result.letterheadUrl} alt="Company Letterhead Top" className="w-full max-h-28 object-contain" />
                 ) : (
-                  <div className="font-black text-xl text-slate-900 tracking-wider">HIRE HUUB ONE</div>
+                  <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+                    <div className="flex items-center gap-3">
+                      {result.logoUrl ? (
+                        <img src={result.logoUrl} alt="Company Logo" className="h-12 object-contain" />
+                      ) : (
+                        <div className="font-black text-xl text-slate-900 tracking-wider">HIRE HUUB ONE</div>
+                      )}
+                    </div>
+                    <div className="text-right font-mono text-[10px] text-slate-500">
+                      Date: {placeholders.date || new Date().toLocaleDateString()}
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="text-right">
-                <div className="font-bold text-xs text-slate-900 uppercase tracking-widest">{result.headerText}</div>
-                <div className="text-[10px] text-slate-500 font-mono">Date: {placeholders.date || new Date().toLocaleDateString()}</div>
-              </div>
-            </div>
-
-            {/* Document Content / Body */}
-            <div className="py-8 space-y-6 flex-1 text-xs text-slate-800 leading-relaxed">
-              <div className="flex justify-between font-mono text-[11px] text-slate-600 border-b border-slate-100 pb-2">
-                <span>Ref: {result.fileName.replace('.pdf', '')}</span>
-                <span>Version: {result.templateVersion || 'v1.0'}</span>
-              </div>
-
-              <div className="space-y-3 pt-2 font-medium">
-                <p className="font-bold text-slate-900 text-sm">To Whom It May Concern,</p>
-                <p>
-                  This official document is generated and issued by <strong>{placeholders.company_name}</strong> ({placeholders.brand_name}) for <strong>{placeholders.employee_name || placeholders.candidate_name || placeholders.client_name}</strong>.
-                </p>
-
-                <div className="my-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 text-xs">Resolved Document Parameters</div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div><span className="text-slate-500">Party / Entity:</span> <strong className="text-slate-900">{placeholders.employee_name || placeholders.client_name}</strong></div>
-                    <div><span className="text-slate-500">Designation / Role:</span> <strong className="text-slate-900">{placeholders.designation || 'Staff'}</strong></div>
-                    <div><span className="text-slate-500">Department:</span> <strong className="text-slate-900">{placeholders.department || 'General'}</strong></div>
-                    <div><span className="text-slate-500">Joining / Issue Date:</span> <strong className="text-slate-900">{placeholders.joining_date || placeholders.date}</strong></div>
-                    <div><span className="text-slate-500">Company GSTIN:</span> <strong className="text-slate-900 font-mono">{placeholders.gstin}</strong></div>
-                    <div><span className="text-slate-500">Company PAN:</span> <strong className="text-slate-900 font-mono">{placeholders.pan}</strong></div>
+            ) : (
+              /* Finance / Payroll Direct Excel Header Banner */
+              <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {result.logoUrl && <img src={result.logoUrl} alt="Logo" className="h-10 object-contain bg-white p-1 rounded-lg" />}
+                  <div>
+                    <div className="font-bold text-sm text-white">{placeholders.company_name || 'Hire Huub One'}</div>
+                    <div className="text-[10px] text-emerald-400 font-mono">FINANCIAL STATEMENT / EXCEL TEMPLATE</div>
                   </div>
                 </div>
+                <div className="text-right text-[11px] font-mono">
+                  <div>Ref: {result.fileName.replace('.pdf', '')}</div>
+                  <div className="text-slate-400">Date: {placeholders.date || new Date().toLocaleDateString()}</div>
+                </div>
+              </div>
+            )}
 
-                <p>
-                  All terms, policies, and proprietary stipulations of <strong>{placeholders.company_name}</strong> remain applicable in full effect as configured under official ERP records.
-                </p>
+            {/* Document Content / Body */}
+            <div className="py-6 space-y-6 flex-1 text-xs text-slate-800 leading-relaxed">
+              <div className="flex justify-between font-mono text-[11px] text-slate-500 border-b border-slate-100 pb-2">
+                <span>Ref No: {result.fileName.replace('.pdf', '')}</span>
+                <span>Template Version: {result.templateVersion || 'v1.0'}</span>
               </div>
 
+              {result.category === 'HR' || result.format === 'DOCX' ? (
+                /* HR Letter Document Layout */
+                <div className="space-y-4 font-medium">
+                  <p className="font-bold text-slate-900 text-sm">To Whom It May Concern,</p>
+                  <p>
+                    This official document is issued by <strong>{placeholders.company_name}</strong> for <strong>{placeholders.employee_name || placeholders.candidate_name || placeholders.client_name}</strong>.
+                  </p>
+
+                  <div className="my-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 text-xs">Resolved Document Parameters</div>
+                    <div className="grid grid-cols-2 gap-3 text-[11px]">
+                      <div><span className="text-slate-500">Party / Entity:</span> <strong className="text-slate-900">{placeholders.employee_name || placeholders.client_name}</strong></div>
+                      <div><span className="text-slate-500">Designation / Role:</span> <strong className="text-slate-900">{placeholders.designation || 'Staff'}</strong></div>
+                      <div><span className="text-slate-500">Department:</span> <strong className="text-slate-900">{placeholders.department || 'General'}</strong></div>
+                      <div><span className="text-slate-500">Joining / Issue Date:</span> <strong className="text-slate-900">{placeholders.joining_date || placeholders.date}</strong></div>
+                      <div><span className="text-slate-500">Company GSTIN:</span> <strong className="text-slate-900 font-mono">{placeholders.gstin}</strong></div>
+                      <div><span className="text-slate-500">Company PAN:</span> <strong className="text-slate-900 font-mono">{placeholders.pan}</strong></div>
+                    </div>
+                  </div>
+
+                  <p>
+                    All terms, policies, and proprietary stipulations of <strong>{placeholders.company_name}</strong> remain applicable in full effect as configured under official ERP records.
+                  </p>
+                </div>
+              ) : (
+                /* Finance & Payroll Excel Template View Layout */
+                <div className="space-y-4">
+                  <div className="font-bold text-slate-900 text-sm border-b pb-1 flex items-center justify-between">
+                    <span>{result.templateUsed || 'Financial Document'}</span>
+                    <span className="text-emerald-700 font-mono text-xs">Direct Excel Spreadsheet Render</span>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 font-mono text-[11px]">
+                    <div className="font-bold text-slate-900 border-b pb-1 font-sans text-xs">Spreadsheet Data Grid Summary</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>Entity Name: <strong className="text-slate-900">{placeholders.client_name || placeholders.employee_name}</strong></div>
+                      <div>Amount / Total: <strong className="text-emerald-700 font-bold">{placeholders.amount || placeholders.ctc || placeholders.net_pay || '₹0.00'}</strong></div>
+                      <div>GSTIN: <strong className="text-slate-900">{placeholders.gstin}</strong></div>
+                      <div>Invoice / Ref ID: <strong className="text-slate-900">{placeholders.invoice_number || result.fileName.replace('.pdf', '')}</strong></div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-600 text-[11px]">
+                    Excel template formatting, table structures, cell borders, and formulas are preserved directly from the uploaded spreadsheet template.
+                  </div>
+                </div>
+              )}
+
               {/* Signatures & Stamp Section */}
-              <div className="pt-12 grid grid-cols-2 gap-8 items-end border-t border-slate-200 mt-8">
+              <div className="pt-8 grid grid-cols-2 gap-8 items-end border-t border-slate-200 mt-6">
                 <div>
                   {result.stampUrl && result.stampUsed ? (
                     <div className="space-y-1">
@@ -206,25 +253,43 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
                   )}
                 </div>
 
-                <div className="text-right space-y-2">
+                <div className="text-right space-y-1.5">
                   {result.signatureUrl ? (
                     <img src={result.signatureUrl} alt="Signature" className="h-14 object-contain ml-auto" />
                   ) : (
                     <div className="h-10 border-b border-slate-400 w-48 ml-auto"></div>
                   )}
-                  <div className="font-bold text-slate-900 text-xs">{result.signatureUsed}</div>
-                  <div className="text-[10px] text-slate-500">Authorized Signatory</div>
+                  <div className="font-bold text-slate-900 text-xs">{result.signatureUsed || 'Authorized Signatory'}</div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    Type: <span className="text-emerald-700 font-bold">{result.signatureType || 'Image'}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer Legal Disclaimer */}
-            <div className="border-t border-slate-300 pt-3 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-              <div>{result.footerText}</div>
-              <div className="flex items-center gap-1 text-emerald-700 font-bold">
-                <CheckCircle2 size={12} /> Registered in Document Center
+            {/* Bottom Letter Footer Image (If HR Category or letterFooterUrl present) */}
+            {result.category === 'HR' || result.format === 'DOCX' || result.letterFooterUrl ? (
+              <div className="border-t border-slate-200 pt-3">
+                {result.letterFooterUrl ? (
+                  <img src={result.letterFooterUrl} alt="Company Letter Footer Bottom" className="w-full max-h-24 object-contain" />
+                ) : (
+                  <div className="border-t border-slate-300 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                    <div>{placeholders.company_name} | Enterprise HR & Document Management System</div>
+                    <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                      <CheckCircle2 size={12} /> Registered in Document Center
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              /* Finance Legal Footer */
+              <div className="border-t border-slate-300 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                <div>This financial document is computer-generated from approved ERP templates.</div>
+                <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                  <CheckCircle2 size={12} /> Registered in Document Center
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

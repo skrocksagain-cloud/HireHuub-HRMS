@@ -23,10 +23,8 @@ export default function OfferTable() {
       const data = await getOffers();
 
       setOffers(data);
-    } catch (error) {
-      console.error(error);
-
-      alert("Unable to load offers.");
+    } catch {
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -37,17 +35,9 @@ export default function OfferTable() {
       data={offers}
       loading={loading}
       columns={getOfferColumns({
-        onView: (offer) => {
-          console.log("View", offer);
-        },
-
-        onEdit: (offer) => {
-          console.log("Edit", offer);
-        },
-
-        onDelete: (offer) => {
-          console.log("Delete", offer);
-        },
+        onView: () => {},
+        onEdit: () => {},
+        onDelete: () => {},
       })}
       emptyTitle="No Offers Found"
       emptyDescription="Create your first internal offer to get started."

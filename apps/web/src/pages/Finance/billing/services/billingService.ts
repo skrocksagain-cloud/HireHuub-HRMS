@@ -1,4 +1,5 @@
 import { billingRepository } from '../repositories/billingRepository';
+import { adminService } from '../../../../services/admin/adminService';
 import { invoiceNumberService } from '../../../../services/numbering/invoiceNumberService';
 import type {
   BillingCompany,
@@ -18,7 +19,6 @@ export interface InvoiceOutstandingBreakdown {
   creditNotesApplied: number;
   outstandingAmount: number;
 }
-const FIXED_BILLING_ENTITY_LEGAL_NAME = 'HIRE HUUB PEOPLE SOLUTION PRIVATE LIMITED';
 
 const validateBillingCompany = (company: BillingCompanyInput): void => {
   if (!company.companyName.trim() || !company.legalName.trim()) throw new Error('Billing company names are required.');
@@ -36,11 +36,58 @@ class BillingService {
   }
 
   async getFixedBillingCompany(): Promise<BillingCompany> {
-    const companies = await billingRepository.getBillingCompanies();
-    const company = companies.find((candidate) => normalizeState(candidate.legalName) === FIXED_BILLING_ENTITY_LEGAL_NAME);
-    if (!company) throw new Error('Hire Huub People Solution Private Limited billing configuration was not found.');
-    if (!company.isActive) throw new Error('Hire Huub People Solution Private Limited billing configuration is inactive.');
-    return company;
+    const adminCompany = await adminService.getCompanySettings();
+    const invoiceTemplate = await adminService.getDocumentTemplateByType('invoice');
+
+    const missingFields: string[] = [];
+    if (!adminCompany?.companyName) missingFields.push('Company Name');
+    if (!adminCompany?.gstin) missingFields.push('GSTIN');
+    if (!adminCompany?.address) missingFields.push('Company Registered Address');
+    if (!adminCompany?.bankDetails?.accountNumber) missingFields.push('Bank Account Number');
+    if (!adminCompany?.pan) missingFields.push('PAN');
+    if (!adminCompany?.registeredState) missingFields.push('Registered State');
+    if (!adminCompany?.postalCode) missingFields.push('Postal Code');
+    if (!adminCompany?.invoicePrefix) missingFields.push('Invoice Prefix');
+    if (!invoiceTemplate) missingFields.push('Active Invoice Document Template');
+
+    if (missingFields.length > 0) {
+      throw new Error(
+        `Invoice cannot be generated.\nMissing in Administration -> Management -> Company Settings:\n• ${missingFields.join('\n• ')}`
+      );
+    }
+
+    return {
+      id: adminCompany.id,
+      companyName: adminCompany.companyName,
+      legalName: adminCompany.companyName,
+      gstin: adminCompany.gstin,
+      pan: adminCompany.pan,
+      registeredAddress: {
+        line1: adminCompany.address,
+        city: adminCompany.registeredCity || '',
+        state: adminCompany.registeredState!,
+        postalCode: adminCompany.postalCode!,
+        country: 'India',
+      },
+      bankDetails: {
+        bankName: adminCompany.bankDetails.bankName,
+        accountNumber: adminCompany.bankDetails.accountNumber,
+        ifscCode: adminCompany.bankDetails.ifscCode,
+        branchName: adminCompany.bankDetails.branchName,
+        accountHolderName: adminCompany.companyName,
+      },
+      invoicePrefix: adminCompany.invoicePrefix!,
+      invoiceTemplateId: invoiceTemplate!.id,
+      invoiceTemplateVersion: invoiceTemplate!.version || 1,
+      authorizedSignatory: adminCompany.signatures?.find((signature) => signature.isActive)?.name || '',
+      isActive: true,
+      configuration: {
+        invoiceSequencePadding: 4,
+        financialYearStartMonth: adminCompany.financialYearStartMonth || 1,
+      },
+      createdAt: new Date().toISOString() as any,
+      updatedAt: new Date().toISOString() as any,
+    };
   }
 
   async createBillingCompany(company: BillingCompanyInput): Promise<string> {
@@ -78,28 +125,13 @@ class BillingService {
   }
 
   async previewNextInvoiceNumber(invoiceDate: Date = new Date(), knownCount = 0): Promise<string> {
-    try {
-      const company = await this.getFixedBillingCompany();
-      return invoiceNumberService.previewNextInvoiceNumber(company.id, invoiceDate, knownCount);
-    } catch {
-      const year = invoiceDate.getFullYear();
-      const nextSeq = knownCount + 1;
-      return `HH${year}-${String(nextSeq).padStart(4, '0')}`;
-    }
+    const company = await this.getFixedBillingCompany();
+    return invoiceNumberService.previewNextInvoiceNumber(company.id, invoiceDate, knownCount);
   }
 
   async generateCreditNoteNumber(creditNoteDate: Date): Promise<InvoiceNumber> {
-    try {
-      const company = await this.getFixedBillingCompany();
-      return invoiceNumberService.generateNextCreditNoteNumber(company.id, creditNoteDate);
-    } catch {
-      const year = creditNoteDate.getFullYear();
-      return {
-        value: `HHCN${year}-0001`,
-        financialYear: String(year),
-        sequence: 1,
-      };
-    }
+    const company = await this.getFixedBillingCompany();
+    return invoiceNumberService.generateNextCreditNoteNumber(company.id, creditNoteDate);
   }
 
   async previewNextCreditNoteNumber(knownCount = 0): Promise<string> {
@@ -131,9 +163,13 @@ class BillingService {
   }
 
   private async getActiveBillingCompany(id: string): Promise<BillingCompany> {
-    if (!id.trim()) throw new Error('Billing company ID is required.');
+    if (!id.trim() || id === 'comp-main') {
+      return this.getFixedBillingCompany();
+    }
     const company = await billingRepository.getBillingCompany(id);
-    if (!company) throw new Error('Billing company was not found.');
+    if (!company) {
+      return this.getFixedBillingCompany();
+    }
     if (!company.isActive) throw new Error('Billing company is inactive.');
     return company;
   }

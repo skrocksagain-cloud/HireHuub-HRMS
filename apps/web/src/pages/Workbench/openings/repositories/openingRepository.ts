@@ -138,7 +138,7 @@ export class OpeningRepository {
   }
 
   async createOpening(input: Omit<Opening, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Opening> {
-    const newId = input.id || openingNumberService.calculateNextNumber(this.openings);
+    const newId = input.id || await openingNumberService.generateNextNumber(this.openings);
     const now = new Date().toISOString();
     const newOpening: Opening = {
       ...input,

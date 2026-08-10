@@ -84,6 +84,7 @@ export interface InvoiceRepository {
   updateDraft(id: string, input: CreateInvoiceDraftInput): Promise<void>;
   completeGeneration(id: string, snapshot: InvoiceSnapshot, document: InvoiceDocumentStorage, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void>;
   updateStatus(id: string, status: InvoiceStatus, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void>;
+  approveInvoice(id: string, approvedBy: string, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void>;
   recordPayment(id: string, update: InvoiceTotalsUpdate): Promise<void>;
 }
 
@@ -151,8 +152,19 @@ class FirestoreInvoiceRepository implements InvoiceRepository {
   }
 
   async updateStatus(id: string, status: InvoiceStatus, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void> {
-    const isLocked = status === 'Paid';
+    const isLocked = status === 'Paid' || status === 'Approved';
     await updateDoc(doc(db, INVOICES_COLLECTION, id), { status, isLocked, statusHistory, updatedAt: serverTimestamp() });
+  }
+
+  async approveInvoice(id: string, approvedBy: string, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void> {
+    await updateDoc(doc(db, INVOICES_COLLECTION, id), {
+      status: 'Approved',
+      isLocked: true,
+      approvedAt: serverTimestamp(),
+      approvedBy,
+      statusHistory,
+      updatedAt: serverTimestamp(),
+    });
   }
 
   async recordPayment(id: string, update: InvoiceTotalsUpdate): Promise<void> {

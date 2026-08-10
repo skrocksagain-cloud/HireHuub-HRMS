@@ -12,6 +12,8 @@ import {
   Lock,
   Download,
   Plus,
+  Edit3,
+  Eye,
 } from 'lucide-react';
 import DashboardLayout from '../../../../layouts/DashboardLayout';
 import StatusBadge from '../../../../ui/StatusBadge';
@@ -37,12 +39,23 @@ export default function InvoiceProfilePage() {
     hasFinanceAccess,
     hasWriteAccess,
     updateStatus,
+    updateDraft,
+    generatePDF,
+    approveInvoice,
     recordPayment,
   } = useInvoiceProfile(invoiceId, currentRole);
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showPaymentDrawer, setShowPaymentDrawer] = useState<boolean>(false);
+  const [showApproveModal, setShowApproveModal] = useState<boolean>(false);
   const [updating, setUpdating] = useState<boolean>(false);
+
+  // Edit Invoice Form State
+  const [showEditDrawer, setShowEditDrawer] = useState<boolean>(false);
+  const [editPoNumber, setEditPoNumber] = useState<string>('');
+  const [editRemarks, setEditRemarks] = useState<string>('');
+  const [editInvoiceDate, setEditInvoiceDate] = useState<string>('');
+  const [editLineItems, setEditLineItems] = useState<Array<{ id: string; description: string; quantity: number; unitPrice: number; gstRate: number }>>([]);
 
   // Record Client Payment Form State
   const [amountReceived, setAmountReceived] = useState<number>(0);
@@ -79,8 +92,10 @@ export default function InvoiceProfilePage() {
 
   const snapshot = invoice.snapshot;
   const client = snapshot?.client;
-  const grandTotal = snapshot?.grandTotal ?? 0;
-  const isLocked = invoice.isLocked || invoice.status === 'Paid';
+  const taxableAmount = snapshot?.taxableAmount ?? invoice.taxableAmount ?? 0;
+  const gstAmount = snapshot?.gst?.totalGstAmount ?? invoice.gstAmount ?? 0;
+  const grandTotal = snapshot?.grandTotal ?? invoice.grandTotal ?? 0;
+  const isLocked = invoice.isLocked || invoice.status === 'Approved' || invoice.status === 'Paid';
 
   // Financial Ledger Computations
   const totalReceived = invoice.totalAmountReceived ?? (invoice.payments ?? []).reduce((s, p) => s + p.amountReceived, 0);
@@ -92,8 +107,9 @@ export default function InvoiceProfilePage() {
   const withheldAmount = invoice.withheldAmount ?? Math.max(0, grandTotal - totalSettlement);
   const displayInvoiceNumber = invoice.snapshot?.invoiceNumber || invoice.invoiceNumber || invoice.id;
 
-  // Live Payment Calculations in Modal
-  const autoTds = Math.round((grandTotal * 0.02 + Number.EPSILON) * 100) / 100;
+  // Live Payment Calculations in Modal per Indian Accounting Formula
+  const autoTds = Math.round((taxableAmount * 0.02 + Number.EPSILON) * 100) / 100;
+  const netReceivable = Math.max(0, grandTotal - autoTds);
   const liveSettlementValue = (amountReceived || 0) + autoTds;
   const liveRevenue = (amountReceived || 0) - (candidatePay || 0);
   const liveOutstanding = Math.max(0, grandTotal - (totalSettlement + liveSettlementValue));
@@ -103,6 +119,89 @@ export default function InvoiceProfilePage() {
     setUpdating(true);
     try {
       await updateStatus(newStatus, user?.name || 'Finance Admin');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleApproveInvoiceSubmit = async () => {
+    setUpdating(true);
+    try {
+      await approveInvoice(user?.name || 'Finance Admin');
+      setShowApproveModal(false);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleOpenEditDrawer = () => {
+    if (!invoice) return;
+    setEditPoNumber(invoice.poNumber || '');
+    setEditRemarks(invoice.remarks || '');
+    setEditInvoiceDate(invoice.invoiceDate || new Date().toISOString().slice(0, 10));
+    setEditLineItems(invoice.lineItems.map((item, idx) => ({
+      id: `item-${idx}`,
+      description: item.description || (item as any).itemDescription || 'Services Rendered',
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      gstRate: item.gstRate || 18,
+    })));
+    setShowEditDrawer(true);
+  };
+
+  const handleSaveDraftSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdating(true);
+    try {
+      const updatedItems = editLineItems.map(item => {
+        const taxableAmount = Math.round(item.quantity * item.unitPrice);
+        const gstAmount = Math.round(taxableAmount * (item.gstRate / 100));
+        return {
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxableAmount,
+          gstRate: item.gstRate,
+          gstAmount,
+          totalAmount: taxableAmount + gstAmount,
+        };
+      });
+
+      const taxableTotal = updatedItems.reduce((acc, i) => acc + i.taxableAmount, 0);
+      const gstTotal = updatedItems.reduce((acc, i) => acc + i.gstAmount, 0);
+      const grandTotal = taxableTotal + gstTotal;
+
+      await updateDraft(
+        {
+          poNumber: editPoNumber,
+          remarks: editRemarks,
+          invoiceDate: editInvoiceDate,
+          lineItems: updatedItems as any,
+          taxableAmount: taxableTotal,
+          gstAmount: gstTotal,
+          grandTotal,
+        },
+        user?.name || 'Finance Admin'
+      );
+      setShowEditDrawer(false);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleGeneratePDFSubmit = async () => {
+    setUpdating(true);
+    try {
+      const docStorage = await generatePDF(user?.name || 'Finance Admin');
+      if (docStorage?.downloadUrl) {
+        const link = document.createElement('a');
+        link.href = docStorage.downloadUrl;
+        link.download = docStorage.fileName || `Invoice-${displayInvoiceNumber}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } finally {
       setUpdating(false);
     }
@@ -203,53 +302,57 @@ export default function InvoiceProfilePage() {
 
               {hasWriteAccess && !isLocked && (
                 <>
-                  {invoice.status === 'Draft' && (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('Generated')}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs"
-                    >
-                      <FileCheck size={14} />
-                      <span>Generate Invoice</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={handleOpenEditDrawer}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-xs disabled:opacity-50"
+                  >
+                    <Edit3 size={14} />
+                    <span>Edit Invoice</span>
+                  </button>
 
-                  {invoice.status === 'Generated' && (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('Approved')}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition shadow-xs"
-                    >
-                      <CheckCircle2 size={14} />
-                      <span>Approve Invoice</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={handleGeneratePDFSubmit}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs disabled:opacity-50"
+                  >
+                    <FileCheck size={14} />
+                    <span>{invoice.document ? 'Regenerate PDF' : 'Generate PDF'}</span>
+                  </button>
 
-                  {(invoice.status === 'Generated' || invoice.status === 'Approved' || invoice.status === 'Partially Paid') && (
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentDrawer(true)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs"
-                    >
-                      <Plus size={14} />
-                      <span>Record Client Payment</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => setShowApproveModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition shadow-xs disabled:opacity-50"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Approve Invoice</span>
+                  </button>
 
-                  {invoice.status !== 'Cancelled' && (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('Cancelled')}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-800 font-semibold transition"
-                    >
-                      <X size={14} />
-                      <span>Cancel Invoice</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => handleUpdateStatus('Cancelled')}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-800 font-semibold transition"
+                  >
+                    <X size={14} />
+                    <span>Cancel Invoice</span>
+                  </button>
                 </>
+              )}
+
+              {hasWriteAccess && (invoice.status === 'Approved' || invoice.status === 'Generated' || invoice.status === 'Partially Paid') && (
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentDrawer(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs"
+                >
+                  <Plus size={14} />
+                  <span>Record Client Payment</span>
+                </button>
               )}
 
               {hasWriteAccess && (invoice.status === 'Paid' || invoice.status === 'Partially Paid' || invoice.status === 'Approved') && (
@@ -505,25 +608,82 @@ export default function InvoiceProfilePage() {
 
             {/* TAB 4: Audit History */}
             {activeTab === 'history' && (
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                <h4 className="font-bold text-slate-900 border-b pb-1 text-xs uppercase tracking-wider text-emerald-700">
-                  Audit History & Status Timeline
-                </h4>
-                <div className="space-y-2">
-                  {(invoice.statusHistory || []).map((history, idx) => (
-                    <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 text-xs">
-                      <div className="flex justify-between font-bold text-slate-900">
-                        <span>Status Changed to {history.status}</span>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {history.changedAt?.seconds
-                            ? new Date(history.changedAt.seconds * 1000).toLocaleString('en-GB')
-                            : 'Just now'}
-                        </span>
+              <div className="space-y-4">
+                {/* Document Version History */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                  <h4 className="font-bold text-slate-900 border-b pb-1 text-xs uppercase tracking-wider text-emerald-700 flex items-center justify-between">
+                    <span>Generated Document Version History</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Current: v{invoice.document?.documentVersion || invoice.document?.version || 1}</span>
+                  </h4>
+
+                  {invoice.document ? (
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          <span>{invoice.document.fileName || `Invoice-${displayInvoiceNumber}.pdf`}</span>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] rounded-full font-mono font-bold">
+                            v{invoice.document.documentVersion || invoice.document.version || 1} (Active)
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          ID: {invoice.document.documentId} • Path: {invoice.document.storagePath}
+                        </div>
                       </div>
-                      <div className="text-slate-600 text-[11px] mt-0.5">{history.remarks}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">By: {history.changedBy}</div>
+
+                      <div className="flex items-center gap-2">
+                        {invoice.document.downloadUrl && (
+                          <>
+                            <a
+                              href={invoice.document.downloadUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs inline-flex items-center gap-1"
+                            >
+                              <Eye size={12} />
+                              <span>Preview</span>
+                            </a>
+                            <a
+                              href={invoice.document.downloadUrl}
+                              target="_blank"
+                              download={invoice.document.fileName || `Invoice-${displayInvoiceNumber}.pdf`}
+                              rel="noreferrer"
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs inline-flex items-center gap-1 shadow-xs"
+                            >
+                              <Download size={12} />
+                              <span>Download</span>
+                            </a>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="p-4 text-center text-slate-400 bg-white rounded-xl border text-xs">
+                      No document versions generated yet. Click 'Generate PDF' above.
+                    </div>
+                  )}
+                </div>
+
+                {/* Audit History Timeline */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                  <h4 className="font-bold text-slate-900 border-b pb-1 text-xs uppercase tracking-wider text-emerald-700">
+                    Audit History & Status Timeline
+                  </h4>
+                  <div className="space-y-2">
+                    {(invoice.statusHistory || []).map((history, idx) => (
+                      <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 text-xs">
+                        <div className="flex justify-between font-bold text-slate-900">
+                          <span>Status Changed to {history.status}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {history.changedAt?.seconds
+                              ? new Date(history.changedAt.seconds * 1000).toLocaleString('en-GB')
+                              : 'Just now'}
+                          </span>
+                        </div>
+                        <div className="text-slate-600 text-[11px] mt-0.5">{history.remarks}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">By: {history.changedBy}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -630,15 +790,27 @@ export default function InvoiceProfilePage() {
               </span>
             </div>
 
-            {/* Read-Only Field 8: TDS (Automatically 2% of Invoice Amount) */}
-            <div className="space-y-1">
-              <label className="font-bold text-slate-800 block">TDS (Read Only - Auto 2% of Invoice Amount)</label>
-              <input
-                type="text"
-                readOnly
-                value={`₹${autoTds.toLocaleString('en-IN')}`}
-                className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-100 font-bold text-purple-800 text-xs"
-              />
+            {/* Read-Only Field 8: TDS (2% of Taxable Basic Amount) */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">TDS (2% Taxable Basic)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`₹${autoTds.toLocaleString('en-IN')}`}
+                  className="w-full p-2.5 rounded-xl border border-purple-200 bg-purple-50 font-bold text-purple-800 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">Net Receivable</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`₹${netReceivable.toLocaleString('en-IN')}`}
+                  className="w-full p-2.5 rounded-xl border border-emerald-200 bg-emerald-50 font-bold text-emerald-800 text-xs"
+                />
+              </div>
             </div>
 
             {/* Editable Field 9: Remarks */}
@@ -654,22 +826,45 @@ export default function InvoiceProfilePage() {
             </div>
 
             {/* Live Calculation Output Card */}
-            <div className="p-3 bg-slate-100 rounded-xl space-y-1 font-semibold text-slate-700">
+            <div className="p-3.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl space-y-1.5 font-semibold text-slate-700">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 pb-1 mb-1">
+                Live Indian Accounting Breakdown
+              </div>
+              <div className="flex justify-between text-slate-700">
+                <span>Taxable Basic Amount:</span>
+                <span className="font-mono">₹{taxableAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-slate-700">
+                <span>GST Amount:</span>
+                <span className="font-mono">₹{gstAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-slate-900 font-bold">
+                <span>Invoice Total:</span>
+                <span className="font-mono">₹{grandTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-purple-700">
+                <span>TDS (2% Taxable):</span>
+                <span className="font-mono">₹{autoTds.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-emerald-800 font-bold pt-1 border-t border-slate-200">
+                <span>Net Receivable:</span>
+                <span className="font-mono">₹{netReceivable.toLocaleString('en-IN')}</span>
+              </div>
               <div className="flex justify-between text-blue-800 font-bold">
                 <span>Settlement Value (Rec'd + TDS):</span>
-                <span>₹{liveSettlementValue.toLocaleString('en-IN')}</span>
+                <span className="font-mono">₹{liveSettlementValue.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-emerald-800">
                 <span>Calculated Revenue (Rec'd - Candidate):</span>
-                <span>₹{liveRevenue.toLocaleString('en-IN')}</span>
+                <span className="font-mono">₹{liveRevenue.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between text-amber-700">
+              <div className="flex justify-between text-amber-700 font-bold">
                 <span>Remaining Outstanding:</span>
-                <span>₹{liveOutstanding.toLocaleString('en-IN')}</span>
+                <span className="font-mono">₹{liveOutstanding.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-rose-700">
                 <span>Remaining Withheld:</span>
-                <span>₹{liveWithheld.toLocaleString('en-IN')}</span>
+                <span className="font-mono">₹{liveWithheld.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
@@ -685,6 +880,169 @@ export default function InvoiceProfilePage() {
               className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs text-xs disabled:opacity-50"
             >
               {updating ? 'Recording Payment…' : 'Submit Client Payment Entry'}
+            </button>
+          </form>
+        </Drawer>
+
+        {/* Approve Invoice Confirmation Modal */}
+        {showApproveModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-slate-200">
+              <div className="flex items-center gap-3 text-purple-700">
+                <div className="p-3 bg-purple-50 rounded-2xl">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Approve & Lock Invoice</h3>
+                  <p className="text-xs text-slate-500">Official Finance Record Lock</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-600">
+                <p>
+                  Approving <strong className="text-slate-900">{displayInvoiceNumber}</strong> will set status to{' '}
+                  <strong className="text-purple-700">Approved</strong> and mark the record as{' '}
+                  <strong className="text-slate-900">Locked & Immutable</strong>.
+                </p>
+                <p className="text-[11px] text-amber-800 font-semibold pt-1 border-t border-slate-200">
+                  Note: Line items, GST resolution, and client billing snapshots cannot be modified after approval.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApproveModal(false)}
+                  className="px-4 py-2 border border-slate-300 bg-white text-slate-700 font-semibold rounded-xl text-xs hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={handleApproveInvoiceSubmit}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs transition disabled:opacity-50"
+                >
+                  {updating ? 'Approving…' : 'Approve & Lock Invoice'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Invoice Drawer */}
+        <Drawer
+          isOpen={showEditDrawer}
+          onClose={() => setShowEditDrawer(false)}
+          title="Edit Invoice Details"
+          subtitle={`Draft Edit Mode • ${displayInvoiceNumber}`}
+        >
+          <form onSubmit={handleSaveDraftSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">PO Number</label>
+              <input
+                type="text"
+                value={editPoNumber}
+                onChange={(e) => setEditPoNumber(e.target.value)}
+                placeholder="PO-2026-001"
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Invoice Date</label>
+              <input
+                type="date"
+                value={editInvoiceDate}
+                onChange={(e) => setEditInvoiceDate(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Line Items</label>
+              <div className="space-y-2">
+                {editLineItems.map((item, idx) => (
+                  <div key={item.id} className="p-3 bg-slate-50 border rounded-xl space-y-2">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-semibold">Description</span>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => {
+                          const newItems = [...editLineItems];
+                          newItems[idx].description = e.target.value;
+                          setEditLineItems(newItems);
+                        }}
+                        className="w-full p-2 bg-white border rounded-lg font-medium"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold">Qty</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newItems = [...editLineItems];
+                            newItems[idx].quantity = Number(e.target.value) || 1;
+                            setEditLineItems(newItems);
+                          }}
+                          className="w-full p-2 bg-white border rounded-lg font-medium"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold">Unit Price</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.unitPrice}
+                          onChange={(e) => {
+                            const newItems = [...editLineItems];
+                            newItems[idx].unitPrice = Number(e.target.value) || 0;
+                            setEditLineItems(newItems);
+                          }}
+                          className="w-full p-2 bg-white border rounded-lg font-medium"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold">GST %</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.gstRate}
+                          onChange={(e) => {
+                            const newItems = [...editLineItems];
+                            newItems[idx].gstRate = Number(e.target.value) || 18;
+                            setEditLineItems(newItems);
+                          }}
+                          className="w-full p-2 bg-white border rounded-lg font-medium"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Remarks / Notes</label>
+              <textarea
+                value={editRemarks}
+                onChange={(e) => setEditRemarks(e.target.value)}
+                rows={3}
+                placeholder="Payment due within 30 days..."
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={updating}
+              className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-xs text-xs disabled:opacity-50"
+            >
+              {updating ? 'Saving Draft Changes…' : 'Save Invoice Draft Updates'}
             </button>
           </form>
         </Drawer>

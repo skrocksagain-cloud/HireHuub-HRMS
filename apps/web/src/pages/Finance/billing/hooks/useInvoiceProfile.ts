@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoiceService } from '../services/invoiceService';
+import { clientService } from '../../../Workbench/Network/clients/services/clientService';
 import { permissionService } from '../../../../core/permissions/permissionService';
-import type { Invoice, InvoiceStatus, RecordClientPaymentInput } from '../../../../types/Invoice';
+import type { Invoice, InvoiceStatus, RecordClientPaymentInput, CreateInvoiceDraftInput, InvoiceDocumentStorage } from '../../../../types/Invoice';
 
 export interface UseInvoiceProfileReturn {
   invoice: Invoice | null;
@@ -13,6 +14,9 @@ export interface UseInvoiceProfileReturn {
   hasWriteAccess: boolean;
   reload: () => Promise<void>;
   updateStatus: (newStatus: InvoiceStatus, actorName: string) => Promise<void>;
+  updateDraft: (updates: Partial<Invoice>, actorName: string) => Promise<void>;
+  generatePDF: (actorName: string) => Promise<InvoiceDocumentStorage | undefined>;
+  approveInvoice: (actorName: string) => Promise<void>;
   recordPayment: (input: RecordClientPaymentInput, actorName: string) => Promise<void>;
 }
 
@@ -69,6 +73,86 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     }
   };
 
+  const updateDraft = async (updates: Partial<Invoice>, actorName: string): Promise<void> => {
+    if (!invoiceId || !invoice) return;
+    if (!hasWriteAccess) throw new Error('Permission Denied to edit invoice.');
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const inputPayload: CreateInvoiceDraftInput = {
+        clientId: invoice.clientId,
+        clientName: invoice.clientName || invoice.snapshot?.client?.clientName || 'Client Name',
+        invoiceDate: updates.invoiceDate || invoice.invoiceDate,
+        lineItems: (updates.lineItems || invoice.lineItems).map(item => ({
+          description: item.description || (item as any).itemDescription || 'Services Rendered',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          gstRate: item.gstRate,
+        })),
+        poNumber: updates.poNumber ?? invoice.poNumber,
+        remarks: updates.remarks ?? invoice.remarks,
+        taxableAmount: updates.taxableAmount,
+        gstAmount: updates.gstAmount,
+        grandTotal: updates.grandTotal,
+      };
+      await invoiceService.updateDraft(invoiceId, inputPayload, actorName);
+      setActionSuccess('Invoice updated successfully.');
+      await reload();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update invoice draft.';
+      setActionError(msg);
+      throw err;
+    }
+  };
+
+  const generatePDF = async (actorName: string): Promise<InvoiceDocumentStorage | undefined> => {
+    if (!invoiceId || !invoice) return;
+    if (!hasWriteAccess) throw new Error('Permission Denied to generate PDF.');
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const fetchedClient = await clientService.getClientById(invoice.clientId);
+      if (!fetchedClient) throw new Error('Invoice generation requires an active client record from Workbench.');
+      const primaryGst = (fetchedClient as any).gstinRecords?.[0];
+      const billingAddress = primaryGst?.billingAddress || fetchedClient.billingAddress;
+      const gstin = primaryGst?.gstin || fetchedClient.gstin;
+      const billingState = primaryGst?.stateName || billingAddress?.state;
+      if (!fetchedClient.name || !gstin || !billingAddress?.line1 || !billingState) {
+        throw new Error('Invoice generation requires complete client GST and billing-address data in Workbench.');
+      }
+      const clientPayload = {
+        clientId: fetchedClient.id, clientName: fetchedClient.name, gstin,
+        billingAddress: { line1: billingAddress.line1, line2: billingAddress.line2 || '', city: billingAddress.city || '', state: billingAddress.state || '', postalCode: billingAddress.postalCode || '', country: billingAddress.country || '' },
+        billingState,
+      };
+
+      const docStorage = await invoiceService.generate(invoiceId, clientPayload, actorName);
+      setActionSuccess('Invoice PDF generated successfully.');
+      await reload();
+      return docStorage;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate PDF.';
+      setActionError(msg);
+      throw err;
+    }
+  };
+
+  const approveInvoice = async (actorName: string): Promise<void> => {
+    if (!invoiceId) return;
+    if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to approve invoice.');
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await invoiceService.approveInvoice(invoiceId, actorName);
+      setActionSuccess('Invoice officially approved and locked.');
+      await reload();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to approve invoice.';
+      setActionError(msg);
+      throw err;
+    }
+  };
+
   const recordPayment = async (input: RecordClientPaymentInput, actorName: string): Promise<void> => {
     if (!invoiceId) return;
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to record client payments.');
@@ -95,6 +179,9 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     hasWriteAccess,
     reload,
     updateStatus,
+    updateDraft,
+    generatePDF,
+    approveInvoice,
     recordPayment,
   };
 }

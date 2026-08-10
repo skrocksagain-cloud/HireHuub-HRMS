@@ -14,7 +14,7 @@ const expenseTransactionFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): 
   const data = snapshot.data();
   return {
     id: snapshot.id,
-    expenseNumber: String(data.expenseNumber ?? data.transactionNumber ?? `HHEXP2026-${snapshot.id.slice(0, 4)}`),
+    expenseNumber: String(data.expenseNumber ?? data.transactionNumber ?? ''),
     transactionNumber: String(data.transactionNumber ?? ''),
     transactionDate: String(data.transactionDate ?? ''),
 
@@ -24,7 +24,7 @@ const expenseTransactionFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): 
 
     paidFromId: String(data.paidFromId ?? ''),
     paidFromName: String(data.paidFromName ?? ''),
-    paidFrom: String(data.paidFrom ?? data.paidFromAccount ?? data.paidFromName ?? 'HDFC Current Account'),
+    paidFrom: String(data.paidFrom ?? data.paidFromAccount ?? data.paidFromName ?? ''),
 
     paidById: data.paidById ? String(data.paidById) : undefined,
     paidByName: data.paidByName ? String(data.paidByName) : undefined,

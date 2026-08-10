@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -60,8 +60,40 @@ export default function ClientsPage() {
   const [payoutAmount, setPayoutAmount] = useState<number>(65000);
   const [tenureCondition, setTenureCondition] = useState<OtsTenureCondition>('90 Days');
   const [poRequired, setPoRequired] = useState<boolean>(true);
-  const [templateReference, setTemplateReference] = useState('sheet-template-default-v1');
+  const [templateReference, setTemplateReference] = useState('Hire Huub Standard Invoice');
   const [templateVersion, setTemplateVersion] = useState<number>(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<{
+    id: string;
+    templateId: string;
+    templateName: string;
+    version: number;
+    companyName: string;
+    storagePath: string;
+  } | null>(null);
+  const [activeTemplates, setActiveTemplates] = useState<Array<{ id: string; templateId: string; templateName: string; version: number; companyName: string; storagePath: string }>>([]);
+
+  useEffect(() => {
+    import('../../../../../services/admin/adminService')
+      .then(({ adminService }) => adminService.getDocumentTemplatesByType('Invoice'))
+      .then((tmplList) => {
+        const active = tmplList.filter((t) => (t.status || (t.isActive ? 'Active' : 'Inactive')) === 'Active');
+        if (active.length > 0) {
+          const mapped = active.map((t) => ({
+            id: t.id,
+            templateId: t.templateId || t.id,
+            templateName: t.templateName,
+            version: t.version || 1,
+            companyName: t.clientName || t.companyName || 'Hire Huub',
+            storagePath: t.templateStoragePath || '',
+          }));
+          setActiveTemplates(mapped);
+          setSelectedTemplate(mapped[0]);
+          setTemplateReference(mapped[0].templateName);
+          setTemplateVersion(mapped[0].version);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // SPOC inputs
   const [hrName, setHrName] = useState('');
@@ -157,8 +189,13 @@ export default function ClientsPage() {
         },
         spocs,
         invoiceConfig: {
-          templateReference,
-          templateVersion,
+          templateId: selectedTemplate?.templateId || 'tmpl-hirehuub-standard',
+          templateName: selectedTemplate?.templateName || templateReference,
+          templateVersion: selectedTemplate?.version || templateVersion,
+          templateReference: selectedTemplate?.templateName || templateReference,
+          storagePath: selectedTemplate?.storagePath || '',
+          referenceName: selectedTemplate?.templateName || templateReference,
+          documentId: selectedTemplate?.id || '',
         },
       };
 
@@ -725,15 +762,30 @@ export default function ClientsPage() {
             </h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Template Reference *</label>
-                <input
-                  type="text"
+                <label className="block font-semibold text-slate-700 mb-1">Invoice Template *</label>
+                <select
                   value={templateReference}
-                  onChange={(e) => setTemplateReference(e.target.value)}
-                  placeholder="sheet-template-acme-v1"
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:border-emerald-500 focus:outline-none"
+                  onChange={(e) => {
+                    const sel = activeTemplates.find((t) => t.templateName === e.target.value || t.templateId === e.target.value);
+                    if (sel) {
+                      setTemplateReference(sel.templateName);
+                      setTemplateVersion(sel.version);
+                    } else {
+                      setTemplateReference(e.target.value);
+                    }
+                  }}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
                   required
-                />
+                >
+                  {activeTemplates.length === 0 && (
+                    <option value={templateReference}>{templateReference} (v{templateVersion})</option>
+                  )}
+                  {activeTemplates.map((t) => (
+                    <option key={t.id} value={t.templateName}>
+                      {t.templateName} (v{t.version})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Template Version *</label>

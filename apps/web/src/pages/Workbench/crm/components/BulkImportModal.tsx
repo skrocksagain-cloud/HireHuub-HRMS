@@ -12,49 +12,6 @@ interface BulkImportModalProps {
   userSession: { id: string; name: string };
 }
 
-const MOCK_PREVIEW_DATA: BulkImportRow[] = [
-  {
-    name: 'Vikas Deshmukh',
-    phone: '9822114455',
-    area: 'Chinchwad',
-    city: 'Pune',
-    role: 'Warehouse Executive',
-    isValid: true,
-    validationErrors: [],
-    isDuplicate: false,
-  },
-  {
-    name: 'Sneha Kulkarni',
-    phone: '9876543210', // Duplicate phone from Ramesh Kumar
-    area: 'Kothrud',
-    city: 'Pune',
-    role: 'Customer Care',
-    isValid: false,
-    validationErrors: ['Duplicate Mobile Number (Phone already registered)'],
-    isDuplicate: true,
-  },
-  {
-    name: 'Anil Jadhav',
-    phone: '99112233', // Invalid phone
-    area: 'Hadapsar',
-    city: 'Pune',
-    role: 'Delivery Boy',
-    isValid: false,
-    validationErrors: ['Invalid Mobile Number (Must be 10 digits)'],
-    isDuplicate: false,
-  },
-  {
-    name: 'Meena Bhosale',
-    phone: '9733445566',
-    area: 'Viman Nagar',
-    city: 'Pune',
-    role: 'Supervisor',
-    isValid: true,
-    validationErrors: [],
-    isDuplicate: false,
-  },
-];
-
 export default function BulkImportModal({
   isOpen,
   onClose,
@@ -66,7 +23,7 @@ export default function BulkImportModal({
   const [activeTab, setActiveTab] = useState<'import' | 'history'>('import');
   const [step, setStep] = useState<number>(1); // 1: Upload, 2: Preview & Source Assignment
   const [file, setFile] = useState<File | null>(null);
-  const [rows] = useState<BulkImportRow[]>(MOCK_PREVIEW_DATA);
+  const [rows] = useState<BulkImportRow[]>([]);
 
   // Source Assignment for file
   const [sourceCategory, setSourceCategory] = useState<MainSourceCategory>('Job Portal');

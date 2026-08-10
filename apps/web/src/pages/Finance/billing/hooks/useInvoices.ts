@@ -23,6 +23,7 @@ export interface UseInvoicesReturn {
   loadInvoices: () => Promise<void>;
   createDraft: (input: CreateInvoiceDraftInput, actorName: string) => Promise<{ id: string; invoiceNumber: string }>;
   generateInvoice: (invoiceId: string, actorName: string) => Promise<InvoiceDocumentStorage>;
+  approveInvoice: (invoiceId: string, actorName: string) => Promise<void>;
   recordClientPayment: (invoiceId: string, input: RecordClientPaymentInput, actorName: string) => Promise<void>;
 }
 
@@ -125,6 +126,12 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
     return docInfo;
   };
 
+  const approveInvoice = async (invoiceId: string, actorName: string): Promise<void> => {
+    if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to approve invoices.');
+    await invoiceService.approveInvoice(invoiceId, actorName);
+    await loadInvoices();
+  };
+
   const recordClientPayment = async (invoiceId: string, input: RecordClientPaymentInput, actorName: string): Promise<void> => {
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to record payments.');
     await invoiceService.recordClientPayment(invoiceId, input, actorName, userRole);
@@ -148,6 +155,7 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
     loadInvoices,
     createDraft,
     generateInvoice,
+    approveInvoice,
     recordClientPayment,
   };
 }

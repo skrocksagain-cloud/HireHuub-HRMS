@@ -103,6 +103,7 @@ export interface Document {
 
   storagePath: string;
   downloadUrl: string;
+  fileUrl?: string;
   fileSize: number;
   mimeType: string;
 

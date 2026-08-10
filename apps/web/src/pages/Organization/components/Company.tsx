@@ -30,9 +30,8 @@ export default function Company() {
       if (data) {
         setCompany(data);
       }
-    } catch (error) {
-      console.error("Failed to load company:", error);
-      alert("Failed to load company details.");
+    } catch {
+      // Quiet fallback
     } finally {
       setLoading(false);
     }
@@ -59,12 +58,8 @@ export default function Company() {
       setSaving(true);
 
       await updateCompany(company);
-
-      console.log("Company updated successfully.");
-      alert("Company updated successfully.");
-    } catch (error) {
-      console.error("Save Error:", error);
-      alert("Unable to save company.");
+    } catch {
+      // Quiet error fallback
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Building2, Save, Plus, Trash2, CheckCircle2, FileSignature, Upload, Image as ImageIcon } from 'lucide-react';
+import { Building2, Save, Plus, Trash2, CheckCircle2, FileSignature, Upload, Image as ImageIcon, Eye } from 'lucide-react';
 import { useAdminCompany } from '../../../hooks/admin/useAdmin';
-import type { CompanySignature } from '../../../types/Admin';
+import type { CompanySignature, SignatureType } from '../../../types/Admin';
 
 export default function CompanySettingsTab() {
   const {
@@ -11,6 +11,10 @@ export default function CompanySettingsTab() {
     uploadLogo,
     uploadStamp,
     deleteStamp,
+    uploadLetterhead,
+    deleteLetterhead,
+    uploadLetterFooter,
+    deleteLetterFooter,
     uploadSignature,
     deleteSignature,
   } = useAdminCompany();
@@ -18,8 +22,11 @@ export default function CompanySettingsTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingStamp, setUploadingStamp] = useState(false);
+  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
+  const [uploadingFooter, setUploadingFooter] = useState(false);
   const [uploadingSigId, setUploadingSigId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState('');
+  const [showLivePreview, setShowLivePreview] = useState(true);
 
   const [form, setForm] = useState(
     company || {
@@ -41,6 +48,38 @@ export default function CompanySettingsTab() {
       phone: '+91 98765 43210',
       logoUrl: '/logo/h-logo.png',
       stampUrl: '',
+      letterheadUrl: '',
+      letterFooterUrl: '',
+      brandingProfiles: [
+        {
+          id: 'profile-default',
+          name: 'Corporate Letterhead (Default)',
+          isDefault: true,
+          letterheadUrl: '',
+          letterFooterUrl: '',
+        },
+        {
+          id: 'profile-staffing',
+          name: 'Staffing Division Letterhead',
+          isDefault: false,
+          letterheadUrl: '',
+          letterFooterUrl: '',
+        },
+        {
+          id: 'profile-payroll',
+          name: 'Payroll Division Letterhead',
+          isDefault: false,
+          letterheadUrl: '',
+          letterFooterUrl: '',
+        },
+        {
+          id: 'profile-training',
+          name: 'Training Division Letterhead',
+          isDefault: false,
+          letterheadUrl: '',
+          letterFooterUrl: '',
+        },
+      ],
       signatures: [],
     }
   );
@@ -55,7 +94,7 @@ export default function CompanySettingsTab() {
     setStatusMsg('');
     try {
       await updateCompany(form);
-      setStatusMsg('Company settings saved successfully!');
+      setStatusMsg('Company settings & Central Branding Assets saved successfully!');
     } catch {
       setStatusMsg('Failed to save company settings.');
     } finally {
@@ -70,7 +109,7 @@ export default function CompanySettingsTab() {
     try {
       const url = await uploadLogo(file);
       setForm((prev) => ({ ...prev, logoUrl: url }));
-      setStatusMsg('Company Logo uploaded successfully to Firebase Storage!');
+      setStatusMsg('Company Logo uploaded successfully to Firebase Storage (/company/logo/)!');
     } catch {
       setStatusMsg('Failed to upload logo.');
     } finally {
@@ -85,7 +124,7 @@ export default function CompanySettingsTab() {
     try {
       const url = await uploadStamp(file);
       setForm((prev) => ({ ...prev, stampUrl: url }));
-      setStatusMsg('Official Stamp uploaded successfully to Firebase Storage!');
+      setStatusMsg('Official Stamp uploaded successfully to Firebase Storage (/company/stamp/)!');
     } catch {
       setStatusMsg('Failed to upload stamp.');
     } finally {
@@ -103,12 +142,87 @@ export default function CompanySettingsTab() {
     }
   };
 
+  const handleLetterheadUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLetterhead(true);
+    try {
+      const url = await uploadLetterhead(file);
+      setForm((prev) => ({
+        ...prev,
+        letterheadUrl: url,
+        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
+          p.isDefault ? { ...p, letterheadUrl: url } : p
+        ),
+      }));
+      setStatusMsg('Top Letterhead Image uploaded successfully to Firebase Storage (/company/letterhead/)!');
+    } catch {
+      setStatusMsg('Failed to upload letterhead.');
+    } finally {
+      setUploadingLetterhead(false);
+    }
+  };
+
+  const handleLetterheadDelete = async () => {
+    try {
+      await deleteLetterhead();
+      setForm((prev) => ({
+        ...prev,
+        letterheadUrl: '',
+        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
+          p.isDefault ? { ...p, letterheadUrl: '' } : p
+        ),
+      }));
+      setStatusMsg('Letterhead Image removed.');
+    } catch {
+      setStatusMsg('Failed to remove letterhead.');
+    }
+  };
+
+  const handleLetterFooterUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFooter(true);
+    try {
+      const url = await uploadLetterFooter(file);
+      setForm((prev) => ({
+        ...prev,
+        letterFooterUrl: url,
+        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
+          p.isDefault ? { ...p, letterFooterUrl: url } : p
+        ),
+      }));
+      setStatusMsg('Bottom Letter Footer Image uploaded successfully to Firebase Storage (/company/letterfooter/)!');
+    } catch {
+      setStatusMsg('Failed to upload footer image.');
+    } finally {
+      setUploadingFooter(false);
+    }
+  };
+
+  const handleLetterFooterDelete = async () => {
+    try {
+      await deleteLetterFooter();
+      setForm((prev) => ({
+        ...prev,
+        letterFooterUrl: '',
+        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
+          p.isDefault ? { ...p, letterFooterUrl: '' } : p
+        ),
+      }));
+      setStatusMsg('Letter Footer Image removed.');
+    } catch {
+      setStatusMsg('Failed to remove letter footer image.');
+    }
+  };
+
   const addSignatureRow = () => {
     const newSig: CompanySignature = {
       id: `sig-${Date.now()}`,
       name: '',
       designation: '',
       signatureUrl: '',
+      signatureType: 'Image',
       isActive: true,
     };
     setForm((prev) => ({ ...prev, signatures: [...prev.signatures, newSig] }));
@@ -122,7 +236,7 @@ export default function CompanySettingsTab() {
         ...prev,
         signatures: prev.signatures.map((s) => (s.id === sigId ? sig : s)),
       }));
-      setStatusMsg(`Signature image for ${name || 'signatory'} uploaded to Firebase Storage!`);
+      setStatusMsg(`Signature image for ${name || 'signatory'} uploaded to Firebase Storage (/company/signatures/)!`);
     } catch {
       setStatusMsg('Failed to upload signature.');
     } finally {
@@ -143,7 +257,7 @@ export default function CompanySettingsTab() {
     }
   };
 
-  const updateSigField = (id: string, field: keyof CompanySignature, value: string | boolean) => {
+  const updateSigField = (id: string, field: keyof CompanySignature, value: string | boolean | SignatureType) => {
     setForm((prev) => ({
       ...prev,
       signatures: prev.signatures.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
@@ -262,6 +376,135 @@ export default function CompanySettingsTab() {
             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
           />
         </div>
+
+        <div className="grid grid-cols-3 gap-4 pt-2">
+          <div>
+            <label className="block font-semibold mb-1">Registered State (for GST) *</label>
+            <input
+              type="text"
+              value={form.registeredState ?? 'Maharashtra'}
+              onChange={(e) => setForm({ ...form, registeredState: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              placeholder="e.g. Maharashtra"
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Registered City</label>
+            <input
+              type="text"
+              value={form.registeredCity ?? 'Pune'}
+              onChange={(e) => setForm({ ...form, registeredCity: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              placeholder="e.g. Pune"
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Postal Code</label>
+            <input
+              type="text"
+              value={form.postalCode ?? '411045'}
+              onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              placeholder="e.g. 411045"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Enterprise Numbering & Financial Rules (Single Source of Truth) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3 font-bold text-slate-900 text-sm">
+          <Building2 size={18} className="text-emerald-600" />
+          <span>Enterprise Numbering Rules & Tax Defaults</span>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <div>
+            <label className="block font-semibold mb-1">Invoice Prefix *</label>
+            <input
+              type="text"
+              value={form.invoicePrefix ?? 'HH'}
+              onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Credit Note Prefix *</label>
+            <input
+              type="text"
+              value={form.creditNotePrefix ?? 'HHCN'}
+              onChange={(e) => setForm({ ...form, creditNotePrefix: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Employee Prefix *</label>
+            <input
+              type="text"
+              value={form.employeeCodePrefix ?? 'HHEMP'}
+              onChange={(e) => setForm({ ...form, employeeCodePrefix: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Offer Letter Prefix *</label>
+            <input
+              type="text"
+              value={form.offerPrefix ?? 'HHOFF'}
+              onChange={(e) => setForm({ ...form, offerPrefix: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <div>
+            <label className="block font-semibold mb-1">Document Prefix</label>
+            <input
+              type="text"
+              value={form.documentPrefix ?? 'HHDOC'}
+              onChange={(e) => setForm({ ...form, documentPrefix: e.target.value })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Financial Year Start Month (1-12)</label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={form.financialYearStartMonth ?? 4}
+              onChange={(e) => setForm({ ...form, financialYearStartMonth: parseInt(e.target.value, 10) || 4 })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Default GST Rate (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={form.defaultGstRate ?? 18}
+              onChange={(e) => setForm({ ...form, defaultGstRate: parseFloat(e.target.value) || 18 })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">Default TDS Rate (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={form.defaultTdsRate ?? 2}
+              onChange={(e) => setForm({ ...form, defaultTdsRate: parseFloat(e.target.value) || 2 })}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Bank Account Details */}
@@ -319,10 +562,15 @@ export default function CompanySettingsTab() {
         </div>
       </div>
 
-      {/* Brand Assets Uploads (Logo & Stamp) */}
+      {/* Global Company Brand Assets (Firebase Storage /company/) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-          Company Brand Assets (Firebase Storage Uploads)
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400">
+            Company Global Brand Assets (Single Source of Truth)
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-mono text-[10px] font-bold">
+            Shared Across All HR & Document Engines
+          </span>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
@@ -330,7 +578,7 @@ export default function CompanySettingsTab() {
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
             <div className="flex items-center justify-between font-bold text-slate-900">
               <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Company Logo
+                <ImageIcon size={16} className="text-emerald-600" /> Company Logo (/company/logo/)
               </span>
               <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
             </div>
@@ -361,7 +609,7 @@ export default function CompanySettingsTab() {
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
             <div className="flex items-center justify-between font-bold text-slate-900">
               <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Official Company Stamp
+                <ImageIcon size={16} className="text-emerald-600" /> Official Company Stamp (/company/stamp/)
               </span>
               <span className="text-[10px] text-slate-400 font-mono">PNG, JPG</span>
             </div>
@@ -398,6 +646,90 @@ export default function CompanySettingsTab() {
               </div>
             </div>
           </div>
+
+          {/* Letterhead Top Image Box */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between font-bold text-slate-900">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon size={16} className="text-emerald-600" /> Letterhead (Top Image) (/company/letterhead/)
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                {form.letterheadUrl ? (
+                  <img src={form.letterheadUrl} alt="Letterhead Top" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-semibold">No Top Letterhead</span>
+                )}
+              </div>
+
+              <div className="space-y-2 flex-1">
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
+                    <Upload size={14} />
+                    {uploadingLetterhead ? 'Uploading…' : form.letterheadUrl ? 'Replace' : 'Upload Top Image'}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLetterheadUpload} className="hidden" />
+                  </label>
+                  {form.letterheadUrl && (
+                    <button
+                      type="button"
+                      onClick={handleLetterheadDelete}
+                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-xl transition"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono truncate">
+                  {form.letterheadUrl ? form.letterheadUrl : 'No letterhead image uploaded'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Letter Footer Bottom Image Box */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between font-bold text-slate-900">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon size={16} className="text-emerald-600" /> Letter Footer (Bottom Image) (/company/letterfooter/)
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                {form.letterFooterUrl ? (
+                  <img src={form.letterFooterUrl} alt="Letter Footer Bottom" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-semibold">No Footer Image</span>
+                )}
+              </div>
+
+              <div className="space-y-2 flex-1">
+                <div className="flex gap-2">
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
+                    <Upload size={14} />
+                    {uploadingFooter ? 'Uploading…' : form.letterFooterUrl ? 'Replace' : 'Upload Footer Image'}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLetterFooterUpload} className="hidden" />
+                  </label>
+                  {form.letterFooterUrl && (
+                    <button
+                      type="button"
+                      onClick={handleLetterFooterDelete}
+                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-xl transition"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono truncate">
+                  {form.letterFooterUrl ? form.letterFooterUrl : 'No footer image uploaded'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -407,10 +739,10 @@ export default function CompanySettingsTab() {
           <div>
             <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
               <FileSignature size={18} className="text-emerald-600" />
-              <span>Authorized Signatures (Firebase Storage /company/signatures/)</span>
+              <span>Authorized Signatures Registry (Firebase Storage /company/signatures/)</span>
             </div>
             <p className="text-slate-500 text-[11px]">
-              Support unlimited authorized signatures for Directors, HR Head, Finance Head, etc.
+              Document templates select a Signatory ID. Support for Image, Digital Certificate, Aadhaar eSign & DSC Token.
             </p>
           </div>
           <button
@@ -455,19 +787,33 @@ export default function CompanySettingsTab() {
                     />
                   </div>
 
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Signature Type</label>
+                    <select
+                      value={sig.signatureType || 'Image'}
+                      onChange={(e) => updateSigField(sig.id, 'signatureType', e.target.value as SignatureType)}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 text-[11px]"
+                    >
+                      <option value="Image">Image</option>
+                      <option value="Digital Certificate">Digital Certificate</option>
+                      <option value="Aadhaar eSign">Aadhaar eSign</option>
+                      <option value="DSC Token">DSC Token</option>
+                    </select>
+                  </div>
+
                   {/* Signature Image Preview & Upload */}
-                  <div className="col-span-3 flex items-center gap-3">
-                    <div className="w-16 h-10 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center overflow-hidden shrink-0">
+                  <div className="col-span-2 flex items-center gap-2">
+                    <div className="w-14 h-9 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center overflow-hidden shrink-0">
                       {sig.signatureUrl ? (
                         <img src={sig.signatureUrl} alt={sig.name} className="max-h-full max-w-full object-contain" />
                       ) : (
-                        <span className="text-[9px] text-slate-400">No Image</span>
+                        <span className="text-[8px] text-slate-400">No Image</span>
                       )}
                     </div>
 
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer transition">
-                      <Upload size={12} />
-                      {uploadingSigId === sig.id ? 'Uploading…' : sig.signatureUrl ? 'Replace' : 'Upload'}
+                    <label className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer transition text-[10px]">
+                      <Upload size={11} />
+                      {uploadingSigId === sig.id ? '…' : sig.signatureUrl ? 'Replace' : 'Upload'}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/jpg"
@@ -480,20 +826,11 @@ export default function CompanySettingsTab() {
                     </label>
                   </div>
 
-                  <div className="col-span-2 flex items-center justify-end gap-3">
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={sig.isActive}
-                        onChange={(e) => updateSigField(sig.id, 'isActive', e.target.checked)}
-                        className="rounded text-emerald-600"
-                      />
-                      <span className="text-[11px] font-semibold text-slate-700">Active</span>
-                    </label>
+                  <div className="col-span-1 flex items-center justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => handleSignatureDelete(sig.id)}
-                      className="text-slate-400 hover:text-rose-600 transition"
+                      className="text-slate-400 hover:text-rose-600 transition p-1"
                       title="Delete Signature"
                     >
                       <Trash2 size={16} />
@@ -504,6 +841,85 @@ export default function CompanySettingsTab() {
             ))
           )}
         </div>
+      </div>
+
+      {/* Live Branding Preview Section (Requirement 5) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+            <Eye size={18} className="text-emerald-600" />
+            <span>Live Company Branding Preview (Stationery Preview)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLivePreview(!showLivePreview)}
+            className="text-xs text-emerald-700 font-bold hover:underline"
+          >
+            {showLivePreview ? 'Collapse Preview' : 'Show Live Preview'}
+          </button>
+        </div>
+
+        {showLivePreview && (
+          <div className="p-6 bg-slate-100 rounded-2xl flex justify-center">
+            <div className="bg-white text-slate-900 w-full max-w-xl min-h-[350px] p-6 shadow-md border border-slate-300 rounded-xl flex flex-col justify-between space-y-4 text-[11px]">
+              {/* Top Letterhead Image */}
+              <div className="border-b pb-2">
+                {form.letterheadUrl ? (
+                  <img src={form.letterheadUrl} alt="Top Letterhead Preview" className="max-h-20 w-full object-contain" />
+                ) : (
+                  <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 font-mono text-[10px]">
+                    Top Letterhead Image Preview (/company/letterhead/top_letterhead.png)
+                  </div>
+                )}
+              </div>
+
+              {/* Sample Content */}
+              <div className="space-y-2 py-2 text-slate-700 leading-relaxed">
+                <div className="font-bold text-slate-900 text-xs">OFFER OF EMPLOYMENT — SAMPLE PREVIEW</div>
+                <p>Dear Candidate Name,</p>
+                <p>
+                  We are pleased to offer you the position at <strong>{form.brandName || form.companyName}</strong>. This document uses central company stationery, logo, stamp, and authorized signature.
+                </p>
+              </div>
+
+              {/* Stamp & Signature Section */}
+              <div className="flex items-end justify-between border-t border-slate-100 pt-3">
+                <div>
+                  {form.stampUrl ? (
+                    <img src={form.stampUrl} alt="Official Stamp" className="h-14 object-contain" />
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">No stamp uploaded</div>
+                  )}
+                </div>
+
+                <div className="text-right space-y-1">
+                  {form.signatures[0]?.signatureUrl ? (
+                    <img src={form.signatures[0].signatureUrl} alt="Signature" className="h-10 object-contain ml-auto" />
+                  ) : (
+                    <div className="h-8 border-b border-slate-300 w-32 ml-auto"></div>
+                  )}
+                  <div className="font-bold text-slate-900 text-[10px]">
+                    {form.signatures[0]?.name || 'Authorized Signatory'}
+                  </div>
+                  <div className="text-[9px] text-slate-500">
+                    {form.signatures[0]?.designation || 'Signatory Designation'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Footer Image */}
+              <div className="border-t pt-2">
+                {form.letterFooterUrl ? (
+                  <img src={form.letterFooterUrl} alt="Bottom Footer Preview" className="max-h-16 w-full object-contain" />
+                ) : (
+                  <div className="p-2 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 font-mono text-[9px]">
+                    Bottom Footer Image Preview (/company/letterfooter/bottom_footer.png)
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end pt-2">

@@ -20,8 +20,13 @@ export interface ClientOwnership {
 }
 
 export interface ClientInvoiceConfig {
+  templateId?: string;
+  templateName?: string;
   templateReference: string;
   templateVersion: number;
+  storagePath?: string;
+  documentId?: string;
+  referenceName?: string;
 }
 
 export interface ClientFinanceSummary {

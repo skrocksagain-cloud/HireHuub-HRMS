@@ -88,6 +88,8 @@ export interface InvoiceDocumentStorage {
   fileSize: number;
   mimeType: string;
   generatedAt: Timestamp;
+  fileName?: string;
+  version?: number;
 }
 
 /** Immutable Payment Record inside Payment History */
@@ -142,6 +144,8 @@ export interface Invoice {
   outstandingAmount?: number;
 
   isLocked?: boolean;
+  approvedAt?: Timestamp | string;
+  approvedBy?: string;
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;

@@ -44,7 +44,7 @@ export class CampaignService {
    */
   async createCampaign(input: CreateCampaignInput, creatorName: string): Promise<CampaignMaster> {
     const existing = await campaignRepository.getAllCampaigns();
-    const campaignNumber = campaignNumberService.calculateNextNumber(existing);
+    const campaignNumber = await campaignNumberService.generateNextNumber(existing);
 
     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
