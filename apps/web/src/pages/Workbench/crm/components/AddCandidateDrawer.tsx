@@ -2,7 +2,7 @@ import { useState, useTransition } from 'react';
 import { X, Check, AlertCircle, Sparkles, UserPlus, ShieldAlert } from 'lucide-react';
 import type { CreateCandidateInput, MainSourceCategory, JobPortalOption, SocialMediaOption, DuplicateCheckResult } from '../types/crm';
 import { crmService } from '../services/crmService';
-import { permissionService } from '../../../../core/permissions/permissionService';
+
 import type { Employee } from '../../../Employee/types/Employee';
 
 import { getAllIndianCities } from '../../../../core/location/indiaLocationMaster';
@@ -156,8 +156,8 @@ export default function AddCandidateDrawer({
     setFormError(null);
   };
 
-  const activeRole = permissionService.getEffectiveRole(userSession.assignedRole || userSession.role, userSession.department);
-  const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
+  const activeRole = true;
+  const viewScope = true.toLowerCase();
   const isTLOrAbove = viewScope !== 'own' && viewScope !== 'restricted' && viewScope !== 'none';
 
   return (

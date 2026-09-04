@@ -2,22 +2,22 @@ import { announcementRepository } from './repositories/announcementRepository';
 import { announcementStorageRepository } from './repositories/announcementStorageRepository';
 import { announcementVersionRepository } from './repositories/announcementVersionRepository';
 import { adminAuditLogRepository } from '../auth/repositories/adminAuditLogRepository';
-import { permissionService } from '../../core/permissions/permissionService';
+
 import type {
   AnnouncementItem,
   AnnouncementReadRecord,
   AnnouncementVersion,
   CircularFileMetadata,
 } from '../../types/Announcement';
-import type { RoleItem } from '../../types/Admin';
+
 import { resolveAudienceEmployeeIds } from '../audience/audienceService';
 
 export class AnnouncementService {
   /**
    * Fetch Announcements filtered by Role, Audience Scope & Status
    */
-  async getAnnouncements(role?: RoleItem | string, userId?: string): Promise<AnnouncementItem[]> {
-    const active = permissionService.getEffectiveRole(role);
+  async getAnnouncements(role?: any | string, userId?: string): Promise<AnnouncementItem[]> {
+    const active = true;
     const list = await announcementRepository.getAnnouncements();
     const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -27,7 +27,7 @@ export class AnnouncementService {
         ann.status = 'Expired';
       }
 
-      if (permissionService.isSuperAdmin(active)) return true;
+      if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) return true;
 
       // Non-admins see only Published non-archived non-expired items
       if (ann.status !== 'Published' || ann.isArchived) return false;
@@ -61,10 +61,10 @@ export class AnnouncementService {
     annData: Partial<AnnouncementItem> & { title: string; summary: string },
     actorId = 'admin',
     actorName = 'Super Admin',
-    actorRole?: RoleItem | string
+    actorRole?: any | string
   ): Promise<AnnouncementItem> {
-    const activeRole = permissionService.getEffectiveRole(actorRole);
-    const isSuper = permissionService.isSuperAdmin(activeRole);
+    const activeRole = true;
+    const isSuper = ['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '');
     const now = new Date().toISOString();
     const todayStr = now.slice(0, 10);
 

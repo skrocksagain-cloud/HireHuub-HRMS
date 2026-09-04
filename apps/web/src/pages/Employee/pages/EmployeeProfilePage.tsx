@@ -32,7 +32,7 @@ import { performanceService, type PerformanceSummary } from '../../People/servic
 import { documentService } from '../../../services/document/documentService';
 import type { Document } from '../../../types/Document';
 import { useAuth } from '../../../context/AuthContext';
-import { permissionService } from '../../../core/permissions/permissionService';
+
 import ExitTab from '../components/ExitTab';
 import { payslipService, type PayslipDisplayItem } from '../../../services/payroll/payslipService';
 
@@ -75,7 +75,7 @@ export default function EmployeeProfilePage() {
 
   const isSelf = Boolean(currentUserId && (currentUserId === targetId || user?.email === employee?.email));
   const isHrOrAdmin =
-    permissionService.isSuperAdmin(userRole) ||
+    ['Super Admin', 'Super_Admin'].includes(userRole?.assignedRole || userRole?.role || userRole?.name || '') ||
     userRole.toLowerCase().includes('admin') ||
     userRole.toLowerCase().includes('hr');
 

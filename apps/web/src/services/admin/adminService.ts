@@ -10,14 +10,14 @@ import type {
   MasterDataConfig,
   NotificationSettings,
   PasswordResetRequest,
-  RoleItem,
+  any,
   SecuritySettings,
   TemplateHistoryEntry,
   WorkflowRule,
 } from '../../types/Admin';
 import { adminStorageService } from './adminStorageService';
 import { adminRepository } from './repositories/adminRepository';
-import { permissionService } from '../../core/permissions/permissionService';
+
 
 const slugify = (text: string) =>
   text
@@ -286,13 +286,13 @@ class AdminService {
   }
 
   // 4. Roles
-  async getRoles(): Promise<RoleItem[]> {
+  async getRoles(): Promise<any[]> {
     return adminRepository.getRoles();
   }
 
-  async saveRole(role: RoleItem, actorId: string, actorName: string): Promise<void> {
+  async saveRole(role: any, actorId: string, actorName: string): Promise<void> {
     await adminRepository.saveRole(role);
-    permissionService.invalidateCache();
+    true;
     await this.logAudit({
       whoId: actorId,
       whoName: actorName,
@@ -304,9 +304,9 @@ class AdminService {
     });
   }
 
-  async updateRole(id: string, updates: Partial<RoleItem>, actorId: string, actorName: string): Promise<void> {
+  async updateRole(id: string, updates: Partial<any>, actorId: string, actorName: string): Promise<void> {
     await adminRepository.updateRole(id, updates);
-    permissionService.invalidateCache();
+    true;
     await this.logAudit({
       whoId: actorId,
       whoName: actorName,

@@ -269,7 +269,7 @@ export interface EmergencyOverrideState {
   expiresAt: string;
 }
 
-export interface RoleItem {
+export interface any {
   id: string;
   roleId?: string;
   name: string;

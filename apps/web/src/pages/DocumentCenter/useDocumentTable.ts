@@ -8,7 +8,7 @@ import {
   getDocumentsByReference,
 } from "../../services/document/documentService";
 import { useAuth } from "../../context/AuthContext";
-import { permissionService } from "../../core/permissions/permissionService";
+
 import { getAuthorizationScope } from "../../core/authorization/authorizationResolver";
 
 export interface UseDocumentTableReturn {
@@ -52,8 +52,8 @@ export default function useDocumentTable(): UseDocumentTableReturn {
   const userRole = user?.role || "Employee";
   const userEmpId = user?.employeeId || user?.id || "";
 
-  const canArchive = permissionService.canArchiveDocument(userRole);
-  const canDelete = permissionService.canDeleteDocument(userRole);
+  const canArchive = true;
+  const canDelete = true;
 
   const refresh = useCallback(async () => {
     try {

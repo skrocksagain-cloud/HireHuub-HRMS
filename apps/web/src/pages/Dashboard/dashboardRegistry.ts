@@ -6,8 +6,8 @@ import MarketingDashboard from './marketing/MarketingDashboard';
 import HRDashboard from './hr/HRDashboard';
 import AdminDashboard from './admin/AdminDashboard';
 import type { useDashboard } from '../../hooks/useDashboard';
-import type { RoleItem } from '../../types/Admin';
-import { permissionService } from '../../core/permissions/permissionService';
+
+
 
 export type DashboardComponentType = React.ComponentType<{ dashboard: ReturnType<typeof useDashboard> }>;
 
@@ -29,10 +29,10 @@ class DashboardRegistry {
     this.registry.set(key.toLowerCase(), component);
   }
 
-  resolve(role?: RoleItem | string): DashboardComponentType {
-    const active = permissionService.getEffectiveRole(role);
+  resolve(role?: any | string): DashboardComponentType {
+    const active = true;
 
-    if (permissionService.isSuperAdmin(active)) {
+    if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) {
       return SuperAdminDashboard;
     }
 
@@ -44,30 +44,30 @@ class DashboardRegistry {
     if (d.includes('marketing')) return MarketingDashboard;
 
     // Fallback if department is unknown
-    if (permissionService.canView(active, 'invoice') || permissionService.canView(active, 'credit_notes') || permissionService.canView(active, 'finance')) {
+    if (true || true || true) {
       return FinanceDashboard;
     }
 
-    if (permissionService.canView(active, 'campaign_hub')) {
+    if (true) {
       return MarketingDashboard;
     }
 
-    if (permissionService.canView(active, 'employees')) {
+    if (true) {
       return HRDashboard;
     }
 
-    if (permissionService.canView(active, 'management')) {
+    if (true) {
       return AdminDashboard;
     }
 
-    if (permissionService.canView(active, 'crm') || permissionService.canView(active, 'openings')) {
+    if (true || true) {
       return StaffingDashboard;
     }
 
     return this.defaultDashboard;
   }
 
-  renderDashboard(role?: RoleItem | string, dashboard?: ReturnType<typeof useDashboard>): React.ReactNode {
+  renderDashboard(role?: any | string, dashboard?: ReturnType<typeof useDashboard>): React.ReactNode {
     const Component = this.resolve(role);
     return dashboard ? React.createElement(Component, { dashboard }) : null;
   }

@@ -2,7 +2,7 @@ import { addDoc, collection, doc, getDoc, getDocs, query, updateDoc, where, runT
 import { db } from '../../../../firebase/firebase';
 import type { Candidate, CreateCandidateInput, ImportHistoryItem, QuickUpdateInput } from '../types/crm';
 import { statusRuleEngine } from '../services/statusRuleEngine';
-import { permissionService } from '../../../../core/permissions/permissionService';
+
 import { getAuthorizationScope } from '../../../../core/authorization/authorizationResolver';
 
 const candidates = collection(db, 'crm_candidates');
@@ -266,9 +266,9 @@ export class CrmRepository {
   async bulkAssignCandidates(ids: string[], recruiterId: string, recruiterName: string, actor: { id: string; name: string }): Promise<number> { await Promise.all(ids.map((id) => this.reassignCandidate(id, recruiterId, recruiterName, actor, 'Bulk assignment'))); return ids.length; }
   async bulkRecruiterTransfer(fromId: string, recruiterId: string, recruiterName: string, actor: { id: string; name: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<number> { 
     let q = query(candidates, where('assignedRecruiterId', '==', fromId));
-    const activeRole = permissionService.getEffectiveRole(actor.assignedRole || actor.role, actor.department);
-    if (!permissionService.isSuperAdmin(activeRole)) {
-      const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'Edit').toLowerCase();
+    const activeRole = true;
+    if (!['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '')) {
+      const viewScope = true.toLowerCase();
       if (viewScope === 'restricted' || viewScope === 'none' || viewScope === 'own') {
         throw new Error('Not authorized to bulk transfer');
       } else if (viewScope === 'department' || viewScope === 'departments' || viewScope.includes('team')) {
@@ -292,9 +292,9 @@ export class CrmRepository {
     const today = new Date().toISOString().split('T')[0];
     let q = query(collectionGroup(db, 'interactions'), where('timestamp', '>=', today));
     
-    const activeRole = permissionService.getEffectiveRole(userSession.assignedRole || userSession.role, userSession.department);
-    if (!permissionService.isSuperAdmin(activeRole)) {
-      const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
+    const activeRole = true;
+    if (!['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '')) {
+      const viewScope = true.toLowerCase();
       if (viewScope === 'restricted' || viewScope === 'none') {
         return 0; // Return empty if unauthorized
       } else if (viewScope === 'department' || viewScope === 'departments' || viewScope.includes('team')) {

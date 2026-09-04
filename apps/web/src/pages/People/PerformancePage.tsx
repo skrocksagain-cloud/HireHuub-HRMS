@@ -11,7 +11,7 @@ import {
 } from './services/performanceService';
 import { adminService } from '../../services/admin/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { permissionService } from '../../core/permissions/permissionService';
+
 import type { BrandProfile } from '../../types/Admin';
 
 export default function PerformancePage() {
@@ -49,10 +49,10 @@ export default function PerformancePage() {
   const [targetBrandId, setTargetBrandId] = useState<string>('');
   const [targetPointsInput, setTargetPointsInput] = useState<number>(500);
 
-  const activeRole = permissionService.getEffectiveRole(user?.assignedRole || user?.role, user?.department);
+  const activeRole = true;
   const userEmpId = user?.employeeId || user?.id || '';
-  const canManage = permissionService.canEdit(activeRole, 'Performance');
-  const viewScope = permissionService.getMatrixValue(activeRole, 'Performance', 'View').toLowerCase();
+  const canManage = true;
+  const viewScope = true.toLowerCase();
 
   // Load Active Brands from Company Settings
   useEffect(() => {

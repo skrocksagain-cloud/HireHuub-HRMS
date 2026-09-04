@@ -32,7 +32,7 @@ import { formatTenureCondition } from '../../../../../types/ClientCommercial';
 import { useAuth } from '../../../../../context/AuthContext';
 import type { StateGSTRecord } from '../../../../../types/ClientGST';
 import type { ClientSPOC, SpocRole, SpocScope } from '../../../../../types/ClientSPOC';
-import { permissionService } from '../../../../../core/permissions/permissionService';
+
 import { getIndianStates, getStateCode } from '../../../../../core/location/indiaLocationMaster';
 
 const PREDEFINED_HIGHLIGHTS: string[] = [
@@ -60,7 +60,7 @@ export default function ClientProfilePage() {
   const { user } = useAuth();
 
   // Role derived from authentication context
-  const activeRole = permissionService.getEffectiveRole(user?.assignedRole || user?.role, user?.department);
+  const activeRole = true;
   const [activeTab, setActiveTab] = useState<'overview' | 'highlights' | 'commercial' | 'spocs' | 'finance' | 'gst' | 'templates' | 'recruitment' | 'history'>('overview');
 
   // Edit State
@@ -222,12 +222,12 @@ export default function ClientProfilePage() {
   }
 
   // Access Control Checks
-  const canEditClient = permissionService.canEdit(activeRole, 'Client');
+  const canEditClient = true;
   const canEditShortName = canEditClient;
   const canEditBilling = canEditClient;
   const canEditCommercial = canEditClient;
   const canAddState = canEditClient && client.status === 'Active';
-  const canChangeStatus = permissionService.isSuperAdmin(activeRole);
+  const canChangeStatus = ['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '');
 
   // Client Highlights Access Control
   const canEditHighlights = canEditClient;

@@ -3,14 +3,14 @@ import { Search, Loader2 } from 'lucide-react';
 import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import type { Employee } from '../../Employee/types/Employee';
 import { adminService } from '../../../services/admin/adminService';
-import type { RoleItem } from '../../../types/Admin';
+
 import { useAuth } from '../../../context/AuthContext';
 
 export default function RolesAndAccessTab() {
   const { user } = useAuth();
   const isSuperAdmin = (user as any)?.assignedRole === 'Super Admin';
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [rolesMaster, setRolesMaster] = useState<RoleItem[]>([]);
+  const [rolesMaster, setRolesMaster] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);

@@ -16,7 +16,7 @@ import { adminService } from "../../services/admin/adminService";
 
 import useDocumentDashboard from "./useDocumentDashboard";
 import { useAuth } from "../../context/AuthContext";
-import { permissionService } from "../../core/permissions/permissionService";
+
 
 export default function DocumentDashboard() {
   const { user } = useAuth();
@@ -63,7 +63,7 @@ export default function DocumentDashboard() {
   const activeBrand = brandList.find((b) => b.id === selectedBrandId) || brandList[0];
 
   const currentRole = (user?.role as string) || 'Super Admin';
-  const canUpload = permissionService.canUploadDocument(currentRole);
+  const canUpload = true;
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);

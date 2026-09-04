@@ -11,7 +11,7 @@ import type {
   MasterDataConfig,
   NotificationSettings,
   PasswordResetRequest,
-  RoleItem,
+  any,
   SecuritySettings,
   WorkflowRule,
   AdminAuditEntry,
@@ -170,7 +170,7 @@ export function useAdminDesignations() {
 }
 
 export function useAdminRoles() {
-  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const fetchRoles = useCallback(async () => {
@@ -189,14 +189,14 @@ export function useAdminRoles() {
     fetchRoles();
   }, [fetchRoles]);
 
-  const saveRole = async (role: RoleItem, actorId = 'admin', actorName = 'Super Admin') => {
+  const saveRole = async (role: any, actorId = 'admin', actorName = 'Super Admin') => {
     await adminService.saveRole(role, actorId, actorName);
     await fetchRoles();
   };
 
   const updateRole = async (
     id: string,
-    updates: Partial<RoleItem>,
+    updates: Partial<any>,
     actorId = 'admin',
     actorName = 'Super Admin'
   ) => {

@@ -23,7 +23,7 @@ import type {
   MasterDataConfig,
   NotificationSettings,
   PasswordResetRequest,
-  RoleItem,
+  any,
   SecuritySettings,
   WorkflowRule,
 } from '../../../types/Admin';
@@ -67,9 +67,9 @@ export interface AdminRepository {
   saveDesignation(desig: DesignationItem): Promise<void>;
   updateDesignation(id: string, updates: Partial<DesignationItem>): Promise<void>;
 
-  getRoles(): Promise<RoleItem[]>;
-  saveRole(role: RoleItem): Promise<void>;
-  updateRole(id: string, updates: Partial<RoleItem>): Promise<void>;
+  getRoles(): Promise<any[]>;
+  saveRole(role: any): Promise<void>;
+  updateRole(id: string, updates: Partial<any>): Promise<void>;
 
   getHierarchy(): Promise<HierarchyNode[]>;
   saveHierarchyNode(node: HierarchyNode): Promise<void>;
@@ -151,10 +151,10 @@ class FirestoreAdminRepository implements AdminRepository {
     await updateDoc(doc(db, 'admin_designations', id), { ...updates, updatedAt: new Date().toISOString() });
   }
 
-  async getRoles(): Promise<RoleItem[]> {
+  async getRoles(): Promise<any[]> {
     const snap = await getDocs(query(collection(db, 'admin_roles'), orderBy('name')));
     return snap.docs.map((d) => {
-      const data = d.data() as Omit<RoleItem, 'id'>;
+      const data = d.data() as Omit<any, 'id'>;
       return {
         id: d.id,
         ...data,
@@ -170,12 +170,12 @@ class FirestoreAdminRepository implements AdminRepository {
     });
   }
 
-  async saveRole(role: RoleItem): Promise<void> {
+  async saveRole(role: any): Promise<void> {
     const docRef = doc(db, 'admin_roles', role.id || slugify(role.name));
     await setDoc(docRef, { ...role, id: docRef.id, createdAt: new Date().toISOString() });
   }
 
-  async updateRole(id: string, updates: Partial<RoleItem>): Promise<void> {
+  async updateRole(id: string, updates: Partial<any>): Promise<void> {
     await updateDoc(doc(db, 'admin_roles', id), { ...updates, updatedAt: new Date().toISOString() });
   }
 

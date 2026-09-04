@@ -1,125 +1,118 @@
-import { useState, useCallback, useMemo } from 'react';
-import { permissionService, type NavigationItem } from '../core/permissions/permissionService';
-import type { RoleItem } from '../types/Admin';
+import { useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { 
+  canAccessErpArea, 
+  type ErpArea, 
+  isSuperAdmin as checkSuperAdmin,
+  type AuthorizationContext
+} from '../core/authorization/authorizationResolver';
 
+function mapModuleToErpArea(moduleKey: string): ErpArea | null {
+  const m = (moduleKey || '').toLowerCase();
+  
+  if (['employees', 'people', 'attendance', 'leave', 'performance', 'profile'].includes(m)) return 'People';
+  
+  if (['recruitment', 'openings', 'crm', 'workforce', 'client', 'associatepartner', 'campaignhub'].includes(m)) return 'Workbench';
+  
+  if (['finance', 'invoices', 'creditnotes', 'internalpayroll', 'transactions', 'payout'].includes(m)) return 'Finance';
+  
+  if (['managementcontrol', 'calendar', 'announcements'].includes(m)) return 'Administration';
+  
+  return null;
+}
 
-export function usePermissions(_currentRole?: RoleItem | string) {
+export function usePermissions() {
   const { user } = useAuth();
-  const [simulatedRole, setSimulatedRoleState] = useState<RoleItem | null>(permissionService.getSimulatedRole());
 
-  const setSimulatedRole = useCallback((role: RoleItem | null) => {
-    permissionService.setSimulatedRole(role);
-    setSimulatedRoleState(role);
-  }, []);
+  const authContext: AuthorizationContext = useMemo(() => ({
+    employeeId: user?.employeeId,
+    departmentId: user?.departmentId,
+    department: user?.department,
+    assignedRole: user?.assignedRole,
+    reportingManagerId: user?.reportingManagerId
+  }), [user]);
 
-  const employee = user as any;
+  const activeRole = useMemo(() => ({ name: user?.assignedRole || 'User' }), [user]);
+  const simulatedRole = null;
+  const setSimulatedRole = useCallback(() => {}, []);
+  const visibleModules = useMemo(() => [], []);
+  const visibleNavigation = useMemo(() => [], []);
+  const dashboardWidgets = useMemo(() => [], []);
 
-  // We hack the department and assignedRole into the string if it's string. But we're just making a synthetic RoleItem.
-  const activeRole = useMemo(() => {
-    if (simulatedRole) return simulatedRole;
-    return permissionService.getEffectiveRole(employee?.assignedRole || employee?.role, employee?.department);
-  }, [employee, simulatedRole]);
+  const canAccessModule = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canAccessModule = useCallback(
-    (moduleKey: string) => permissionService.canAccessModule(activeRole, moduleKey),
-    [activeRole]
-  );
+  const canAccessPage = useCallback((pageKey: string) => {
+    const area = mapModuleToErpArea(pageKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canAccessPage = useCallback(
-    (pageKey: string) => permissionService.canAccessPage(activeRole, pageKey),
-    [activeRole]
-  );
+  const canAccessRoute = useCallback((path: string) => {
+    const p = (path || '').toLowerCase();
+    if (p.includes('workbench')) return canAccessErpArea(authContext, 'Workbench');
+    if (p.includes('finance')) return canAccessErpArea(authContext, 'Finance');
+    if (p.includes('administration') || p.includes('settings') || p.includes('management')) return canAccessErpArea(authContext, 'Administration');
+    if (p.includes('dashboard') || p.includes('profile')) return true;
+    return false;
+  }, [authContext]);
 
-  const canAccessRoute = useCallback(
-    (path: string) => permissionService.canAccessRoute(activeRole, path),
-    [activeRole]
-  );
+  const canView = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canView = useCallback(
-    (moduleKey: string, recordDeptId?: string, recordOwnerId?: string, currentUserId?: string) =>
-      permissionService.canView(activeRole, moduleKey, recordDeptId, recordOwnerId, currentUserId),
-    [activeRole]
-  );
+  const canCreate = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canCreate = useCallback(
-    (moduleKey: string) => permissionService.canCreate(activeRole, moduleKey),
-    [activeRole]
-  );
+  const canEdit = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canEdit = useCallback(
-    (moduleKey: string, recordDeptId?: string) => permissionService.canEdit(activeRole, moduleKey, recordDeptId),
-    [activeRole]
-  );
+  const canDelete = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canDelete = useCallback(
-    (moduleKey: string) => permissionService.canDelete(activeRole, moduleKey),
-    [activeRole]
-  );
+  const canApprove = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canApprove = useCallback(
-    (moduleKey: string, targetDeptId?: string, targetEmployeeId?: string) =>
-      permissionService.canApprove(activeRole, moduleKey, targetDeptId, targetEmployeeId),
-    [activeRole]
-  );
+  const canReject = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canReject = useCallback(
-    (moduleKey: string) => permissionService.canReject(activeRole, moduleKey),
-    [activeRole]
-  );
+  const canExport = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canExport = useCallback(
-    (moduleKey: string) => permissionService.canExport(activeRole, moduleKey),
-    [activeRole]
-  );
+  const canGenerateDocument = useCallback((docType?: string) => {
+    const area = mapModuleToErpArea(docType || 'documents');
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canGenerateDocument = useCallback(
-    (docType?: string) => permissionService.canGenerateDocument(activeRole, docType),
-    [activeRole]
-  );
+  const canManage = useCallback((moduleKey: string) => {
+    const area = mapModuleToErpArea(moduleKey);
+    return area ? canAccessErpArea(authContext, area) : false;
+  }, [authContext]);
 
-  const canManage = useCallback(
-    (moduleKey: string) => permissionService.canManage(activeRole, moduleKey),
-    [activeRole]
-  );
-
-  const isFeatureEnabled = useCallback(
-    (featureKey: string) => permissionService.isFeatureEnabled(featureKey, activeRole),
-    [activeRole]
-  );
-
-  const isSuperAdmin = useMemo(() => permissionService.isSuperAdmin(activeRole), [activeRole]);
-
-  const visibleModules = useMemo(() => permissionService.getVisibleModules(activeRole), [activeRole]);
-  const visibleNavigation: NavigationItem[] = useMemo(() => permissionService.getVisibleNavigation(activeRole), [activeRole]);
-  const dashboardWidgets = useMemo(() => permissionService.getDashboardWidgets(activeRole), [activeRole]);
-  const landingModule = useMemo(() => permissionService.getLandingModule(activeRole), [activeRole]);
-
-  const getVisibleEmployees = useCallback(
-    <T extends { departmentId?: string; id?: string; employeeId?: string }>(employees: T[], userId?: string) =>
-      permissionService.getVisibleEmployees(activeRole, employees, userId),
-    [activeRole]
-  );
-
-  const getVisibleCandidates = useCallback(
-    <T extends { departmentId?: string; assignedRecruiterId?: string }>(candidates: T[], userId?: string) =>
-      permissionService.getVisibleCandidates(activeRole, candidates, userId),
-    [activeRole]
-  );
-
-  const getVisibleInvoices = useCallback(
-    <T extends { id?: string; clientId?: string }>(invoices: T[]) =>
-      permissionService.getVisibleInvoices(activeRole, invoices),
-    [activeRole]
-  );
-
-  const getVisibleDocuments = useCallback(
-    <T extends { category?: string; createdBy?: string }>(documents: T[], userId?: string) =>
-      permissionService.getVisibleDocuments(activeRole, documents, userId),
-    [activeRole]
-  );
+  const isFeatureEnabled = useCallback(() => true, []);
+  const isSuperAdmin = useMemo(() => checkSuperAdmin(authContext), [authContext]);
+  const getVisibleEmployees = useCallback(<T,>(items: T[]) => items, []);
+  const getVisibleCandidates = useCallback(<T,>(items: T[]) => items, []);
+  const getVisibleInvoices = useCallback(<T,>(items: T[]) => items, []);
+  const getVisibleDocuments = useCallback(<T,>(items: T[]) => items, []);
+  const landingModule = '/dashboard';
 
   return {
+    authContext,
     activeRole,
     simulatedRole,
     setSimulatedRole,

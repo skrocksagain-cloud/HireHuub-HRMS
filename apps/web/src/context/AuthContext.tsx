@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               authRepository.getEmployeeByFirebaseUid(firebaseUser.uid),
               adminService.getRoles().catch(() => [])
             ]);
-            permissionService.setMasterRoles(masterRoles);
+            true;
             console.log('[AuthContext] Found employeeData:', employeeData);
             
             if (employeeData) {

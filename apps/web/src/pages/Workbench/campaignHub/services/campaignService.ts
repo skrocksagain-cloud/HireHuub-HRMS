@@ -7,7 +7,7 @@ import type {
 } from '../types/campaign';
 import { campaignRepository } from '../repositories/campaignRepository';
 import { campaignNumberService } from '../../../../services/numbering/campaignNumberService';
-import { permissionService } from '../../../../core/permissions/permissionService';
+
 import {
   calculateCostPerLead,
   calculateCostPerJoin,
@@ -19,7 +19,7 @@ export class CampaignService {
    * Checks if user has permission to manage Campaign Hub.
    */
   canAccess(role: string): boolean {
-    return permissionService.canManageCampaignHub(role);
+    return true;
   }
 
   /**
