@@ -47,42 +47,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function initializeAuth() {
       const { onIdTokenChanged } = await import('firebase/auth');
       const { auth } = await import('../firebase/firebase');
-      const { adminService } = await import('../services/admin/adminService');
-      const { permissionService } = await import('../core/permissions/permissionService');
 
       const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
         if (!isMounted) return;
-        
+
         if (firebaseUser) {
           try {
-            // Verify required claims for ERP readiness
-            const tokenResult = await firebaseUser.getIdTokenResult();
-            const { role, employeeId } = tokenResult.claims;
-            
-            if (!role || !employeeId) {
-              console.log('[AuthContext] Required custom claims missing. Waiting for token refresh.');
-              setUserState(null);
-              setIsLoading(false);
-              return;
-            }
-
-            // We have valid claims. Ensure the app shows a loading state while fetching profile.
-            // This prevents ProtectedRoute from prematurely redirecting if navigate() is called before this finishes.
             setIsLoading(true);
 
-            // Find employee by their firebaseUid
-            console.log('[AuthContext] Searching for firebaseUid:', firebaseUser.uid);
-            const [employeeData, masterRoles] = await Promise.all([
-              authRepository.getEmployeeByFirebaseUid(firebaseUser.uid),
-              adminService.getRoles().catch(() => [])
-            ]);
-            true;
-            console.log('[AuthContext] Found employeeData:', employeeData);
-            
+            const employeeData =
+              await authRepository.getEmployeeByFirebaseUid(firebaseUser.uid);
+
             if (employeeData) {
-              const { resolveAuthorizationIdentity } = await import('../core/authorization/authorizationResolver');
-              const authIdentity = resolveAuthorizationIdentity(employeeData, firebaseUser.uid);
-              
+              const { resolveAuthorizationIdentity } =
+                await import('../core/authorization/authorizationResolver');
+
+              const authIdentity = resolveAuthorizationIdentity(
+                employeeData,
+                firebaseUser.uid
+              );
+
               const emp: Employee = {
                 id: employeeData.id,
                 employeeId: employeeData.employeeId,
@@ -98,30 +82,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 email: employeeData.email,
                 mobileNumber: employeeData.mobileNumber,
                 accountStatus: employeeData.accountStatus,
-                mustChangePassword: employeeData.accountStatus === 'Pending Activation' || !employeeData.firstLoginCompleted,
+                mustChangePassword:
+                  employeeData.accountStatus === 'Pending Activation' ||
+                  !employeeData.firstLoginCompleted,
                 authorization: authIdentity,
               };
+
               setUserState(emp);
             } else {
-              // Not found, maybe they are not an employee
               setUserState(null);
             }
           } catch (error) {
+            console.error('[AuthContext] Authentication initialization failed:', error);
             setUserState(null);
           }
         } else {
           setUserState(null);
         }
-        setIsLoading(false);
+
+        if (isMounted) {
+          setIsLoading(false);
+        }
       });
 
       return unsubscribe;
     }
 
     const initPromise = initializeAuth();
+
     return () => {
       isMounted = false;
-      initPromise.then(unsub => unsub && unsub());
+      initPromise.then((unsubscribe) => {
+        if (unsubscribe) unsubscribe();
+      });
     };
   }, []);
 
@@ -137,10 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { signOut } = await import('firebase/auth');
       const { auth } = await import('../firebase/firebase');
+
       await signOut(auth);
     } catch {
-      // ignore signOut errors
+      // Ignore sign-out errors
     }
+
     setUserState(null);
     setSessionIdState(null);
   };
@@ -165,8 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used inside AuthProvider');
   }
+
   return context;
 }
