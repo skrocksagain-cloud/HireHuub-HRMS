@@ -29,12 +29,14 @@ export class OpeningService {
   async createOpening(opening: Omit<Opening, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Opening> {
     const created = await openingRepository.createOpening(opening);
     await this.audit.logActivity(created.id, 'CREATED', { title: created.title, clientName: created.clientName });
+    await this.googleSheetsSync.handleOpeningSyncLifecycle(created);
     return created;
   }
 
   async updateOpening(id: string, updates: Partial<Opening>): Promise<Opening> {
     const updated = await openingRepository.updateOpening(id, updates);
     await this.audit.logActivity(updated.id, 'UPDATED', { updates });
+    await this.googleSheetsSync.handleOpeningSyncLifecycle(updated);
     return updated;
   }
 
@@ -42,6 +44,7 @@ export class OpeningService {
     const success = await openingRepository.deleteOpening(id);
     if (success) {
       await this.audit.logActivity(id, 'DELETED');
+      await this.googleSheetsSync.removeOpeningFromSheet(id);
     }
     return success;
   }

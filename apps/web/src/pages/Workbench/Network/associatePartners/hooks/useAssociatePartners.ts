@@ -3,9 +3,8 @@ import type {
   AssociatePartner,
   CreateAssociatePartnerInput,
   CandidateSubmissionStatus,
-  CandidateBillingStatus,
 } from '../../../../../types/AssociatePartner';
-import { associatePartnerService } from '../services/associatePartnerService';
+import { associatePartnerService, type AddActiveCandidateInput } from '../services/associatePartnerService';
 
 export function useAssociatePartners() {
   const [partners, setPartners] = useState<AssociatePartner[]>([]);
@@ -84,19 +83,12 @@ export function useAssociatePartnerProfile(id?: string) {
     setPartner(updated);
   };
 
-  const updateCandidateBillingStatus = async (
-    submissionId: string,
-    billingStatus: CandidateBillingStatus,
-    userRole: string
-  ) => {
-    if (!id) return;
-    const updated = await associatePartnerService.updateCandidateBillingStatus(
-      id,
-      submissionId,
-      billingStatus,
-      userRole
-    );
-    setPartner(updated);
+  const addActiveCandidate = async (input: AddActiveCandidateInput) => {
+    const updated = await associatePartnerService.addActiveCandidate(input);
+    if (id && updated.id === id) {
+      setPartner(updated);
+    }
+    return updated;
   };
 
   const updateReportingTo = async (
@@ -121,7 +113,8 @@ export function useAssociatePartnerProfile(id?: string) {
     refresh: fetchPartner,
     toggleStatus,
     updateCandidateStatus,
-    updateCandidateBillingStatus,
+    addActiveCandidate,
     updateReportingTo,
   };
 }
+

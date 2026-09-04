@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Document } from "../../types/Document";
 import { documentService } from "../../services/document/documentService";
 import { useAuth } from "../../context/AuthContext";
-import { permissionService } from "../../core/permissions/permissionService";
-import { employeeService } from "../Employee/services/employeeService";
+import { getAuthorizationScope } from "../../core/authorization/authorizationResolver";
 
 interface DocumentActivity {
   id: string;
@@ -48,40 +47,17 @@ export default function useDocumentDashboard(): UseDocumentDashboardReturn {
     try {
       setLoading(true);
 
-      const allDocs = await documentService.getAll();
-      const allEmps = await employeeService.getEmployees();
-
-      // Filter documents based on PO Role-Based Document Center Permission Model
-      let allowedDocs: Document[] = [];
-      const userRole = user?.role || "Employee";
+      const canonicalRole = user?.authorization?.role || user?.assignedRole || "";
+      const scope = getAuthorizationScope(canonicalRole);
       const userEmpId = user?.employeeId || user?.id || "";
 
-      if (permissionService.isSuperAdmin(userRole)) {
-        // Super Admin (Founder, Co-Founder, Director, Board Member, Super Admin): Access EVERYTHING
-        allowedDocs = allDocs;
-      } else if (userRole === "Department Admin") {
-        // Department Admin: View own docs & entire department docs
-        const deptEmpIds = new Set(
-          allEmps
-            .filter((e) => e.department === user?.department)
-            .map((e) => e.employeeId || e.employeeCode || e.id)
-        );
-        allowedDocs = allDocs.filter(
-          (d) => d.referenceId === userEmpId || deptEmpIds.has(d.referenceId)
-        );
-      } else if (userRole === "Team Lead" || userRole === "Team Leader" || userRole === "Manager") {
-        // Team Lead / Manager: View own docs & docs of employees reporting directly to them
-        const teamEmpIds = new Set(
-          allEmps
-            .filter((e) => e.reportingManager === user?.name || e.reportingManagerId === userEmpId)
-            .map((e) => e.employeeId || e.employeeCode || e.id)
-        );
-        allowedDocs = allDocs.filter(
-          (d) => d.referenceId === userEmpId || teamEmpIds.has(d.referenceId)
-        );
+      let allowedDocs: Document[] = [];
+
+      if (scope === 'GLOBAL') {
+        allowedDocs = await documentService.getAllGlobally(canonicalRole);
       } else {
-        // Employee: View ONLY own documents (referenceId == user.employeeId / code)
-        allowedDocs = allDocs.filter((d) => d.referenceId === userEmpId);
+        // Fallback for non-GLOBAL canonical roles: strictly bounded query for own documents.
+        allowedDocs = await documentService.getByReference(userEmpId);
       }
 
       setTotalDocuments(allowedDocs.length);

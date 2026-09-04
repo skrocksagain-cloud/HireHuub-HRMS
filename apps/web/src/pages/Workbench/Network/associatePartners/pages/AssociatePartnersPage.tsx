@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -7,10 +7,8 @@ import {
   Eye,
   CheckCircle2,
   MapPin,
-  FileSpreadsheet,
   Award,
   UserCheck,
-  Receipt,
   UserCheck2,
 } from 'lucide-react';
 
@@ -21,8 +19,10 @@ import Drawer from '../../../../../ui/Drawer';
 import KpiCard from '../../../../../ui/KpiCard';
 import { useAssociatePartners } from '../hooks/useAssociatePartners';
 import { useAuth } from '../../../../../context/AuthContext';
+import { employeeService } from '../../../../Employee/services/employeeService';
+import { getIndianStates, getCitiesForState } from '../../../../../core/location/indiaLocationMaster';
 import type { AssociatePartnerType, CreateAssociatePartnerInput } from '../../../../../types/AssociatePartner';
-import type { UserRole } from '../../../../../types/Client';
+import { permissionService } from '../../../../../core/permissions/permissionService';
 
 export default function AssociatePartnersPage() {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ export default function AssociatePartnersPage() {
   const { user } = useAuth();
 
   // Role derived from authentication session
-  const currentRole: UserRole = (user?.role as UserRole) || 'Super Admin';
+  const activeRole = permissionService.getEffectiveRole(user?.assignedRole || user?.role, user?.department);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -42,29 +42,65 @@ export default function AssociatePartnersPage() {
   const [formError, setFormError] = useState<string>('');
 
   // Form fields
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeId: string; fullName: string; designation?: string; department?: string }>>([]);
   const [subVendorName, setSubVendorName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('');
   const [state, setState] = useState('Maharashtra');
+  const [city, setCity] = useState('Mumbai');
   const [type, setType] = useState<AssociatePartnerType>('SME');
-  const [reportingToEmployeeId, setReportingToEmployeeId] = useState('emp-001');
-  const [reportingToEmployeeName, setReportingToEmployeeName] = useState('Somnath (Account Exec)');
+  const [reportingToEmployeeId, setReportingToEmployeeId] = useState('');
+  const [reportingToEmployeeName, setReportingToEmployeeName] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [pan, setPan] = useState('');
   const [aadhaarOrTradeLicence, setAadhaarOrTradeLicence] = useState('');
-  const [sheetId, setSheetId] = useState('');
+
+  const availableStates = getIndianStates();
+  const availableCities = getCitiesForState(state);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadEmployees() {
+      try {
+        const emps = await employeeService.getEmployees();
+        if (isMounted) {
+          const mapped = emps.map((e) => {
+            const empId = e.employeeId || e.id || '';
+            return {
+              id: e.id || e.employeeId || empId,
+              employeeId: empId,
+              fullName: `${e.firstName} ${e.lastName}`,
+              designation: e.designation,
+              department: e.department,
+            };
+          });
+          setEmployees(mapped);
+          if (mapped.length > 0 && !reportingToEmployeeId) {
+            const firstEmpId = mapped[0].employeeId;
+            setReportingToEmployeeId(firstEmpId);
+            setReportingToEmployeeName(`${mapped[0].fullName} (${mapped[0].designation || mapped[0].department || 'Staffing'})`);
+          }
+        }
+      } catch {
+        if (isMounted) setEmployees([]);
+      }
+    }
+    loadEmployees();
+    return () => {
+      isMounted = false;
+    };
+  }, [reportingToEmployeeId]);
 
   // Access Control: Marketing, Staffing & Super Admin can create
-  const canCreate = currentRole === 'Super Admin' || currentRole === 'Marketing' || currentRole === 'Staffing';
+  const canCreate = permissionService.canEdit(activeRole, 'Associate partner');
 
   const handleCreatePartnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreate) {
-      setFormError(`Your current role '${currentRole}' is not permitted to create Associate Partners.`);
+      setFormError(`Your current role '${activeRole.name}' is not permitted to create Associate Partners.`);
       return;
     }
     setCreating(true);
@@ -86,7 +122,6 @@ export default function AssociatePartnersPage() {
         ifscCode: ifscCode.trim(),
         pan: pan.trim(),
         aadhaarOrTradeLicence: aadhaarOrTradeLicence.trim(),
-        sheetId: sheetId.trim() || undefined,
       };
 
       await createPartner(input);
@@ -104,8 +139,8 @@ export default function AssociatePartnersPage() {
     setContactPerson('');
     setEmail('');
     setPhone('');
-    setCity('');
     setState('Maharashtra');
+    setCity('Mumbai');
     setType('SME');
     setReportingToEmployeeId('emp-001');
     setReportingToEmployeeName('Somnath (Account Exec)');
@@ -114,7 +149,6 @@ export default function AssociatePartnersPage() {
     setIfscCode('');
     setPan('');
     setAadhaarOrTradeLicence('');
-    setSheetId('');
   };
 
   const filteredPartners = partners.filter((partner) => {
@@ -134,7 +168,6 @@ export default function AssociatePartnersPage() {
   const joined = partners.reduce((sum, p) => sum + p.metrics.joined, 0);
   const active = partners.reduce((sum, p) => sum + p.metrics.active, 0);
   const eligible = partners.reduce((sum, p) => sum + p.metrics.eligible, 0);
-  const pendingBilling = partners.reduce((sum, p) => sum + p.metrics.pendingBilling, 0);
 
   return (
     <DashboardLayout>
@@ -143,7 +176,7 @@ export default function AssociatePartnersPage() {
         <div>
           <SectionHeader
             title="Associate Partner Workspace (Sub Vendors)"
-            subtitle="Manage external Sub Vendors & Freelancers, monitor candidate submissions, eligibility, workforce progress, and billing lifecycle."
+            subtitle="Manage external Sub Vendors & Freelancers, monitor active candidate submissions, eligibility, and workforce progress."
           />
         </div>
 
@@ -168,7 +201,7 @@ export default function AssociatePartnersPage() {
       )}
 
       {/* Associate Partner Dashboard KPI Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           metric={{
             id: 'metric-submitted',
@@ -234,19 +267,6 @@ export default function AssociatePartnersPage() {
           icon={<Award size={18} className="text-amber-600" />}
           badgeBg="bg-amber-50 text-amber-700 border-amber-200"
         />
-        <KpiCard
-          metric={{
-            id: 'metric-pending-billing',
-            title: 'Pending Billing',
-            value: pendingBilling.toString(),
-            change: 'Finance',
-            trend: 'neutral',
-            subtext: 'Awaiting billing status update',
-            category: 'invoices',
-          }}
-          icon={<Receipt size={18} className="text-rose-600" />}
-          badgeBg="bg-rose-50 text-rose-700 border-rose-200"
-        />
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -308,7 +328,6 @@ export default function AssociatePartnersPage() {
                   <th className="py-3.5 px-4">Reporting To (Hire Huub Employee)</th>
                   <th className="py-3.5 px-4">City / State</th>
                   <th className="py-3.5 px-4">Submissions / Joined</th>
-                  <th className="py-3.5 px-4">Sheet Sync</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -345,17 +364,6 @@ export default function AssociatePartnersPage() {
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900">{partner.metrics.joined} Joined</div>
                       <div className="text-[10px] text-slate-500">{partner.metrics.totalSubmitted} total submitted</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          partner.syncMetadata.syncStatus === 'Synced'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        <FileSpreadsheet size={10} /> {partner.syncMetadata.syncStatus}
-                      </span>
                     </td>
                     <td className="py-3.5 px-4">
                       <StatusBadge status={partner.status} />
@@ -421,14 +429,22 @@ export default function AssociatePartnersPage() {
             <select
               value={reportingToEmployeeId}
               onChange={(e) => {
-                setReportingToEmployeeId(e.target.value);
-                setReportingToEmployeeName(e.target.options[e.target.selectedIndex].text);
+                const val = e.target.value;
+                setReportingToEmployeeId(val);
+                const selectedText = e.target.options[e.target.selectedIndex]?.text || '';
+                setReportingToEmployeeName(selectedText);
               }}
               className="w-full p-2 bg-white border border-emerald-300 rounded-lg font-semibold text-slate-800"
             >
-              <option value="emp-001">Somnath (Account Exec)</option>
-              <option value="emp-002">Anil Kumar (Staffing Lead)</option>
-              <option value="emp-003">Meenal Joshi (Account Exec)</option>
+              {employees.length === 0 ? (
+                <option value="" disabled>No records available.</option>
+              ) : (
+                employees.map((emp) => (
+                  <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
+                    {emp.fullName} ({emp.designation || emp.department || 'Staffing'})
+                  </option>
+                ))
+              )}
             </select>
             <span className="text-[10px] text-slate-500 block">Responsible employee for managing this Sub Vendor</span>
           </div>
@@ -472,30 +488,52 @@ export default function AssociatePartnersPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">City *</label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Pune"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl"
-                required
-              />
+              <label className="block font-semibold text-slate-700 mb-1">State *</label>
+              <select
+                value={state}
+                onChange={(e) => {
+                  const newSt = e.target.value;
+                  setState(newSt);
+                  const cities = getCitiesForState(newSt);
+                  if (cities.length > 0) setCity(cities[0]);
+                }}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800"
+              >
+                {availableStates.map((st) => (
+                  <option key={st.stateCode} value={st.stateName}>
+                    {st.stateName}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">State *</label>
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="Maharashtra"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl"
-                required
-              />
+              <label className="block font-semibold text-slate-700 mb-1">City *</label>
+              {availableCities.length > 0 ? (
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                >
+                  {availableCities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Enter City"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  required
+                />
+              )}
             </div>
           </div>
 
-          {/* Bank & Tax Details */}
+          {/* Bank Details */}
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
             <span className="font-bold text-slate-900 text-[11px] block border-b border-slate-200 pb-1">
               Bank Details & Tax Information
@@ -562,18 +600,6 @@ export default function AssociatePartnersPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">External Integration Sheet ID (Optional)</label>
-            <input
-              type="text"
-              value={sheetId}
-              onChange={(e) => setSheetId(e.target.value)}
-              placeholder="e.g. 1BxiMVs0XRm5nPyD-8B_1234567890"
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px]"
-            />
-            <span className="text-[10px] text-slate-400 block mt-0.5">Configures integration for Partner Submissions Database.</span>
-          </div>
-
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
@@ -595,3 +621,4 @@ export default function AssociatePartnersPage() {
     </DashboardLayout>
   );
 }
+

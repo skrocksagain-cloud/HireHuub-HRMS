@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { UserCheck } from 'lucide-react';
 import type { WorkforceItem } from '../types/workforce';
+import ActiveEmployeePicker from '../../../Administration/Announcements/components/ActiveEmployeePicker';
+import type { Employee } from '../../../Employee/types/Employee';
 
 interface AssignmentPanelProps {
   item: WorkforceItem;
   userRole: string;
   userSession: { id: string; name: string };
-  onUpdateAssignment: (id: string, newAssigneeId: string, newAssigneeName: string) => Promise<void>;
+  onUpdateAssignment: (id: string, employee: Employee) => Promise<void>;
 }
 
 export default function AssignmentPanel({
@@ -15,24 +17,29 @@ export default function AssignmentPanel({
   onUpdateAssignment,
 }: AssignmentPanelProps) {
   const [showReassignModal, setShowReassignModal] = useState<boolean>(false);
-  const [newAssigneeName, setNewAssigneeName] = useState<string>(item.currentAssignee);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(item.recruiterId ? [item.recruiterId] : []);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [updating, setUpdating] = useState<boolean>(false);
 
-  const canReassign = userRole !== 'Finance' && userRole !== 'Marketing' && userRole !== 'HR';
+  // Recruiter/Employee cannot reassign
+  const canReassign = userRole !== 'Finance' && userRole !== 'Marketing' && userRole !== 'HR' && userRole !== 'Recruiter' && userRole !== 'Employee';
 
-  const handleReassignSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canReassign || !newAssigneeName.trim()) return;
+  const handleReassignSubmit = async () => {
+    if (!canReassign || !selectedEmployee) return;
 
     setUpdating(true);
     try {
-      await onUpdateAssignment(item.id, `user-${Date.now()}`, newAssigneeName.trim());
+      await onUpdateAssignment(item.id, selectedEmployee);
       setShowReassignModal(false);
     } catch {
       // Handled upstream
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleSelectionChange = (employees: Employee[]) => {
+    setSelectedEmployee(employees.length > 0 ? employees[0] : null);
   };
 
   return (
@@ -51,7 +58,7 @@ export default function AssignmentPanel({
             Reassign Candidate
           </button>
         ) : (
-          <span className="text-[10px] text-slate-400 font-medium">Read Only (Finance)</span>
+          <span className="text-[10px] text-slate-400 font-medium">Read Only</span>
         )}
       </div>
 
@@ -73,32 +80,33 @@ export default function AssignmentPanel({
       </div>
 
       {showReassignModal && (
-        <div className="p-3 bg-slate-100 rounded-xl border border-slate-300 space-y-2 mt-2">
+        <div className="p-3 bg-slate-100 rounded-xl border border-slate-300 space-y-3 mt-2">
           <label className="block text-[11px] font-bold text-slate-800">
             Reassign {item.candidateName} to New Recruiter / Assignee:
           </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newAssigneeName}
-              onChange={(e) => setNewAssigneeName(e.target.value)}
-              className="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900"
-              placeholder="Enter recruiter name..."
-            />
-            <button
-              type="button"
-              disabled={updating}
-              onClick={handleReassignSubmit}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition"
-            >
-              {updating ? 'Saving…' : 'Save'}
-            </button>
+          
+          <ActiveEmployeePicker
+            singleSelect={true}
+            selectedEmployeeIds={selectedEmployeeIds}
+            onChange={setSelectedEmployeeIds}
+            onSelectionChange={handleSelectionChange}
+          />
+          
+          <div className="flex gap-2 justify-end">
             <button
               type="button"
               onClick={() => setShowReassignModal(false)}
-              className="px-3 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
+              className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
             >
               Cancel
+            </button>
+            <button
+              type="button"
+              disabled={updating || selectedEmployeeIds.length === 0}
+              onClick={handleReassignSubmit}
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
+            >
+              {updating ? 'Saving…' : 'Save Assignment'}
             </button>
           </div>
         </div>

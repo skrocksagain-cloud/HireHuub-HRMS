@@ -1,10 +1,11 @@
 import type { Candidate, CandidateStatus, DuplicateCheckResult } from '../types/crm';
+import { permissionService } from '../../../../core/permissions/permissionService';
 import { crmRepository } from '../repositories/crmRepository';
 
 export interface CrmFilterState {
   searchQuery: string;
-  quickFilter: 'All' | 'Assigned' | 'Today\'s Follow Up' | 'Today\'s Interview' | 'Interested' | 'Call Back Later' | 'Active' | 'Overdue';
-  status?: CandidateStatus | 'All';
+  quickFilter: 'All' | 'Assigned' | 'Today\'s Follow Up' | 'Today\'s Interview' | 'Interested' | 'Call Back Later' | 'Active' | 'Overdue' | 'Not Contacted' | 'New Leads' | 'Calls Today';
+  status?: CandidateStatus | 'All' | 'Not Contacted';
   clientId?: string;
   sourceCategory?: string;
   recruiterId?: string;
@@ -23,6 +24,7 @@ export interface KpiSummary {
   activeThisMonth: number;
   callBackLater: number;
   overdueFollowUp: number;
+  newLeads: number;
   waitingForUpdate?: number; // TL and above
 }
 
@@ -84,19 +86,27 @@ export class CrmService {
 
     return candidates.filter((c) => {
       // 1. Role-based Visibility Filter
-      if (currentUser.role === 'Recruiter') {
-        if (c.assignedRecruiterId !== currentUser.id) return false;
-      } else if (currentUser.role === 'Team Leader') {
-        if (c.assignedRecruiterId !== currentUser.id && c.teamId !== currentUser.teamId) return false;
-      } else if (['HR', 'Finance', 'Marketing'].includes(currentUser.role)) {
-        return false; // Zero CRM access
+      const activeRole = permissionService.getEffectiveRole((currentUser as any).assignedRole || currentUser.role, (currentUser as any).department);
+      const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
+      
+      if (viewScope === 'restricted' || viewScope === 'none') {
+        return false;
+      } else if (viewScope === 'own' || viewScope === 'own and team') {
+        if (viewScope === 'own and team' && (currentUser as any).teamId) {
+          if (c.teamId !== (currentUser as any).teamId && c.assignedRecruiterId !== currentUser.id) return false;
+        } else {
+          if (c.assignedRecruiterId !== currentUser.id) return false;
+        }
+      } else if (viewScope === 'department' || viewScope === 'departments' || viewScope.includes('team')) {
+        if (c.assignedRecruiterId !== currentUser.id && c.teamId !== (currentUser as any).teamId && c.departmentId !== (currentUser as any).departmentId) return false;
       }
 
       // 2. Global Search (Name & Phone number)
       if (filters.searchQuery && filters.searchQuery.trim()) {
         const q = filters.searchQuery.trim().toLowerCase();
+        const qDigits = q.replace(/\D/g, '');
         const matchesName = c.name.toLowerCase().includes(q);
-        const matchesPhone = c.phone.includes(q);
+        const matchesPhone = qDigits.length > 0 && c.phone.replace(/\D/g, '').includes(qDigits);
         const matchesRole = c.role.toLowerCase().includes(q);
         const matchesCity = c.city.toLowerCase().includes(q);
         const matchesArea = c.area.toLowerCase().includes(q);
@@ -109,19 +119,31 @@ export class CrmService {
       } else if (filters.quickFilter === 'Today\'s Follow Up') {
         if (c.followUpDate !== today) return false;
       } else if (filters.quickFilter === 'Today\'s Interview') {
-        if (c.interviewDate !== today || c.status !== 'Line Up') return false;
+        if (c.interviewDate !== today || c.currentCrmStatus !== 'Line Up') return false;
       } else if (filters.quickFilter === 'Interested') {
-        if (c.status !== 'Interested') return false;
+        if (c.currentCrmStatus !== 'Interested') return false;
       } else if (filters.quickFilter === 'Call Back Later') {
-        if (c.status !== 'Call Back Later') return false;
+        if (c.currentCrmStatus !== 'Call Back Later') return false;
       } else if (filters.quickFilter === 'Active') {
-        if (c.status !== 'Active') return false;
+        if (c.currentCrmStatus !== 'Active') return false;
       } else if (filters.quickFilter === 'Overdue') {
-        if (!c.followUpDate || c.followUpDate >= today || c.status === 'Active' || c.status === 'Inactive') return false;
+        if (!c.followUpDate || c.followUpDate >= today || c.currentCrmStatus === 'Active' || c.currentCrmStatus === 'Inactive') return false;
+      } else if (filters.quickFilter === 'Not Contacted') {
+        if (c.currentCrmStatus !== null) return false;
+      } else if (filters.quickFilter === 'New Leads') {
+        if (c.currentCrmStatus !== null || c.callsCount > 0) return false;
+      } else if (filters.quickFilter === 'Calls Today') {
+        if (!c.lastCalledAt || !c.lastCalledAt.startsWith(today)) return false;
       }
 
       // 4. Advanced Filters
-      if (filters.status && filters.status !== 'All' && c.status !== filters.status) return false;
+      if (filters.status && filters.status !== 'All') {
+         if (filters.status === 'Not Contacted') {
+           if (c.currentCrmStatus !== null) return false;
+         } else {
+           if (c.currentCrmStatus !== filters.status) return false;
+         }
+      }
       if (filters.clientId && c.currentClientId !== filters.clientId) return false;
       if (filters.sourceCategory && c.source.category !== filters.sourceCategory) return false;
       if (filters.recruiterId && c.assignedRecruiterId !== filters.recruiterId) return false;
@@ -145,51 +167,45 @@ export class CrmService {
    */
   calculateKpiSummary(
     candidates: Candidate[],
-    currentUser: { id: string; role: string; teamId?: string }
+    currentUser: { id: string; role: string; assignedRole?: string; teamId?: string },
+    callsTodayMetric: number = 0
   ): KpiSummary {
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = today.slice(0, 7); // YYYY-MM
 
-    // Filter accessible candidates first
-    const accessible = candidates.filter((c) => {
-      if (currentUser.role === 'Recruiter') return c.assignedRecruiterId === currentUser.id;
-      if (currentUser.role === 'Team Leader') return c.assignedRecruiterId === currentUser.id || c.teamId === currentUser.teamId;
-      return true;
-    });
+    const accessible = candidates; // Authorization is now handled upstream in crmRepository
 
-    const isTLOrAbove = ['Team Leader', 'Manager', 'Admin', 'Staffing', 'Super Admin'].includes(currentUser.role);
+    // Display 'waitingForUpdate' for anyone above a basic User scope
+    const isAboveUser = currentUser.assignedRole && currentUser.assignedRole !== 'User';
 
     let assignedCandidates = 0;
     let todaysFollowUp = 0;
     let todaysLineUp = 0;
-    let callsToday = 0;
+    const callsToday = callsTodayMetric;
     let interested = 0;
     let activeThisMonth = 0;
     let callBackLater = 0;
     let overdueFollowUp = 0;
     let waitingForUpdate = 0;
+    let newLeads = 0;
 
     for (const c of accessible) {
       if (c.assignedRecruiterId === currentUser.id) assignedCandidates++;
 
-      if (c.followUpDate === today && c.status !== 'Active') todaysFollowUp++;
-      if (c.interviewDate === today && c.status === 'Line Up') todaysLineUp++;
+      if (c.followUpDate === today && c.currentCrmStatus !== 'Active') todaysFollowUp++;
+      if (c.interviewDate === today && c.currentCrmStatus === 'Line Up') todaysLineUp++;
+      if (c.currentCrmStatus === null && c.callsCount === 0) newLeads++;
 
-      // Calls today from timeline
-      const callsForToday = c.interactionTimeline.filter((t) => t.createdAt.startsWith(today)).length;
-      callsToday += callsForToday;
+      if (c.currentCrmStatus === 'Interested') interested++;
+      if (c.currentCrmStatus === 'Active' && c.activeDate && c.activeDate.startsWith(currentMonth)) activeThisMonth++;
+      if (c.currentCrmStatus === 'Call Back Later') callBackLater++;
 
-      if (c.status === 'Interested') interested++;
-      if (c.status === 'Active' && c.activeDate && c.activeDate.startsWith(currentMonth)) activeThisMonth++;
-      if (c.status === 'Call Back Later') callBackLater++;
-
-      if (c.followUpDate && c.followUpDate < today && c.status !== 'Active' && c.status !== 'Inactive') {
+      if (c.followUpDate && c.followUpDate < today && c.currentCrmStatus !== 'Active' && c.currentCrmStatus !== 'Inactive') {
         overdueFollowUp++;
       }
 
-      // Waiting for update: No interaction in last 3 days for non-active candidates
       const lastUpdateDate = c.updatedAt.split('T')[0];
-      if (lastUpdateDate < today && c.status !== 'Active' && c.status !== 'Inactive') {
+      if (lastUpdateDate < today && c.currentCrmStatus !== 'Active' && c.currentCrmStatus !== 'Inactive') {
         waitingForUpdate++;
       }
     }
@@ -203,37 +219,34 @@ export class CrmService {
       activeThisMonth,
       callBackLater,
       overdueFollowUp,
-      waitingForUpdate: isTLOrAbove ? waitingForUpdate : undefined,
+      newLeads,
+      waitingForUpdate: isAboveUser ? waitingForUpdate : undefined,
     };
   }
 
   /**
-   * Sort candidates for Today's Work Queue (Priority: Overdue -> Today's Follow Up -> Today's Interview -> New Assignment)
+   * Sort candidates for Today's Work Queue (Priority: Overdue -> Today's Follow Up -> Today's Interview -> New Lead)
    */
   getTodaysWorkQueue(
     candidates: Candidate[],
-    currentUser: { id: string; role: string; teamId?: string }
+    _currentUser: { id: string; role: string; assignedRole?: string; teamId?: string }
   ): Candidate[] {
     const today = new Date().toISOString().split('T')[0];
 
-    const userCandidates = candidates.filter((c) => {
-      if (currentUser.role === 'Recruiter') return c.assignedRecruiterId === currentUser.id;
-      if (currentUser.role === 'Team Leader') return c.assignedRecruiterId === currentUser.id || c.teamId === currentUser.teamId;
-      return true;
-    });
+    const userCandidates = candidates; // Authorization is now handled upstream in crmRepository
 
     const overdue = userCandidates.filter(
-      (c) => c.followUpDate && c.followUpDate < today && c.status !== 'Active' && c.status !== 'Inactive'
+      (c) => c.followUpDate && c.followUpDate < today && c.currentCrmStatus !== 'Active' && c.currentCrmStatus !== 'Inactive'
     );
-    const followUpToday = userCandidates.filter((c) => c.followUpDate === today && c.status !== 'Active');
-    const interviewToday = userCandidates.filter((c) => c.interviewDate === today && c.status === 'Line Up');
-    const newAssignments = userCandidates.filter((c) => c.interactionTimeline.length <= 1 && c.status === 'Interested');
+    const followUpToday = userCandidates.filter((c) => c.followUpDate === today && c.currentCrmStatus !== 'Active');
+    const interviewToday = userCandidates.filter((c) => c.interviewDate === today && c.currentCrmStatus === 'Line Up');
+    const newLeads = userCandidates.filter((c) => c.currentCrmStatus === null && c.callsCount === 0);
 
     // Combine avoiding duplicates
     const set = new Set<string>();
     const queue: Candidate[] = [];
 
-    for (const list of [overdue, followUpToday, interviewToday, newAssignments]) {
+    for (const list of [overdue, followUpToday, interviewToday, newLeads]) {
       for (const item of list) {
         if (!set.has(item.id)) {
           set.add(item.id);
@@ -248,34 +261,47 @@ export class CrmService {
   /**
    * Role-masked Duplicate Phone Check
    */
-  async checkDuplicatePhone(phone: string, userRole: string): Promise<DuplicateCheckResult> {
+  async checkDuplicatePhone(phone: string, userSession: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<DuplicateCheckResult> {
     const candidate = await crmRepository.findDuplicateByPhone(phone);
     if (!candidate) {
       return { isDuplicate: false, isRestrictedView: false };
     }
 
-    const isRestricted = userRole === 'Recruiter';
+    const activeRole = permissionService.getEffectiveRole(userSession.assignedRole || userSession.role, userSession.department);
+    const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
+    
+    // Check if user is allowed to view this specific candidate's info fully
+    let isRestricted = true;
+    if (permissionService.isSuperAdmin(activeRole)) {
+      isRestricted = false;
+    } else if (viewScope === 'all') {
+      isRestricted = false;
+    } else if (viewScope.includes('department') && candidate.departmentId === userSession.departmentId) {
+      isRestricted = false;
+    } else if (viewScope.includes('team') && candidate.teamId === userSession.teamId) {
+      isRestricted = false;
+    } else if ((viewScope === 'own' || viewScope === 'own and team') && candidate.assignedRecruiterId === userSession.id) {
+      isRestricted = false;
+    }
+
     return {
       isDuplicate: true,
       existingCandidate: isRestricted
         ? {
-            // Masked candidate details for Recruiter
+            // Masked candidate details for Restricted view
             id: candidate.id,
             name: 'Candidate already exists',
             phone: '**********',
             area: '***',
             city: '***',
             role: '***',
-            status: 'Interested',
+            currentCrmStatus: 'Interested',
             assignedRecruiterId: '***',
             assignedRecruiterName: '***',
             source: candidate.source,
             sourceHistory: [],
             phoneHistory: [],
             placementHistory: [],
-            interactionTimeline: [],
-            assignmentHistory: [],
-            followUps: [],
             documents: [],
             attachments: [],
             systemAudit: [],

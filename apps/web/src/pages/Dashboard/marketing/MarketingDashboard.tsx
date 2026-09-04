@@ -19,7 +19,7 @@ interface WorkspaceDashboardProps {
 export default function MarketingDashboard({ dashboard }: WorkspaceDashboardProps) {
   return (
     <div className="space-y-6">
-      <LiveStatusStrip />
+      <LiveStatusStrip metrics={dashboard.statusMetrics} />
       <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Marketing & Brand Partnerships" designation="Growth Specialist" />
       <FavoritesBar />
 

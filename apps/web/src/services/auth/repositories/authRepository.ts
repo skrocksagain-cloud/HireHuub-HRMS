@@ -22,13 +22,19 @@ export interface EmployeeAuthData {
   firstName?: string;
   lastName?: string;
   role: string;
+  assignedRole?: string;
+  departmentId?: string;
   department?: string;
+  teamId?: string;
+  teamName?: string;
+  reportingManagerId?: string;
   designation: string;
   email?: string;
   mobileNumber?: string;
   mobile?: string;
   accountStatus: AccountStatus;
   lockReason?: LockReason | string | null;
+  firebaseUid?: string | null;
   passwordHash?: string;
   passwordSalt?: string;
   tempPasswordHash?: string;
@@ -44,6 +50,7 @@ export interface EmployeeAuthData {
 export interface AuthRepository {
   getEmployeeByIdOrMobile(identifier: string): Promise<EmployeeAuthData | null>;
   getEmployeeByDocId(documentId: string): Promise<EmployeeAuthData | null>;
+  getEmployeeByFirebaseUid(uid: string): Promise<EmployeeAuthData | null>;
   updateEmployeeAuthData(documentId: string, updates: Record<string, unknown>): Promise<void>;
   recordFailedLoginAttempt(documentId: string, currentAttempts: number, lockTimeMinutes?: number): Promise<{ isLocked: boolean; remainingAttempts: number }>;
   resetFailedLoginAttempts(documentId: string): Promise<void>;
@@ -74,7 +81,12 @@ export class FirestoreAuthRepository implements AuthRepository {
       firstName,
       lastName,
       role: typeof data.role === 'string' ? data.role : typeof data.designation === 'string' ? data.designation : 'Employee',
+      assignedRole: typeof data.assignedRole === 'string' ? data.assignedRole : undefined,
+      departmentId: typeof data.departmentId === 'string' ? data.departmentId : undefined,
       department: typeof data.department === 'string' ? data.department : undefined,
+      teamId: typeof data.teamId === 'string' ? data.teamId : undefined,
+      teamName: typeof data.teamName === 'string' ? data.teamName : undefined,
+      reportingManagerId: typeof data.reportingManagerId === 'string' ? data.reportingManagerId : undefined,
       designation: typeof data.designation === 'string' ? data.designation : 'Staff',
       email: typeof data.email === 'string' ? data.email : typeof data.officialEmail === 'string' ? data.officialEmail : undefined,
       mobileNumber: typeof data.mobileNumber === 'string' ? data.mobileNumber : typeof data.mobile === 'string' ? data.mobile : undefined,
@@ -143,6 +155,15 @@ export class FirestoreAuthRepository implements AuthRepository {
     return this.parseEmployeeAuthData(docSnap.id, docSnap.data());
   }
 
+  async getEmployeeByFirebaseUid(uid: string): Promise<EmployeeAuthData | null> {
+    const qUid = query(collection(db, EMPLOYEES_COLLECTION), where('firebaseUid', '==', uid), limit(1));
+    const snapUid = await getDocs(qUid);
+    if (!snapUid.empty && snapUid.docs[0]) {
+      return this.parseEmployeeAuthData(snapUid.docs[0].id, snapUid.docs[0].data());
+    }
+    return null;
+  }
+
   async updateEmployeeAuthData(documentId: string, updates: Record<string, unknown>): Promise<void> {
     const docRef = doc(db, EMPLOYEES_COLLECTION, documentId);
     await updateDoc(docRef, {
@@ -179,7 +200,6 @@ export class FirestoreAuthRepository implements AuthRepository {
       failedLoginAttempts: 0,
       lockedUntil: null,
       lockReason: null,
-      accountStatus: 'Active',
     });
   }
 

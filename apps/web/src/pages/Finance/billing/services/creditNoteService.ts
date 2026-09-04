@@ -10,6 +10,7 @@ import type { Invoice } from '../../../../types/Invoice';
 import { creditNoteRepository } from '../repositories/creditNoteRepository';
 import { billingService } from './billingService';
 import { invoiceService } from './invoiceService';
+import type { FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
 
 const roundMoney = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 const allowedTransitions: Record<Exclude<CreditNoteStatus, 'Draft'>, CreditNoteStatus[]> = { Generated: ['Issued', 'Cancelled'], Issued: ['Applied', 'Cancelled'], Applied: [], Cancelled: [] };
@@ -24,14 +25,14 @@ const validateDraft = (input: CreateCreditNoteDraftInput): void => {
 const fileNameFor = (number: string): string => `${number.replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`;
 
 class CreditNoteService {
-  async getCreditNoteHistory(): Promise<CreditNote[]> {
-    return creditNoteRepository.getCreditNotes();
+  async getCreditNoteHistory(actor: FinanceAuthorizationContext): Promise<CreditNote[]> {
+    return creditNoteRepository.getCreditNotes(actor);
   }
 
-  async createDraft(input: CreateCreditNoteDraftInput, createdBy: string): Promise<string> {
+  async createDraft(input: CreateCreditNoteDraftInput, createdBy: string, actor: FinanceAuthorizationContext): Promise<string> {
     validateDraft(input);
     if (!createdBy.trim()) throw new Error('Credit note creator is required.');
-    await invoiceService.getGeneratedInvoice(input.originalInvoiceId);
+    await invoiceService.getGeneratedInvoice(input.originalInvoiceId, actor);
     return creditNoteRepository.createDraft(input, createdBy);
   }
 
@@ -40,7 +41,7 @@ class CreditNoteService {
     const creditNote = await this.requireCreditNote(creditNoteId);
     if (creditNote.status !== 'Draft') throw new Error('Generated credit notes are immutable and cannot be edited.');
     if (creditNote.originalInvoiceId !== input.originalInvoiceId) throw new Error('The original invoice cannot be changed after credit note creation.');
-    await invoiceService.getGeneratedInvoice(input.originalInvoiceId);
+    await invoiceService.getGeneratedInvoice(input.originalInvoiceId, {});
     await creditNoteRepository.updateDraft(creditNote.id, input);
   }
 
@@ -49,7 +50,7 @@ class CreditNoteService {
     if (creditNote.status !== 'Draft') throw new Error('Only draft credit notes can be generated.');
     if (!generatedBy.trim()) throw new Error('Credit note generator is required.');
     validateDraft({ originalInvoiceId: creditNote.originalInvoiceId, creditType: creditNote.creditType, creditDate: creditNote.creditDate, reason: creditNote.reason, selections: creditNote.selections });
-    const invoice = await invoiceService.getGeneratedInvoice(creditNote.originalInvoiceId);
+    const invoice = await invoiceService.getGeneratedInvoice(creditNote.originalInvoiceId, {});
     const lineItems = this.createCreditLineItems(creditNote, invoice);
     await this.validateAvailableCredit(invoice, lineItems, creditNote.id);
     const taxableAmount = roundMoney(lineItems.reduce((total, item) => total + item.taxableAmount, 0));
@@ -95,7 +96,7 @@ class CreditNoteService {
   }
 
   private async validateAvailableCredit(invoice: Invoice, lineItems: CreditNoteLineItem[], currentCreditNoteId: string): Promise<void> {
-    const generatedCredits = (await creditNoteRepository.getCreditNotesForInvoice(invoice.id)).filter((note) => note.id !== currentCreditNoteId && note.status !== 'Draft' && note.status !== 'Cancelled' && note.snapshot);
+    const generatedCredits = (await creditNoteRepository.getCreditNotesForInvoice(invoice.id, {})).filter((note) => note.id !== currentCreditNoteId && note.status !== 'Draft' && note.status !== 'Cancelled' && note.snapshot);
     lineItems.forEach((line) => {
       const previouslyCredited = generatedCredits.reduce((total, note) => total + (note.snapshot!.lineItems.find((item) => item.invoiceLineIndex === line.invoiceLineIndex)?.creditedQuantity ?? 0), 0);
       if (roundMoney(previouslyCredited + line.creditedQuantity) > line.originalQuantity) throw new Error(`Credit quantity exceeds the available balance for invoice line ${line.invoiceLineIndex + 1}.`);
@@ -108,7 +109,7 @@ class CreditNoteService {
 
   private async requireCreditNote(id: string): Promise<CreditNote> {
     if (!id.trim()) throw new Error('Credit note ID is required.');
-    const creditNote = await creditNoteRepository.getCreditNote(id);
+    const creditNote = await creditNoteRepository.getCreditNote(id, {});
     if (!creditNote) throw new Error('Credit note was not found.');
     return creditNote;
   }

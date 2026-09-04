@@ -58,7 +58,11 @@ class CalendarRepository {
    * Save or Update Calendar Event
    */
   async saveEvent(event: Omit<CalendarEventItem, 'id'> & { id?: string }): Promise<CalendarEventItem> {
-    const eventId = event.id || `evt_${Date.now()}`;
+    if (!event.id) {
+      const created = await addDoc(collection(db, EVENTS_COLLECTION), { ...event, createdAt: event.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+      return { ...event, id: created.id, createdAt: event.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    }
+    const eventId = event.id;
     const docRef = doc(db, EVENTS_COLLECTION, eventId);
     const now = new Date().toISOString();
 
@@ -152,7 +156,11 @@ class CalendarRepository {
    * Save Holiday
    */
   async saveHoliday(holiday: Omit<HolidayItem, 'id'> & { id?: string }): Promise<HolidayItem> {
-    const holId = holiday.id || `hol_${Date.now()}`;
+    if (!holiday.id) {
+      const created = await addDoc(collection(db, HOLIDAYS_COLLECTION), { ...holiday, createdAt: holiday.createdAt || new Date().toISOString() });
+      return { ...holiday, id: created.id, createdAt: holiday.createdAt || new Date().toISOString() };
+    }
+    const holId = holiday.id;
     const docRef = doc(db, HOLIDAYS_COLLECTION, holId);
     const payload: HolidayItem = {
       ...holiday,

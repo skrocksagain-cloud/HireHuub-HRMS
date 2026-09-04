@@ -16,15 +16,45 @@ import type { RegisteredDocument, DocumentFilterOptions } from '../../../types/D
 const DOCUMENTS_COLLECTION = 'documents';
 const COUNTERS_COLLECTION = 'document_counters';
 
+import { query, where } from 'firebase/firestore';
+import { getAuthorizationScope } from '../../../core/authorization/authorizationResolver';
+
 class DocumentCenterRepository {
   async getDocuments(filters?: DocumentFilterOptions): Promise<RegisteredDocument[]> {
     try {
-      const snap = await getDocs(collection(db, DOCUMENTS_COLLECTION));
-      const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RegisteredDocument, 'id'>) }));
-      if (filters?.module) {
-        return list.filter((item) => item.module === filters.module);
+      const constraints: any[] = [];
+      
+      if (filters?.module) constraints.push(where('module', '==', filters.module));
+      if (filters?.referenceId) constraints.push(where('referenceId', '==', filters.referenceId));
+      if (filters?.documentId) constraints.push(where('documentId', '==', filters.documentId));
+      
+      if (constraints.length === 0) {
+        return []; // Fail safely: Never execute parameterless global fetch
+      }
+
+      const q = query(collection(db, DOCUMENTS_COLLECTION), ...constraints);
+      const snap = await getDocs(q);
+      let list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RegisteredDocument, 'id'>) }));
+
+      if (filters?.documentType) {
+        const lowerSearch = filters.documentType.toLowerCase();
+        list = list.filter((item) => 
+          item.documentType?.toLowerCase().includes(lowerSearch)
+        );
       }
       return list;
+    } catch {
+      return [];
+    }
+  }
+
+  async getAllDocumentsGlobally(canonicalRole: string): Promise<RegisteredDocument[]> {
+    if (getAuthorizationScope(canonicalRole) !== 'GLOBAL') {
+      return []; // Must be explicit GLOBAL canonical scope
+    }
+    try {
+      const snap = await getDocs(collection(db, DOCUMENTS_COLLECTION));
+      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RegisteredDocument, 'id'>) }));
     } catch {
       return [];
     }
@@ -80,6 +110,7 @@ class DocumentCenterRepository {
 
   async getNextDocumentNumber(): Promise<string> {
     const company = await adminService.getCompanySettings();
+    if (!company) throw new Error('Company settings not found');
     if (!company.documentPrefix?.trim()) {
       throw new Error('Administration → Company Settings is missing the document prefix.');
     }

@@ -1,8 +1,9 @@
 import React from 'react';
-import { ShieldAlert, ArrowLeft, LayoutDashboard } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ShieldAlert, ArrowLeft, LayoutDashboard, Loader2 } from 'lucide-react';
+import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { usePermissions } from '../hooks/usePermissions';
 import DashboardLayout from '../layouts/DashboardLayout';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   moduleKey?: string;
@@ -12,8 +13,32 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ moduleKey, pageKey, path, children }: ProtectedRouteProps) {
+  const { user, isLoading } = useAuth();
   const { activeRole, canAccessModule, canAccessPage, canAccessRoute, landingModule } = usePermissions();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="animate-spin text-emerald-600 mb-4" size={32} />
+        <span className="text-slate-500 font-medium tracking-tight">Authenticating ONE Identity...</span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  const roleNameLower = (activeRole?.name || '').toLowerCase();
+  if (roleNameLower === 'associate partner guest' || roleNameLower === 'associate_partner_guest') {
+    return <Navigate to="/guest/associate-partner" replace />;
+  }
 
   let isAuthorized = true;
 

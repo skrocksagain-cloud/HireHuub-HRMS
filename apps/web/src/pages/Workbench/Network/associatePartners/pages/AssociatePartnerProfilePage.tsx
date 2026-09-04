@@ -1,21 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Users,
   MapPin,
-  FileSpreadsheet,
   Award,
   Edit2,
   Phone,
   Mail,
-  ShieldCheck,
   CheckCircle2,
   UserCheck,
   CreditCard,
   Lock,
-  Receipt,
   UserCheck2,
+  Plus,
+  Download,
+  Upload,
+  Link2,
 } from 'lucide-react';
 
 import DashboardLayout from '../../../../../layouts/DashboardLayout';
@@ -24,8 +25,13 @@ import KpiCard from '../../../../../ui/KpiCard';
 import Drawer from '../../../../../ui/Drawer';
 import { useAssociatePartnerProfile } from '../hooks/useAssociatePartners';
 import { useAuth } from '../../../../../context/AuthContext';
-import type { CandidateSubmissionStatus, CandidateBillingStatus } from '../../../../../types/AssociatePartner';
-import type { UserRole } from '../../../../../types/Client';
+import { employeeService } from '../../../../Employee/services/employeeService';
+import { clientService } from '../../clients/services/clientService';
+import { associatePartnerService, type AddActiveCandidateInput } from '../services/associatePartnerService';
+import { guestAuthService } from '../../../../../services/guest/guestAuthService';
+import { getIndianStates, getCitiesForState } from '../../../../../core/location/indiaLocationMaster';
+import type { CandidateSubmissionStatus } from '../../../../../types/AssociatePartner';
+import type { Client, UserRole } from '../../../../../types/Client';
 
 export default function AssociatePartnerProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -37,13 +43,13 @@ export default function AssociatePartnerProfilePage() {
     error,
     toggleStatus,
     updateCandidateStatus,
-    updateCandidateBillingStatus,
+    addActiveCandidate,
     updateReportingTo,
   } = useAssociatePartnerProfile(id);
 
   // Role derived from authentication context
   const currentRole: UserRole = (user?.role as UserRole) || 'Super Admin';
-  const [activeTab, setActiveTab] = useState<'overview' | 'submissions' | 'sync'>('submissions');
+  const [activeTab, setActiveTab] = useState<'overview' | 'submissions'>('submissions');
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -55,15 +61,78 @@ export default function AssociatePartnerProfilePage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [joiningDate, setJoiningDate] = useState('');
 
-  // Billing Status Edit State
-  const [showBillingDrawer, setShowBillingDrawer] = useState(false);
-  const [selectedBillingSubId, setSelectedBillingSubId] = useState('');
-  const [newBillingStatus, setNewBillingStatus] = useState<CandidateBillingStatus>('Pending Billing');
+  // Add Active Candidate Drawer State
+  const [showAddCandidateDrawer, setShowAddCandidateDrawer] = useState(false);
+  const [addMode, setAddMode] = useState<'single' | 'bulk'>('single');
+  const [candName, setCandName] = useState('');
+  const [candPhone, setCandPhone] = useState('');
+  const [candState, setCandState] = useState('Maharashtra');
+  const [candCity, setCandCity] = useState('Mumbai');
+  const [candClientId, setCandClientId] = useState('');
+  const [candClientName, setCandClientName] = useState('');
+  const [candActiveDate, setCandActiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [candRole, setCandRole] = useState('');
+  const [submittingCand, setSubmittingCand] = useState(false);
 
-  // Change Reporting To State (Super Admin Only)
+  // Bulk Upload State
+  const [bulkCsvText, setBulkCsvText] = useState('');
+  const [bulkValidationErrors, setBulkValidationErrors] = useState<Array<{ rowNumber: number; error: string }>>([]);
+  const [validBulkRows, setValidBulkRows] = useState<AddActiveCandidateInput[]>([]);
+
+  const [employees, setEmployees] = useState<Array<{ id: string; employeeId: string; fullName: string; designation?: string; department?: string }>>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isEditingReportingTo, setIsEditingReportingTo] = useState(false);
-  const [newEmpId, setNewEmpId] = useState('emp-001');
-  const [newEmpName, setNewEmpName] = useState('Somnath (Account Exec)');
+  const [newEmpId, setNewEmpId] = useState('');
+  const [newEmpName, setNewEmpName] = useState('');
+
+  const availableStates = getIndianStates();
+  const availableCities = getCitiesForState(candState);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        const [emps, clientList] = await Promise.all([
+          employeeService.getEmployees(),
+          clientService.getClients(),
+        ]);
+        if (isMounted) {
+          const mappedEmps = emps.map((e) => {
+            const empId = e.employeeId || e.id || '';
+            return {
+              id: e.id || e.employeeId || empId,
+              employeeId: empId,
+              fullName: `${e.firstName} ${e.lastName}`,
+              designation: e.designation,
+              department: e.department,
+            };
+          });
+          setEmployees(mappedEmps);
+          setClients(clientList);
+
+          if (clientList.length > 0 && !candClientId) {
+            setCandClientId(clientList[0].id);
+            setCandClientName(clientList[0].name);
+          }
+
+          if (mappedEmps.length > 0 && !newEmpId) {
+            const firstEmpId = mappedEmps[0].employeeId;
+            setNewEmpId(firstEmpId);
+            setNewEmpName(`${mappedEmps[0].fullName} (${mappedEmps[0].designation || mappedEmps[0].department || 'Staffing'})`);
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setEmployees([]);
+          setClients([]);
+        }
+      }
+    }
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [candClientId, newEmpId]);
 
   if (loading) {
     return (
@@ -97,6 +166,21 @@ export default function AssociatePartnerProfilePage() {
     setActionSuccess(`Partner status toggled successfully to ${partner.status === 'Active' ? 'Inactive' : 'Active'}.`);
   };
 
+  const handleGenerateGuestLink = async () => {
+    try {
+      setActionError('');
+      if (!partner?.phone) {
+        throw new Error('Partner must have a valid phone number to generate a secure guest link.');
+      }
+      const token = await guestAuthService.generateInvitation(partner.id, partner.phone);
+      const url = `${window.location.origin}/guest/login/${token}`;
+      await navigator.clipboard.writeText(url);
+      setActionSuccess('Guest Link generated and copied to clipboard successfully!');
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to generate guest link.');
+    }
+  };
+
   const handleSaveReportingTo = async () => {
     try {
       setActionError('');
@@ -120,16 +204,126 @@ export default function AssociatePartnerProfilePage() {
     }
   };
 
-  const handleBillingSubmit = async (e: React.FormEvent) => {
+  const handleSingleCandidateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!partner) return;
+    setSubmittingCand(true);
     setActionError('');
     try {
-      await updateCandidateBillingStatus(selectedBillingSubId, newBillingStatus, currentRole);
-      setShowBillingDrawer(false);
-      setActionSuccess(`Candidate billing status updated to ${newBillingStatus} by ${currentRole}.`);
+      const input: AddActiveCandidateInput = {
+        candidateName: candName.trim(),
+        phone: candPhone.trim(),
+        city: candCity.trim(),
+        state: candState.trim(),
+        associatePartnerId: partner.id,
+        clientId: candClientId,
+        clientName: candClientName,
+        activeDate: candActiveDate,
+        role: candRole.trim(),
+      };
+      await addActiveCandidate(input);
+      setShowAddCandidateDrawer(false);
+      resetAddForm();
+      setActionSuccess(`Active candidate '${input.candidateName}' added and created in Workforce.`);
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update billing status.');
+      setActionError(err instanceof Error ? err.message : 'Failed to add active candidate.');
+    } finally {
+      setSubmittingCand(false);
     }
+  };
+
+  const resetAddForm = () => {
+    setCandName('');
+    setCandPhone('');
+    setCandState('Maharashtra');
+    setCandCity('Mumbai');
+    setCandRole('');
+    setCandActiveDate(new Date().toISOString().split('T')[0]);
+    setBulkCsvText('');
+    setBulkValidationErrors([]);
+    setValidBulkRows([]);
+  };
+
+  const handleValidateBulk = async () => {
+    if (!partner) return;
+    setActionError('');
+    try {
+      const lines = bulkCsvText.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        throw new Error('Please enter or paste bulk CSV rows.');
+      }
+
+      // Format: Candidate Name, Phone Number, City, State, Role, Active Date, Client ID, Client Name
+      const parsedRows = lines.map((line) => {
+        const parts = line.split(',').map((p) => p.trim());
+        return {
+          'Candidate Name': parts[0] || '',
+          'Phone Number': parts[1] || '',
+          'City': parts[2] || '',
+          'State': parts[3] || '',
+          'Role': parts[4] || '',
+          'Candidate Active Date': parts[5] || candActiveDate,
+          'Client ID': parts[6] || candClientId,
+          'Client Name': parts[7] || candClientName,
+          'Associate Partner ID': partner.id,
+        };
+      });
+
+      const res = await associatePartnerService.validateBulkCandidateRows(parsedRows, partner.id);
+      setValidBulkRows(res.validInputs);
+      setBulkValidationErrors(res.invalidRows.map((r) => ({ rowNumber: r.rowNumber, error: r.error })));
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to validate bulk CSV inputs.');
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    if (validBulkRows.length === 0) return;
+    setSubmittingCand(true);
+    setActionError('');
+    try {
+      await associatePartnerService.bulkAddActiveCandidates(validBulkRows);
+      setShowAddCandidateDrawer(false);
+      resetAddForm();
+      setActionSuccess(`Successfully added ${validBulkRows.length} active candidate(s) to Workforce.`);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to submit bulk candidate upload.');
+    } finally {
+      setSubmittingCand(false);
+    }
+  };
+
+  const handleExportEligibleCandidates = () => {
+    if (!partner) return;
+    const eligibleList = partner.submissions.filter((s) => s.eligibilityStatus === 'Eligible');
+    if (eligibleList.length === 0) {
+      setActionError('No eligible candidates available for export.');
+      return;
+    }
+
+    const headers = ['Candidate Name', 'Phone Number', 'City', 'State', 'Client Name', 'Active Date', 'Role', 'Tenure', 'Eligibility Status'];
+    const rows = eligibleList.map((s) => [
+      `"${s.candidateName}"`,
+      `"${s.mobileNumber}"`,
+      `"${s.city || ''}"`,
+      `"${s.state}"`,
+      `"${s.clientName}"`,
+      `"${s.joiningDate || s.submissionDate}"`,
+      `"${s.role || ''}"`,
+      `"${s.tenure || '90 Days'}"`,
+      `"Yes"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Eligible_Candidates_${partner.partnerCode}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setActionSuccess(`Exported ${eligibleList.length} eligible candidate(s) to CSV.`);
   };
 
   return (
@@ -143,6 +337,14 @@ export default function AssociatePartnerProfilePage() {
             className="inline-flex items-center gap-2 text-xs text-slate-500 font-semibold hover:text-emerald-600 transition"
           >
             <ArrowLeft size={16} /> Back to Associate Partners List
+          </button>
+
+          <button
+            type="button"
+            onClick={handleGenerateGuestLink}
+            className="inline-flex items-center gap-2 text-xs text-emerald-600 font-semibold hover:text-emerald-700 transition"
+          >
+            <Link2 size={16} /> Generate Guest Link
           </button>
         </div>
 
@@ -183,14 +385,22 @@ export default function AssociatePartnerProfilePage() {
                       <select
                         value={newEmpId}
                         onChange={(e) => {
-                          setNewEmpId(e.target.value);
-                          setNewEmpName(e.target.options[e.target.selectedIndex].text);
+                          const val = e.target.value;
+                          setNewEmpId(val);
+                          const selText = e.target.options[e.target.selectedIndex]?.text || '';
+                          setNewEmpName(selText);
                         }}
                         className="bg-slate-50 border border-slate-300 rounded px-2 py-0.5 text-xs font-bold"
                       >
-                        <option value="emp-001">Somnath (Account Exec)</option>
-                        <option value="emp-002">Anil Kumar (Staffing Lead)</option>
-                        <option value="emp-003">Meenal Joshi (Account Exec)</option>
+                        {employees.length === 0 ? (
+                          <option value="" disabled>No records available.</option>
+                        ) : (
+                          employees.map((emp) => (
+                            <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
+                              {emp.fullName} ({emp.designation || emp.department || 'Staffing'})
+                            </option>
+                          ))
+                        )}
                       </select>
                       <button
                         type="button"
@@ -260,8 +470,8 @@ export default function AssociatePartnerProfilePage() {
         </div>
       </div>
 
-      {/* KPI Overview Summary Cards (Dashboard Metrics) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* KPI Overview Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           metric={{
             id: 'prof-submitted',
@@ -327,19 +537,6 @@ export default function AssociatePartnerProfilePage() {
           icon={<Award size={18} className="text-amber-600" />}
           badgeBg="bg-amber-50 text-amber-700 border-amber-200"
         />
-        <KpiCard
-          metric={{
-            id: 'prof-pending-billing',
-            title: 'Pending Billing',
-            value: partner.metrics.pendingBilling.toString(),
-            change: 'Finance',
-            trend: 'neutral',
-            subtext: 'Awaiting billing status update',
-            category: 'invoices',
-          }}
-          icon={<Receipt size={18} className="text-rose-600" />}
-          badgeBg="bg-rose-50 text-rose-700 border-rose-200"
-        />
       </div>
 
       {/* Tabs Navigation */}
@@ -354,7 +551,7 @@ export default function AssociatePartnerProfilePage() {
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <UserCheck size={16} /> Candidate Submissions
+            <UserCheck size={16} /> Candidate Submissions & Active Entries
           </button>
           <button
             type="button"
@@ -367,31 +564,44 @@ export default function AssociatePartnerProfilePage() {
           >
             <Users size={16} /> Master Info & Bank Details
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('sync')}
-            className={`py-3.5 px-2 text-xs font-semibold border-b-2 flex items-center gap-2 transition ${
-              activeTab === 'sync'
-                ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <FileSpreadsheet size={16} /> Integration & Synchronization
-          </button>
         </nav>
       </div>
 
       {/* Tab 1: Candidate Submissions */}
       {activeTab === 'submissions' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <UserCheck size={18} className="text-emerald-600" /> Candidate Submissions
+                <UserCheck size={18} className="text-emerald-600" /> Candidate Submissions & Active Entry
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Managed by assigned Hire Huub Employee: <strong className="text-slate-800 font-bold">{partner.reportingTo.employeeName}</strong>. Setting status to <strong className="text-emerald-800">Joined</strong> automatically makes candidate active in Workforce. Rejection requires mandatory reason.
+                Managed by assigned Hire Huub Employee: <strong className="text-slate-800 font-bold">{partner.reportingTo.employeeName}</strong>. Active candidates automatically sync with Workbench $\rightarrow$ Workforce.
               </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportEligibleCandidates}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl font-bold text-xs shadow-xs transition"
+                title="Export candidates with Eligibility Status = Yes (Eligible)"
+              >
+                <Download size={14} />
+                <span>Export Eligible Candidates</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetAddForm();
+                  setShowAddCandidateDrawer(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition"
+              >
+                <Plus size={14} />
+                <span>Add Active Candidate</span>
+              </button>
             </div>
           </div>
 
@@ -400,19 +610,18 @@ export default function AssociatePartnerProfilePage() {
               <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3 px-3">Candidate & Mobile</th>
-                  <th className="py-3 px-3">Client & State</th>
-                  <th className="py-3 px-3">Submission Date</th>
-                  <th className="py-3 px-3">Hire Huub Status</th>
-                  <th className="py-3 px-3">Joining Date</th>
+                  <th className="py-3 px-3">Client & Role</th>
+                  <th className="py-3 px-3">Location (City, State)</th>
+                  <th className="py-3 px-3">Active / Submission Date</th>
+                  <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3">Tenure & Eligibility</th>
-                  <th className="py-3 px-3">Billing Status</th>
                   <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {partner.submissions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
                       No candidate submissions recorded yet.
                     </td>
                   </tr>
@@ -425,10 +634,13 @@ export default function AssociatePartnerProfilePage() {
                       </td>
                       <td className="py-3.5 px-3">
                         <div className="font-semibold text-emerald-800">{sub.clientName}</div>
-                        <div className="text-[10px] text-slate-400">{sub.state}</div>
+                        {sub.role && <div className="text-[10px] text-slate-500 font-medium">{sub.role}</div>}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="font-medium text-slate-700">{sub.city || '—'}, {sub.state}</div>
                       </td>
                       <td className="py-3.5 px-3 font-mono text-slate-600">
-                        {sub.submissionDate}
+                        {sub.joiningDate || sub.submissionDate}
                       </td>
                       <td className="py-3.5 px-3">
                         <span
@@ -450,9 +662,6 @@ export default function AssociatePartnerProfilePage() {
                           </div>
                         )}
                       </td>
-                      <td className="py-3.5 px-3 font-mono text-slate-700">
-                        {sub.joiningDate || '—'}
-                      </td>
                       <td className="py-3.5 px-3">
                         {sub.eligibilityStatus ? (
                           <span
@@ -462,29 +671,10 @@ export default function AssociatePartnerProfilePage() {
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
-                            <Award size={10} /> {sub.eligibilityStatus} ({sub.tenure || '30 Days'})
+                            <Award size={10} /> {sub.eligibilityStatus === 'Eligible' ? 'Yes' : 'No'} ({sub.tenure || '30 Days'})
                           </span>
                         ) : (
                           <span className="text-slate-400 text-[10px]">—</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        {sub.eligibilityStatus === 'Eligible' ? (
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                              sub.billingStatus === 'Billed'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : sub.billingStatus === 'Paid'
-                                ? 'bg-teal-100 text-teal-800'
-                                : 'bg-amber-50 text-amber-900 border border-amber-200'
-                            }`}
-                          >
-                            {sub.billingStatus || 'Pending'}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[10px]" title="Billing Status available ONLY when Eligible">
-                            Locked (Not Eligible)
-                          </span>
                         )}
                       </td>
                       <td className="py-3.5 px-3 text-right space-x-1">
@@ -498,25 +688,10 @@ export default function AssociatePartnerProfilePage() {
                             setJoiningDate(sub.joiningDate || '');
                             setShowStatusDrawer(true);
                           }}
-                          className="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 font-semibold rounded-lg text-[11px]"
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 font-semibold rounded-lg text-[11px]"
                         >
                           Update Status
                         </button>
-
-                        {sub.eligibilityStatus === 'Eligible' && (currentRole === 'Super Admin' || currentRole === 'Finance') && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBillingSubId(sub.id);
-                              setNewBillingStatus(sub.billingStatus || 'Pending Billing');
-                              setShowBillingDrawer(true);
-                            }}
-                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold rounded-lg text-[11px]"
-                            title="Super Admin / Finance: Update Billing Status"
-                          >
-                            Billing
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))
@@ -610,46 +785,241 @@ export default function AssociatePartnerProfilePage() {
         </div>
       )}
 
-      {/* Tab 3: Integration & Synchronization */}
-      {activeTab === 'sync' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <FileSpreadsheet size={18} className="text-emerald-600" /> Integration & Synchronization
-          </h3>
-          <p className="text-xs text-slate-500">
-            Every Associate Partner (Sub Vendor) has one dedicated integration dataset containing <strong className="text-slate-800">Submissions</strong> and <strong className="text-slate-800">Requirements</strong> data. Synchronization updates status, joining date, candidate tenure, and eligibility lifecycle.
-          </p>
-
-          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span className="text-slate-400 font-semibold block">Configured Integration Sheet ID</span>
-                <span className="font-mono text-slate-900 font-bold">{partner.syncMetadata.sheetId || 'Not Configured'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 font-semibold block">Sync Status</span>
-                <span className="font-bold text-emerald-800">{partner.syncMetadata.syncStatus}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-emerald-600" />
-                <span className="font-semibold text-slate-800">Database Sheet Tab Architecture: Ready</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-emerald-600" />
-                <span className="font-semibold text-slate-800">Requirements Sheet Tab Architecture: Ready</span>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 text-slate-600 flex items-center gap-2 text-[11px]">
-              <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
-              <span>Prepared for future Apps Script / Drive API synchronization without modifying existing Sub Vendor business workflow.</span>
-            </div>
+      {/* Drawer: Add Active Candidate (Single & Bulk Entry) */}
+      <Drawer
+        isOpen={showAddCandidateDrawer}
+        onClose={() => setShowAddCandidateDrawer(false)}
+        title={`Add Active Candidate(s) for ${partner.subVendorName}`}
+      >
+        <div className="space-y-4 text-xs">
+          <div className="flex border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setAddMode('single')}
+              className={`py-2 px-4 font-bold border-b-2 transition ${
+                addMode === 'single' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500'
+              }`}
+            >
+              Single Candidate Entry
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddMode('bulk')}
+              className={`py-2 px-4 font-bold border-b-2 transition ${
+                addMode === 'bulk' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500'
+              }`}
+            >
+              Bulk Upload
+            </button>
           </div>
+
+          {addMode === 'single' ? (
+            <form onSubmit={handleSingleCandidateSubmit} className="space-y-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Candidate Name *</label>
+                <input
+                  type="text"
+                  value={candName}
+                  onChange={(e) => setCandName(e.target.value)}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Phone Number *</label>
+                <input
+                  type="text"
+                  value={candPhone}
+                  onChange={(e) => setCandPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">State *</label>
+                  <select
+                    value={candState}
+                    onChange={(e) => {
+                      const st = e.target.value;
+                      setCandState(st);
+                      const cities = getCitiesForState(st);
+                      if (cities.length > 0) setCandCity(cities[0]);
+                    }}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                  >
+                    {availableStates.map((st) => (
+                      <option key={st.stateCode} value={st.stateName}>
+                        {st.stateName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">City *</label>
+                  {availableCities.length > 0 ? (
+                    <select
+                      value={candCity}
+                      onChange={(e) => setCandCity(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    >
+                      {availableCities.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={candCity}
+                      onChange={(e) => setCandCity(e.target.value)}
+                      placeholder="Enter City"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl"
+                      required
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Client Master *</label>
+                <select
+                  value={candClientId}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    setCandClientId(selId);
+                    const matched = clients.find((c) => c.id === selId);
+                    if (matched) setCandClientName(matched.name);
+                  }}
+                  className="w-full p-2 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900"
+                >
+                  {clients.length === 0 ? (
+                    <option value="" disabled>No Client Master records found.</option>
+                  ) : (
+                    clients.map((cli) => (
+                      <option key={cli.id} value={cli.id}>
+                        {cli.name} ({cli.clientId || cli.id})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Candidate Active Date *</label>
+                  <input
+                    type="date"
+                    value={candActiveDate}
+                    onChange={(e) => setCandActiveDate(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Role *</label>
+                  <input
+                    type="text"
+                    value={candRole}
+                    onChange={(e) => setCandRole(e.target.value)}
+                    placeholder="e.g. Delivery Executive"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCandidateDrawer(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingCand}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                >
+                  {submittingCand ? 'Saving Candidate…' : 'Create & Sync to Workforce'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[11px] text-slate-500">
+                Paste CSV rows with comma-separated values: <br />
+                <code className="font-mono bg-slate-100 p-1 rounded block mt-1 text-[10px]">
+                  Candidate Name, Phone Number, City, State, Role, Active Date
+                </code>
+              </p>
+
+              <textarea
+                value={bulkCsvText}
+                onChange={(e) => setBulkCsvText(e.target.value)}
+                placeholder={`Ramesh Kumar, 9876543210, Mumbai, Maharashtra, Delivery Executive, 2026-08-01\nSuresh Verma, 9811122233, Bengaluru, Karnataka, Warehouse Staff, 2026-08-02`}
+                rows={6}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px]"
+              />
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleValidateBulk}
+                  className="px-4 py-2 bg-slate-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Upload size={14} /> Validate CSV Rows
+                </button>
+                {validBulkRows.length > 0 && (
+                  <span className="text-emerald-700 font-bold text-xs">
+                    ✓ {validBulkRows.length} valid row(s) ready for creation.
+                  </span>
+                )}
+              </div>
+
+              {bulkValidationErrors.length > 0 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1 max-h-40 overflow-y-auto">
+                  <span className="font-bold text-rose-900 text-xs block">Invalid Row Errors ({bulkValidationErrors.length}):</span>
+                  {bulkValidationErrors.map((err) => (
+                    <div key={err.rowNumber} className="text-[11px] text-rose-700 font-mono">
+                      Row {err.rowNumber}: {err.error}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCandidateDrawer(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkSubmit}
+                  disabled={submittingCand || validBulkRows.length === 0}
+                  className={`px-5 py-2 rounded-xl text-white font-semibold shadow-xs ${
+                    validBulkRows.length > 0
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-slate-300 cursor-not-allowed'
+                  }`}
+                >
+                  {submittingCand ? 'Importing…' : `Import ${validBulkRows.length} Candidates to Workforce`}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </Drawer>
 
       {/* Drawer: Update Candidate Status */}
       <Drawer
@@ -702,7 +1072,7 @@ export default function AssociatePartnerProfilePage() {
                 />
               </div>
               <p className="text-[10px] text-emerald-800">
-                Candidate will automatically become <strong className="font-bold">Active</strong> and appear inside Workbench → Workforce. Eligibility will auto-calculate based on Client Tenure.
+                Candidate will automatically become <strong className="font-bold">Active</strong> and appear inside Workbench → Workforce.
               </p>
             </div>
           )}
@@ -724,48 +1094,7 @@ export default function AssociatePartnerProfilePage() {
           </div>
         </form>
       </Drawer>
-
-      {/* Drawer: Update Candidate Billing Status */}
-      <Drawer
-        isOpen={showBillingDrawer}
-        onClose={() => setShowBillingDrawer(false)}
-        title="Update Candidate Billing Status (Finance / Super Admin)"
-      >
-        <form onSubmit={handleBillingSubmit} className="space-y-4 text-xs">
-          <p className="text-slate-500 text-[11px]">
-            Billing Status is available ONLY when candidate eligibility is <strong className="text-amber-900 font-bold">Eligible</strong>. Restricted to Super Admin or Finance.
-          </p>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Billing Status *</label>
-            <select
-              value={newBillingStatus}
-              onChange={(e) => setNewBillingStatus(e.target.value as CandidateBillingStatus)}
-              className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-xl font-bold text-amber-950"
-            >
-              <option value="Pending Billing">Pending Billing</option>
-              <option value="Billed">Billed</option>
-              <option value="Paid">Paid</option>
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={() => setShowBillingDrawer(false)}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
-            >
-              Save Billing Status
-            </button>
-          </div>
-        </form>
-      </Drawer>
     </DashboardLayout>
   );
 }
+

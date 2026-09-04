@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   List,
   FileText,
+  TrendingUp,
 } from "lucide-react";
 
 import DashboardLayout from "../../layouts/DashboardLayout";
@@ -21,7 +22,9 @@ import EmployeeCard from "./components/EmployeeCard";
 import EmployeeFilterPanel from "./components/EmployeeFilterPanel";
 import GenerateOfferDrawer from "./components/GenerateOfferDrawer";
 import NewEmployeeDrawer from "./components/NewEmployeeDrawer";
+import AppraisalModal from "./components/AppraisalModal";
 import { useEmployees } from "./hooks/useEmployees";
+import { calculateProbationState } from "../Leave/services/leaveAccrualService";
 import type { Employee } from "./types/Employee";
 
 interface EmployeePageProps {
@@ -79,6 +82,7 @@ export default function EmployeePage({ initialPanel }: EmployeePageProps) {
   // Drawers
   const [showOfferDrawer, setShowOfferDrawer] = useState<boolean>(false);
   const [showNewEmployeeDrawer, setShowNewEmployeeDrawer] = useState<boolean>(false);
+  const [showAppraisalModal, setShowAppraisalModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialPanel === "create" && !hasInitializedCreatePanel.current) {
@@ -146,7 +150,7 @@ export default function EmployeePage({ initialPanel }: EmployeePageProps) {
           />
         </div>
 
-        {/* Dual Actions: Generate Offer & New Employee */}
+        {/* Actions: Generate Offer | Appraisal | New Employee */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
@@ -155,6 +159,15 @@ export default function EmployeePage({ initialPanel }: EmployeePageProps) {
           >
             <FileText size={16} />
             <span>Generate Offer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowAppraisalModal(true)}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition"
+          >
+            <TrendingUp size={16} />
+            <span>Appraisal</span>
           </button>
 
           <button
@@ -210,11 +223,11 @@ export default function EmployeePage({ initialPanel }: EmployeePageProps) {
             id: "probation-emp",
             title: "On Probation",
             value: filteredEmployees
-              .filter((e) => e.employmentStatus === "Notice Period" || e.notes?.includes("Probation"))
+              .filter((e) => calculateProbationState(e.joiningDate).isProbation)
               .length.toString(),
             change: "Under review",
             trend: "neutral",
-            subtext: "Probationary employees",
+            subtext: "Probationary employees (First 90 Days)",
             category: "people",
           }}
           icon={<Clock size={20} className="text-amber-600" />}
@@ -383,6 +396,12 @@ export default function EmployeePage({ initialPanel }: EmployeePageProps) {
           void removeEmployee();
         }}
         onCancel={cancelDelete}
+      />
+
+      {/* Appraisal Workflow Modal */}
+      <AppraisalModal
+        isOpen={showAppraisalModal}
+        onClose={() => setShowAppraisalModal(false)}
       />
     </DashboardLayout>
   );

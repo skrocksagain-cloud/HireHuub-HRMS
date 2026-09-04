@@ -1,3 +1,12 @@
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+} from 'firebase/firestore';
+import { db } from '../../../../../firebase/firebase';
 import type {
   AssociatePartner,
   CreateAssociatePartnerInput,
@@ -5,13 +14,14 @@ import type {
   AssociatePartnerDashboardMetrics,
 } from '../../../../../types/AssociatePartner';
 
+const partnersCollection = collection(db, 'associate_partners');
+
 const calculateMetrics = (submissions: AssociatePartnerCandidateSubmission[]): AssociatePartnerDashboardMetrics => {
   const totalSubmitted = submissions.length;
   const selected = submissions.filter((s) => s.status === 'Selected').length;
   const joined = submissions.filter((s) => s.status === 'Joined').length;
   const active = joined; // Joined candidates automatically become Active
   const eligible = submissions.filter((s) => s.eligibilityStatus === 'Eligible').length;
-  const pendingBilling = submissions.filter((s) => s.eligibilityStatus === 'Eligible' && (s.billingStatus === 'Pending Billing' || !s.billingStatus)).length;
 
   return {
     totalSubmitted,
@@ -19,166 +29,88 @@ const calculateMetrics = (submissions: AssociatePartnerCandidateSubmission[]): A
     joined,
     active,
     eligible,
-    pendingBilling,
   };
 };
 
-const SAMPLE_SUBMISSIONS_1: AssociatePartnerCandidateSubmission[] = [
-  {
-    id: 'sub-001',
-    candidateName: 'Rahul Verma',
-    mobileNumber: '+91 98765 11111',
-    state: 'Maharashtra',
-    clientName: 'Elastic Run',
-    submissionDate: '2026-07-01',
-    status: 'Joined',
-    joiningDate: '2026-07-10',
-    tenure: '90 Days',
-    eligibilityStatus: 'Eligible',
-    billingStatus: 'Pending Billing',
-  },
-  {
-    id: 'sub-002',
-    candidateName: 'Pooja Kulkarni',
-    mobileNumber: '+91 98765 22222',
-    state: 'Karnataka',
-    clientName: 'Elastic Run',
-    submissionDate: '2026-07-05',
-    status: 'Selected',
-  },
-  {
-    id: 'sub-003',
-    candidateName: 'Amit Saxena',
-    mobileNumber: '+91 98765 33333',
-    state: 'Maharashtra',
-    clientName: 'Acme Tech',
-    submissionDate: '2026-06-15',
-    status: 'Rejected',
-    rejectionReason: 'Failed technical round 2 interview',
-  },
-];
+export function formatPartnerCode(serial: number): string {
+  return `HH/AP/${String(serial).padStart(6, '0')}`;
+}
 
-const SAMPLE_SUBMISSIONS_2: AssociatePartnerCandidateSubmission[] = [
-  {
-    id: 'sub-004',
-    candidateName: 'Deepak Thorat',
-    mobileNumber: '+91 91234 44444',
-    state: 'Karnataka',
-    clientName: 'Infosys Workforce',
-    submissionDate: '2026-06-20',
-    status: 'Joined',
-    joiningDate: '2026-07-01',
-    tenure: '30 Days',
-    eligibilityStatus: 'Eligible',
-    billingStatus: 'Billed',
-  },
-];
+const partnerFromDoc = (id: string, value: Record<string, unknown>): AssociatePartner => {
+  const rawSubmissions = Array.isArray(value.submissions) ? (value.submissions as AssociatePartnerCandidateSubmission[]) : [];
+  // Strip obsolete billingStatus from submissions during document mapping
+  const cleanedSubmissions = rawSubmissions.map((sub) => {
+    const { billingStatus, ...rest } = sub as AssociatePartnerCandidateSubmission & { billingStatus?: unknown };
+    return rest;
+  });
 
-const SAMPLE_ASSOCIATE_PARTNERS: AssociatePartner[] = [
-  {
-    id: 'ap-001',
-    partnerCode: 'AP-2026-001',
-    subVendorName: 'Apex Recruitment Solutions',
-    name: 'Apex Recruitment Solutions',
-    contactPerson: 'Vikramaditya Singh',
-    email: 'vikram@apexrecruitment.in',
-    phone: '+91 98220 11223',
-    city: 'Pune',
-    state: 'Maharashtra',
-    status: 'Active',
-    type: 'SME',
-    reportingTo: {
-      employeeId: 'emp-001',
-      employeeName: 'Somnath (Account Exec)',
-      designation: 'Account Manager',
-    },
-    bankDetails: {
-      bankName: 'HDFC Bank',
-      accountNumber: '50100234567890',
-      ifscCode: 'HDFC0000123',
-    },
-    pan: 'ABCDE1234F',
-    aadhaarOrTradeLicence: 'MH-PUN-2024-98765',
-    syncMetadata: {
-      sheetId: '1BxiMVs0XRm5nPyD-8B_1234567890',
-      lastSyncedAt: '2026-08-01T10:30:00.000Z',
-      syncStatus: 'Synced',
-      databaseTabReady: true,
-      requirementsTabReady: true,
-    },
-    submissions: SAMPLE_SUBMISSIONS_1,
-    metrics: calculateMetrics(SAMPLE_SUBMISSIONS_1),
-    createdAt: '2026-01-15T09:00:00.000Z',
-    updatedAt: '2026-08-01T10:30:00.000Z',
-  },
-  {
-    id: 'ap-002',
-    partnerCode: 'AP-2026-002',
-    subVendorName: 'TalentScout Freelance Network',
-    name: 'TalentScout Freelance Network',
-    contactPerson: 'Priya Nambiar',
-    email: 'priya@talentscout.co.in',
-    phone: '+91 98450 33445',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    status: 'Active',
-    type: 'Freelancer',
-    reportingTo: {
-      employeeId: 'emp-002',
-      employeeName: 'Anil Kumar',
-      designation: 'Staffing Lead',
-    },
-    bankDetails: {
-      bankName: 'ICICI Bank',
-      accountNumber: '000401567890',
-      ifscCode: 'ICIC0000004',
-    },
-    pan: 'PQRSW5678G',
-    aadhaarOrTradeLicence: '9876-5432-1098',
-    syncMetadata: {
-      sheetId: '1CxiMVs0XRm5nPyD-8C_9876543210',
-      lastSyncedAt: '2026-07-28T14:15:00.000Z',
-      syncStatus: 'Synced',
-      databaseTabReady: true,
-      requirementsTabReady: true,
-    },
-    submissions: SAMPLE_SUBMISSIONS_2,
-    metrics: calculateMetrics(SAMPLE_SUBMISSIONS_2),
-    createdAt: '2026-02-01T11:20:00.000Z',
-    updatedAt: '2026-07-28T14:15:00.000Z',
-  },
-];
+  return {
+    id,
+    partnerCode: String(value.partnerCode ?? id),
+    subVendorName: String(value.subVendorName ?? ''),
+    name: String(value.name ?? value.subVendorName ?? ''),
+    contactPerson: String(value.contactPerson ?? ''),
+    email: String(value.email ?? ''),
+    phone: String(value.phone ?? ''),
+    city: String(value.city ?? ''),
+    state: String(value.state ?? ''),
+    status: (value.status as AssociatePartner['status']) || 'Active',
+    type: (value.type as AssociatePartner['type']) || 'SME',
+    reportingTo: typeof value.reportingTo === 'object' && value.reportingTo
+      ? (value.reportingTo as AssociatePartner['reportingTo'])
+      : { employeeId: '', employeeName: '' },
+    bankDetails: typeof value.bankDetails === 'object' && value.bankDetails
+      ? (value.bankDetails as AssociatePartner['bankDetails'])
+      : { bankName: '', accountNumber: '', ifscCode: '' },
+    pan: String(value.pan ?? ''),
+    aadhaarOrTradeLicence: String(value.aadhaarOrTradeLicence ?? ''),
+    submissions: cleanedSubmissions,
+    metrics: calculateMetrics(cleanedSubmissions),
+    createdAt: String(value.createdAt ?? ''),
+    updatedAt: String(value.updatedAt ?? ''),
+  };
+};
 
 class AssociatePartnerRepository {
-  private partners: AssociatePartner[] = [...SAMPLE_ASSOCIATE_PARTNERS];
-
   async getPartners(): Promise<AssociatePartner[]> {
-    return [...this.partners];
+    const snap = await getDocs(partnersCollection);
+    return snap.docs.map((d) => partnerFromDoc(d.id, d.data()));
   }
 
   async getPartnerById(id: string): Promise<AssociatePartner | null> {
-    const found = this.partners.find((p) => p.id === id);
-    return found ? { ...found } : null;
+    const docRef = doc(db, 'associate_partners', id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+    return partnerFromDoc(snap.id, snap.data());
   }
 
   async createPartner(input: CreateAssociatePartnerInput): Promise<AssociatePartner> {
-    const nextSeq = this.partners.length + 1;
-    const newId = `ap-${String(nextSeq).padStart(3, '0')}`;
-    const code = `AP-2026-${String(nextSeq).padStart(3, '0')}`;
     const now = new Date().toISOString();
-
     const emptySubmissions: AssociatePartnerCandidateSubmission[] = [];
 
-    const newPartner: AssociatePartner = {
-      id: newId,
-      partnerCode: code,
-      subVendorName: input.subVendorName,
-      name: input.subVendorName,
-      contactPerson: input.contactPerson,
-      email: input.email,
-      phone: input.phone,
-      city: input.city,
-      state: input.state,
+    // Atomic / sequential partner code calculation: HH/AP/000001
+    const snap = await getDocs(partnersCollection);
+    let maxSerial = 0;
+    snap.docs.forEach((d) => {
+      const code = String(d.data().partnerCode ?? '');
+      const match = code.match(/HH\/AP\/(\d+)/) || code.match(/AP-(\d+)/) || code.match(/(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxSerial) maxSerial = num;
+      }
+    });
+
+    const partnerCode = formatPartnerCode(maxSerial + 1);
+
+    const payload = {
+      partnerCode,
+      subVendorName: input.subVendorName.trim(),
+      name: input.subVendorName.trim(),
+      contactPerson: input.contactPerson.trim(),
+      email: input.email.trim(),
+      phone: input.phone.trim(),
+      city: input.city.trim(),
+      state: input.state.trim(),
       type: input.type,
       status: 'Active',
       reportingTo: {
@@ -190,48 +122,40 @@ class AssociatePartnerRepository {
         accountNumber: input.accountNumber,
         ifscCode: input.ifscCode,
       },
-      pan: input.pan,
-      aadhaarOrTradeLicence: input.aadhaarOrTradeLicence,
-      syncMetadata: {
-        sheetId: input.sheetId || undefined,
-        syncStatus: input.sheetId ? 'Synced' : 'Not Configured',
-        lastSyncedAt: input.sheetId ? now : undefined,
-        databaseTabReady: true,
-        requirementsTabReady: true,
-      },
+      pan: input.pan.trim(),
+      aadhaarOrTradeLicence: input.aadhaarOrTradeLicence.trim(),
       submissions: emptySubmissions,
       metrics: calculateMetrics(emptySubmissions),
       createdAt: now,
       updatedAt: now,
     };
 
-    this.partners.push(newPartner);
-    return { ...newPartner };
+    const docRef = await addDoc(partnersCollection, payload);
+    const createdSnap = await getDoc(docRef);
+    return partnerFromDoc(createdSnap.id, createdSnap.data() as Record<string, unknown>);
   }
 
   async updatePartner(id: string, updates: Partial<AssociatePartner>): Promise<AssociatePartner> {
-    const index = this.clientsIndex(id);
-    if (index === -1) throw new Error(`Associate Partner with ID ${id} not found.`);
+    const docRef = doc(db, 'associate_partners', id);
+    const currentSnap = await getDoc(docRef);
+    if (!currentSnap.exists()) throw new Error(`Associate Partner with ID ${id} not found.`);
 
-    const current = this.partners[index];
+    const current = partnerFromDoc(currentSnap.id, currentSnap.data());
     const updatedSubmissions = updates.submissions || current.submissions;
     const updatedMetrics = calculateMetrics(updatedSubmissions);
 
     const now = new Date().toISOString();
-    const updated: AssociatePartner = {
-      ...current,
+    const payload = {
       ...updates,
       metrics: updatedMetrics,
       updatedAt: now,
     };
 
-    this.partners[index] = updated;
-    return { ...updated };
-  }
-
-  private clientsIndex(id: string): number {
-    return this.partners.findIndex((p) => p.id === id);
+    await updateDoc(docRef, payload);
+    const updatedSnap = await getDoc(docRef);
+    return partnerFromDoc(updatedSnap.id, updatedSnap.data() as Record<string, unknown>);
   }
 }
 
 export const associatePartnerRepository = new AssociatePartnerRepository();
+

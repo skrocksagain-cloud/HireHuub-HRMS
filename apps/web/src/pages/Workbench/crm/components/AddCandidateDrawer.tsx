@@ -2,7 +2,10 @@ import { useState, useTransition } from 'react';
 import { X, Check, AlertCircle, Sparkles, UserPlus, ShieldAlert } from 'lucide-react';
 import type { CreateCandidateInput, MainSourceCategory, JobPortalOption, SocialMediaOption, DuplicateCheckResult } from '../types/crm';
 import { crmService } from '../services/crmService';
+import { permissionService } from '../../../../core/permissions/permissionService';
 import type { Employee } from '../../../Employee/types/Employee';
+
+import { getAllIndianCities } from '../../../../core/location/indiaLocationMaster';
 
 interface AddCandidateDrawerProps {
   isOpen: boolean;
@@ -13,6 +16,8 @@ interface AddCandidateDrawerProps {
     id: string;
     name: string;
     role: string;
+    assignedRole?: string;
+    department?: string;
     teamId?: string;
   };
   onOpenDuplicateProfile?: (candidateId: string) => void;
@@ -34,19 +39,21 @@ export default function AddCandidateDrawer({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [area, setArea] = useState('');
-  const [city, setCity] = useState('Pune');
+  const [city, setCity] = useState('');
   const [roleInput, setRoleInput] = useState('');
   const [roleSuggestion, setRoleSuggestion] = useState<string | undefined>(undefined);
 
   // Source Fields
-  const [sourceCategory, setSourceCategory] = useState<MainSourceCategory>('Job Portal');
-  const [jobPortalOption, setJobPortalOption] = useState<JobPortalOption>('Apna');
-  const [socialOption, setSocialOption] = useState<SocialMediaOption>('Facebook');
+  const [sourceCategory, setSourceCategory] = useState<MainSourceCategory | ''>('');
+  const [jobPortalOption, setJobPortalOption] = useState<JobPortalOption | ''>('');
+  const [socialOption, setSocialOption] = useState<SocialMediaOption | ''>('');
   const [customDetailText, setCustomDetailText] = useState('');
 
   // Assignment Fields
-  const [assignedRecruiterId, setAssignedRecruiterId] = useState(userSession.id);
-  const [assignedRecruiterName, setAssignedRecruiterName] = useState(userSession.name);
+  const [assignedRecruiterId, setAssignedRecruiterId] = useState<string>('');
+  const [assignedRecruiterName, setAssignedRecruiterName] = useState<string>('');
+  const [targetTeamId, setTargetTeamId] = useState<string>('');
+  const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
 
   // Duplicate Check & Error state
   const [duplicateResult, setDuplicateResult] = useState<DuplicateCheckResult | null>(null);
@@ -83,8 +90,8 @@ export default function AddCandidateDrawer({
     setFormError(null);
 
     // Required fields check
-    if (!name.trim() || !phone.trim() || !area.trim() || !city.trim() || !roleInput.trim()) {
-      setFormError('Please fill in all required fields (Name, Phone, Area, City, Role).');
+    if (!name.trim() || !phone.trim() || !area.trim() || !city.trim() || !roleInput.trim() || !sourceCategory) {
+      setFormError('Please fill in all required fields (Name, Phone, Area, City, Role, Source Category).');
       return;
     }
 
@@ -98,9 +105,9 @@ export default function AddCandidateDrawer({
     let detailOption: string | undefined = undefined;
     let detailText: string | undefined = undefined;
 
-    if (sourceCategory === 'Job Portal') detailOption = jobPortalOption;
-    else if (sourceCategory === 'Social Media') detailOption = socialOption;
-    else if (sourceCategory === 'Reference' || sourceCategory === 'Advertisement') detailText = customDetailText;
+    if (sourceCategory === 'Job Portal') detailOption = jobPortalOption || undefined;
+    else if (sourceCategory === 'Social Media') detailOption = socialOption || undefined;
+    else if (sourceCategory === 'Reference' || sourceCategory === 'Advertisement') detailText = customDetailText || undefined;
 
     const input: CreateCandidateInput = {
       name: name.trim(),
@@ -109,12 +116,14 @@ export default function AddCandidateDrawer({
       city: city.trim(),
       role: normalizedRole,
       source: {
-        category: sourceCategory,
+        category: sourceCategory as MainSourceCategory,
         detailOption,
         detailText,
       },
-      assignedRecruiterId,
-      assignedRecruiterName,
+      assignedRecruiterId: assignedRecruiterId || null,
+      assignedRecruiterName: assignedRecruiterName || null,
+      targetTeamId: targetTeamId || null,
+      targetDepartmentId: targetDepartmentId || null,
     };
 
     try {
@@ -136,16 +145,20 @@ export default function AddCandidateDrawer({
     setName('');
     setPhone('');
     setArea('');
-    setCity('Pune');
+    setCity('');
     setRoleInput('');
     setRoleSuggestion(undefined);
-    setSourceCategory('Job Portal');
+    setSourceCategory('');
+    setJobPortalOption('');
+    setSocialOption('');
     setCustomDetailText('');
     setDuplicateResult(null);
     setFormError(null);
   };
 
-  const isTLOrAbove = ['Team Leader', 'Manager', 'Admin', 'Staffing', 'Super Admin'].includes(userSession.role);
+  const activeRole = permissionService.getEffectiveRole(userSession.assignedRole || userSession.role, userSession.department);
+  const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
+  const isTLOrAbove = viewScope !== 'own' && viewScope !== 'restricted' && viewScope !== 'none';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex justify-end">
@@ -186,7 +199,7 @@ export default function AddCandidateDrawer({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Ramesh Kumar"
+                  placeholder="e.g. Candidate Full Name"
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
@@ -215,13 +228,12 @@ export default function AddCandidateDrawer({
 
                 {duplicateResult.isRestrictedView ? (
                   <p className="text-amber-800 text-[11px]">
-                    Candidate already exists in the system. Duplicate candidates cannot be created.
+                    Candidate {duplicateResult.existingCandidate?.name || 'with this mobile'} is already assigned to a different team mate.
                   </p>
                 ) : (
                   <div className="space-y-1 text-amber-900 text-[11px]">
-                    <p><strong>Name:</strong> {duplicateResult.existingCandidate?.name}</p>
-                    <p><strong>Assigned Recruiter:</strong> {duplicateResult.existingCandidate?.assignedRecruiterName}</p>
-                    <p><strong>Status:</strong> {duplicateResult.existingCandidate?.status}</p>
+                    <p><strong>Candidate {duplicateResult.existingCandidate?.name}</strong> is already assigned to {duplicateResult.existingCandidate?.assignedRecruiterName}.</p>
+                    <p><strong>Status:</strong> {duplicateResult.existingCandidate?.currentCrmStatus ?? 'Not Contacted'}</p>
                     <div className="pt-2 flex items-center gap-2">
                       <button
                         type="button"
@@ -243,25 +255,32 @@ export default function AddCandidateDrawer({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">City *</label>
+                <input
+                  type="text"
+                  required
+                  list="all-indian-cities"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Type city name..."
+                  autoComplete="off"
+                  className="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                />
+                <datalist id="all-indian-cities">
+                  {getAllIndianCities().map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Area / Locality *</label>
                 <input
                   type="text"
                   required
                   value={area}
                   onChange={(e) => setArea(e.target.value)}
-                  placeholder="e.g. Warje"
-                  className="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">City *</label>
-                <input
-                  type="text"
-                  required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Pune"
+                  placeholder="e.g. Locality"
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
                 />
               </div>
@@ -275,7 +294,7 @@ export default function AddCandidateDrawer({
                 required
                 value={roleInput}
                 onChange={(e) => handleRoleChange(e.target.value)}
-                placeholder="e.g. delivery boy"
+                placeholder="Enter role..."
                 className="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium"
               />
 
@@ -305,10 +324,12 @@ export default function AddCandidateDrawer({
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Source Category *</label>
               <select
+                required
                 value={sourceCategory}
                 onChange={(e) => setSourceCategory(e.target.value as MainSourceCategory)}
                 className="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-slate-50"
               >
+                <option value="" disabled>Select Source Category</option>
                 <option value="Job Portal">Job Portal</option>
                 <option value="Reference">Reference</option>
                 <option value="Social Media">Social Media</option>
@@ -327,6 +348,7 @@ export default function AddCandidateDrawer({
                   onChange={(e) => setJobPortalOption(e.target.value as JobPortalOption)}
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-slate-50"
                 >
+                  <option value="" disabled>Select Portal</option>
                   <option value="Apna">Apna</option>
                   <option value="WorkIndia">WorkIndia</option>
                   <option value="Indeed">Indeed</option>
@@ -345,6 +367,7 @@ export default function AddCandidateDrawer({
                   onChange={(e) => setSocialOption(e.target.value as SocialMediaOption)}
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-slate-50"
                 >
+                  <option value="" disabled>Select Channel</option>
                   <option value="Facebook">Facebook</option>
                   <option value="WhatsApp">WhatsApp</option>
                   <option value="Instagram">Instagram</option>
@@ -365,7 +388,7 @@ export default function AddCandidateDrawer({
                   required
                   value={customDetailText}
                   onChange={(e) => setCustomDetailText(e.target.value)}
-                  placeholder={sourceCategory === 'Reference' ? 'e.g. Vikram Singh' : 'e.g. Pune H2 Banner Campaign'}
+                  placeholder={sourceCategory === 'Reference' ? 'Reference Name' : 'Campaign Name'}
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl"
                 />
               </div>
@@ -379,7 +402,9 @@ export default function AddCandidateDrawer({
             </h4>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Recruiter</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Assigned Recruiter <span className="text-slate-400 font-normal ml-1">(Optional &mdash; if left blank, assigned to you)</span>
+              </label>
               {!isTLOrAbove ? (
                 <input
                   type="text"
@@ -387,31 +412,38 @@ export default function AddCandidateDrawer({
                   value={`${userSession.name} (Auto-assigned to self)`}
                   className="w-full text-xs p-2.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-600 font-medium"
                 />
+              ) : assignableEmployees.length === 0 ? (
+                <div className="text-xs text-slate-500 italic p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  No records available.
+                </div>
               ) : (
                 <select
-                  value={assignedRecruiterId}
+                  value={assignedRecruiterId || ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setAssignedRecruiterId(val);
-                    const sel = e.target.options[e.target.selectedIndex]?.text || '';
-                    setAssignedRecruiterName(sel.split(' (')[0]);
+                    if (!val) {
+                      setAssignedRecruiterId('');
+                      setAssignedRecruiterName('');
+                      setTargetTeamId('');
+                      setTargetDepartmentId('');
+                      return;
+                    }
+                    const emp = assignableEmployees.find(emp => (emp.employeeId || emp.id) === val);
+                    if (emp) {
+                      setAssignedRecruiterId(val);
+                      setAssignedRecruiterName(emp.fullName || '');
+                      setTargetTeamId((emp as any).teamId || '');
+                      setTargetDepartmentId((emp.departmentId || emp.department) || '');
+                    }
                   }}
                   className="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-slate-50 font-medium"
                 >
-                  {assignableEmployees.length > 0 ? (
-                    assignableEmployees.map((emp) => (
-                      <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
-                        {emp.fullName} ({emp.designation || emp.department || 'Staffing'})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="user-001">Rahul Sharma (Team Pune)</option>
-                      <option value="user-002">Anita Roy (Team Pune)</option>
-                      <option value="tl-001">Vikram Patil (Team Lead)</option>
-                      <option value="admin-001">Sanjay Gupta (Staffing Admin)</option>
-                    </>
-                  )}
+                  <option value="">Leave blank (assign to me)</option>
+                  {assignableEmployees.map((emp) => (
+                    <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
+                      {emp.fullName} ({emp.designation || emp.department || 'Staffing'})
+                    </option>
+                  ))}
                 </select>
               )}
             </div>
@@ -440,3 +472,4 @@ export default function AddCandidateDrawer({
     </div>
   );
 }
+

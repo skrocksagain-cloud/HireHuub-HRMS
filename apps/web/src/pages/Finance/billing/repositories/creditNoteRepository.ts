@@ -1,6 +1,8 @@
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, Timestamp, updateDoc, where, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '../../../../firebase/firebase';
+import type { FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
+import { canReadFinanceGlobally } from '../../../../core/authorization/financeAuthorization';
 import type { CreateCreditNoteDraftInput, CreditNote, CreditNoteDocumentStorage, CreditNoteSnapshot, CreditNoteStatus, CreditNoteStatusHistoryEntry } from '../../../../types/CreditNote';
 
 const CREDIT_NOTES_COLLECTION = 'creditNotes';
@@ -32,9 +34,9 @@ const creditNoteFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): CreditNo
 
 export interface CreditNoteRepository {
   createDraft(input: CreateCreditNoteDraftInput, createdBy: string): Promise<string>;
-  getCreditNote(id: string): Promise<CreditNote | null>;
-  getCreditNotes(): Promise<CreditNote[]>;
-  getCreditNotesForInvoice(invoiceId: string): Promise<CreditNote[]>;
+  getCreditNote(id: string, actor: FinanceAuthorizationContext): Promise<CreditNote | null>;
+  getCreditNotes(actor: FinanceAuthorizationContext): Promise<CreditNote[]>;
+  getCreditNotesForInvoice(invoiceId: string, actor: FinanceAuthorizationContext): Promise<CreditNote[]>;
   updateDraft(id: string, input: CreateCreditNoteDraftInput): Promise<void>;
   completeGeneration(id: string, snapshot: CreditNoteSnapshot, document: CreditNoteDocumentStorage, statusHistory: CreditNoteStatusHistoryEntry[]): Promise<void>;
   updateStatus(id: string, status: CreditNoteStatus, statusHistory: CreditNoteStatusHistoryEntry[]): Promise<void>;
@@ -47,17 +49,20 @@ class FirestoreCreditNoteRepository implements CreditNoteRepository {
     return result.id;
   }
 
-  async getCreditNote(id: string): Promise<CreditNote | null> {
+  async getCreditNote(id: string, actor: FinanceAuthorizationContext): Promise<CreditNote | null> {
+    if (!canReadFinanceGlobally(actor)) return null;
     const snapshot = await getDoc(doc(db, CREDIT_NOTES_COLLECTION, id));
     return snapshot.exists() ? creditNoteFrom(snapshot) : null;
   }
 
-  async getCreditNotes(): Promise<CreditNote[]> {
+  async getCreditNotes(actor: FinanceAuthorizationContext): Promise<CreditNote[]> {
+    if (!canReadFinanceGlobally(actor)) return [];
     const result = await getDocs(collection(db, CREDIT_NOTES_COLLECTION));
     return result.docs.map(creditNoteFrom);
   }
 
-  async getCreditNotesForInvoice(invoiceId: string): Promise<CreditNote[]> {
+  async getCreditNotesForInvoice(invoiceId: string, actor: FinanceAuthorizationContext): Promise<CreditNote[]> {
+    if (!canReadFinanceGlobally(actor)) return [];
     const result = await getDocs(query(collection(db, CREDIT_NOTES_COLLECTION), where('originalInvoiceId', '==', invoiceId)));
     return result.docs.map(creditNoteFrom);
   }

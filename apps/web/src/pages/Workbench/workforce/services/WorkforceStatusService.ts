@@ -34,41 +34,48 @@ export class WorkforceStatusService {
 
   /**
    * Enforces role-based permission access check for Workforce workspace.
-   * Marketing and HR roles have NO ACCESS.
    */
   static canAccessWorkforce(userRole: string): boolean {
+    // We allow Finance temporarily for backwards compatibility/uploads if needed, but per requirements we focus on the main 4.
+    // The requirement says: "Marketing and other unauthorized users must not gain Workforce access."
     const restrictedRoles = ['Marketing', 'HR'];
     return !restrictedRoles.includes(userRole);
   }
 
   /**
    * Filters workforce list by user role and assignment bounds.
-   * - Recruiter: Own workforce only (assignedRecruiterId === userId or currentAssignee === userName)
-   * - Team Lead: Reporting team only
-   * - Staffing Admin / Finance / Super Admin: All workforce
+   * EMPLOYEE: Own candidates only
+   * ADMIN: Own candidates + candidates assigned to them
+   * MASTER ADMIN: Candidates belonging to their department
+   * SUPER ADMIN: All candidates
    */
   static filterWorkforceByRole(
     items: WorkforceItem[],
     userRole: string,
-    userSession: { id: string; name: string }
+    userSession: { id: string; name: string; teamId?: string; departmentId?: string }
   ): WorkforceItem[] {
-    if (userRole === 'Recruiter') {
+    const role = userRole || 'Employee';
+
+    if (role === 'Super Admin' || role === 'Finance') {
+      return items;
+    }
+
+    if (role === 'Master Admin') {
+      return items.filter(
+        (item) => userSession.departmentId && item.departmentId === userSession.departmentId
+      );
+    }
+
+    if (role === 'Admin') {
       return items.filter(
         (item) =>
           item.recruiterId === userSession.id ||
-          item.currentAssignee.toLowerCase() === userSession.name.toLowerCase()
-      );
-    }
-
-    if (userRole === 'Team Lead') {
-      return items.filter(
-        (item) =>
           item.teamLeadId === userSession.id ||
-          item.reportingTeamLead.toLowerCase() === userSession.name.toLowerCase()
+          (userSession.teamId && item.teamId === userSession.teamId)
       );
     }
 
-    // Staffing Admin, Finance, Super Admin have access to all workforce records
-    return items;
+    // Default to EMPLOYEE
+    return items.filter((item) => item.recruiterId === userSession.id);
   }
 }

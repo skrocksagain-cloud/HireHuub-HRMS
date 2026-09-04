@@ -1,22 +1,17 @@
-import { Eye, Edit3, PhoneCall, UserCheck, ShieldAlert, Activity } from 'lucide-react';
+import { PhoneCall, UserCheck, ShieldAlert, Activity } from 'lucide-react';
 import type { Candidate } from '../types/crm';
 
 interface CandidateTableProps {
   candidates: Candidate[];
   onSelectCandidate: (candidate: Candidate) => void;
-  onQuickUpdate: (candidate: Candidate) => void;
-  onOpenClientPreview: (clientId: string) => void;
   selectedCandidateIds: string[];
   onToggleCandidateSelect: (id: string) => void;
   onSelectAll: (selectAll: boolean) => void;
-  userRole: string;
 }
 
 export default function CandidateTable({
   candidates,
   onSelectCandidate,
-  onQuickUpdate,
-  onOpenClientPreview,
   selectedCandidateIds,
   onToggleCandidateSelect,
   onSelectAll,
@@ -44,17 +39,7 @@ export default function CandidateTable({
     }
   };
 
-  // Recent timeline updates across all visible candidates for recent updates side drawer/panel
-  const recentUpdates = candidates
-    .flatMap((c) =>
-      c.interactionTimeline.map((t) => ({
-        ...t,
-        candidateName: c.name,
-        candidateId: c.id,
-      }))
-    )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 6);
+  const recentUpdates: any[] = [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -62,7 +47,7 @@ export default function CandidateTable({
       <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            <UserCheck size={18} className="text-emerald-600" /> Candidate Database ({candidates.length})
+            <UserCheck size={18} className="text-emerald-600" /> CRM Leads ({candidates.length})
           </h3>
           <span className="text-[11px] text-slate-400 font-medium">Click candidate or client to view details</span>
         </div>
@@ -79,25 +64,20 @@ export default function CandidateTable({
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
                 </th>
-                <th className="p-3">Candidate</th>
-                <th className="p-3">Phone</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Area</th>
-                <th className="p-3">City</th>
+                <th className="p-3">Candidate Name</th>
+                <th className="p-3">Phone Number</th>
                 <th className="p-3">Status</th>
-                <th className="p-3">Client</th>
-                <th className="p-3">Next Action</th>
-                <th className="p-3">Follow Up</th>
-                <th className="p-3">Interview</th>
-                <th className="p-3">Source</th>
-                <th className="p-3">Last Updated</th>
+                <th className="p-3">Last Called Date</th>
+                <th className="p-3">Follow Up Date</th>
+                <th className="p-3">Interview Date</th>
+                <th className="p-3">Assignee Name</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {candidates.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="p-8 text-center text-slate-400 italic">
+                  <td colSpan={9} className="p-8 text-center text-slate-400 italic">
                     No candidates found matching the active criteria.
                   </td>
                 </tr>
@@ -129,96 +109,39 @@ export default function CandidateTable({
                             </span>
                           )}
                         </button>
-                        <span className="block text-[10px] font-mono text-slate-400 font-normal">{cand.id}</span>
+                        <span className="block text-[10px] font-mono text-slate-400 font-normal"></span>
                       </td>
 
-                      {/* Phone */}
+                      {/* Phone Number */}
                       <td className="p-3 font-mono text-slate-600 whitespace-nowrap">{cand.phone}</td>
 
-                      {/* Role */}
-                      <td className="p-3 font-medium">{cand.role}</td>
-
-                      {/* Area */}
-                      <td className="p-3">{cand.area}</td>
-
-                      {/* City */}
-                      <td className="p-3 font-medium text-slate-800">{cand.city}</td>
-
                       {/* Status */}
-                      <td className="p-3">{getStatusBadge(cand.status)}</td>
+                      <td className="p-3">{getStatusBadge(cand.currentCrmStatus ?? 'Not Contacted')}</td>
 
-                      {/* Client */}
-                      <td className="p-3 font-medium">
-                        {cand.currentClientName ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenClientPreview(cand.currentClientId || cand.currentClientName!)}
-                            className="text-emerald-700 hover:underline font-semibold text-left cursor-pointer"
-                          >
-                            {cand.currentClientName}
-                          </button>
-                        ) : (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
+                      {/* Last Called Date */}
+                      <td className="p-3 text-[11px] text-slate-600 whitespace-nowrap">
+                        {cand.lastCalledAt ? new Date(cand.lastCalledAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', year: 'numeric', month: 'short', day: 'numeric' }) : (cand.callsCount > 0 ? new Date(cand.updatedAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', year: 'numeric', month: 'short', day: 'numeric' }) : '—')}
                       </td>
 
-                      {/* Next Action */}
-                      <td className="p-3 text-[11px] text-slate-600">
-                        {cand.status === 'Active'
-                          ? 'Placed & Working'
-                          : cand.followUpDate
-                          ? `Follow up on ${cand.followUpDate}`
-                          : cand.interviewDate
-                          ? `Interview on ${cand.interviewDate}`
-                          : 'Pending update'}
-                      </td>
-
-                      {/* Follow Up */}
+                      {/* Follow Up Date */}
                       <td className="p-3 text-[11px] whitespace-nowrap font-mono">{cand.followUpDate || '—'}</td>
 
-                      {/* Interview */}
+                      {/* Interview Date */}
                       <td className="p-3 text-[11px] whitespace-nowrap font-mono">{cand.interviewDate || '—'}</td>
 
-                      {/* Source */}
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">
-                          {cand.source.category}
-                        </span>
-                      </td>
-
-                      {/* Last Updated */}
-                      <td className="p-3 text-[10px] text-slate-400 whitespace-nowrap">
-                        {new Date(cand.updatedAt).toLocaleDateString()}
-                      </td>
+                      {/* Assignee Name */}
+                      <td className="p-3 text-[11px] font-medium text-slate-700">{cand.assignedRecruiterName || 'Unassigned'}</td>
 
                       {/* Actions */}
                       <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end">
                           <button
                             type="button"
                             onClick={() => onSelectCandidate(cand)}
-                            title="View Candidate Profile"
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-emerald-600 transition cursor-pointer"
+                            title="Call & Update Candidate"
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs shadow-xs"
                           >
-                            <Eye size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onQuickUpdate(cand)}
-                            title="Quick Update"
-                            className="p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-700 transition cursor-pointer"
-                          >
-                            <Edit3 size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onSelectCandidate(cand)}
-                            title="Call History & Timeline"
-                            className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition cursor-pointer"
-                          >
-                            <PhoneCall size={14} />
+                            <PhoneCall size={14} /> Call
                           </button>
                         </div>
                       </td>

@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
-
-import { pdfService } from '../../../services/document/pdfService';
 import type { DocumentGenerationRequest } from '../../../types/DocumentGenerationRequest';
 import type { DocumentGenerationResult } from '../../../types/DocumentGenerationResult';
+import { DocumentGenerationService } from '../../../services/documentGeneration/DocumentGenerationService';
 
 interface UseDocumentGenerationResult {
   loading: boolean;
@@ -19,23 +18,7 @@ function validateRequest(request: DocumentGenerationRequest): string | null {
   }
 
   if (!request.referenceId.trim()) {
-    return 'Document reference ID is required.';
-  }
-
-  if (!request.fileName.trim()) {
-    return 'File name is required.';
-  }
-
-  if (!request.generatedBy.trim()) {
-    return 'Generated-by user is required.';
-  }
-
-  if (!Number.isInteger(request.version) || request.version < 1) {
-    return 'Document version must be a positive integer.';
-  }
-
-  if (!request.template) {
-    return 'Document template is required.';
+    return 'Reference ID is required.';
   }
 
   return null;
@@ -44,9 +27,13 @@ function validateRequest(request: DocumentGenerationRequest): string | null {
 export function useDocumentGeneration(): UseDocumentGenerationResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isGeneratingReference = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const reset = (): void => {
+  const reset = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setLoading(false);
     setError(null);
   };
@@ -54,62 +41,28 @@ export function useDocumentGeneration(): UseDocumentGenerationResult {
   const generateDocument = async (
     request: DocumentGenerationRequest,
   ): Promise<DocumentGenerationResult> => {
-    if (isGeneratingReference.current) {
-      const duplicateRequestError = 'Document generation is already in progress.';
-
-      setError(duplicateRequestError);
-
-      return {
-        success: false,
-        error: duplicateRequestError,
-      };
-    }
+    reset();
 
     const validationError = validateRequest(request);
-
     if (validationError) {
       setError(validationError);
-      return {
-        success: false,
-        error: validationError,
-      };
+      return { success: false, error: validationError };
     }
 
-    isGeneratingReference.current = true;
     setLoading(true);
-    setError(null);
+    abortControllerRef.current = new AbortController();
 
     try {
-      await pdfService.download(request.template, request.fileName);
-
-      return {
-        success: true,
-        fileName: request.fileName.endsWith('.pdf')
-          ? request.fileName
-          : `${request.fileName}.pdf`,
-        generatedAt: new Date(),
-      };
-    } catch (downloadError: unknown) {
-      const message = downloadError instanceof Error
-        ? downloadError.message
-        : 'Unable to generate the document.';
-
-      setError(message);
-
-      return {
-        success: false,
-        error: message,
-      };
+      const res = await DocumentGenerationService.generate(request);
+      return res;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload document error';
+      setError(msg);
+      return { success: false, error: msg };
     } finally {
-      isGeneratingReference.current = false;
       setLoading(false);
     }
   };
 
-  return {
-    loading,
-    error,
-    generateDocument,
-    reset,
-  };
+  return { loading, error, generateDocument, reset };
 }

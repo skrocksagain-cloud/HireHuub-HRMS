@@ -1,639 +1,295 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  FileText,
-  Save,
-  CheckCircle2,
-  Upload,
-  Plus,
+  ShieldCheck,
+  Edit3,
   Layers,
-  FileSpreadsheet,
-  Download,
-  Trash2,
-  RefreshCw,
-  XCircle,
+  CheckCircle2,
+  History,
+  GitBranch,
+  AlertCircle,
 } from 'lucide-react';
-import { useAdminCompany, useAdminDocumentTemplates } from '../../../hooks/admin/useAdmin';
-import type { DocumentTemplateConfig, TemplateHistoryEntry } from '../../../types/Admin';
-import documentEngine, { type DocumentResult } from '../../../core/engine/documentEngine';
-import DocumentPreviewModal from '../../../components/DocumentPreviewModal';
-
-const STANDARD_DOCUMENT_TYPES = [
-  { type: 'Offer Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Appointment Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Confirmation Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Increment Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Experience Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Relieving Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Warning Letter', category: 'HR', format: 'DOCX' },
-  { type: 'Termination Letter', category: 'HR', format: 'DOCX' },
-  { type: 'NDA', category: 'HR', format: 'DOCX' },
-  { type: 'Employment Contract', category: 'HR', format: 'DOCX' },
-  { type: 'Invoice', category: 'Finance', format: 'XLSX' },
-  { type: 'Credit Note', category: 'Finance', format: 'XLSX' },
-  { type: 'Debit Note', category: 'Finance', format: 'XLSX' },
-  { type: 'Payslip', category: 'Payroll', format: 'XLSX' },
-  { type: 'Salary Register', category: 'Payroll', format: 'XLSX' },
-  { type: 'Payroll Reports', category: 'Payroll', format: 'XLSX' },
-] as const;
-
-const slugify = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+import { useAdminCompany } from '../../../hooks/admin/useAdmin';
+import OfferTemplateDesignerModal from './designer/OfferTemplateDesignerModal';
+import RelievingTemplateDesignerModal from './designer/RelievingTemplateDesignerModal';
+import IncrementTemplateDesignerModal from './designer/IncrementTemplateDesignerModal';
+import { offerTemplateService, type TemplateVersionRecord } from '../../../services/admin/offerTemplateService';
+import type { DocumentTemplateConfig, BrandProfile } from '../../../types/Admin';
 
 export default function DocumentTemplateTab() {
   const { company } = useAdminCompany();
-  const { templates, isLoading, saveTemplate, uploadTemplateFile, deleteTemplate } = useAdminDocumentTemplates();
 
-  const [selectedType, setSelectedType] = useState<string>('Offer Letter');
+  const brandList: BrandProfile[] =
+    (company?.brandProfilesList || []).filter((b) => b.isActive !== false);
 
-  const [statusMsg, setStatusMsg] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<'OFFER_LETTER' | 'RELIEVING_LETTER' | 'INCREMENT_LETTER'>('OFFER_LETTER');
+  const [selectedBrandForDesigner, setSelectedBrandForDesigner] = useState<string | null>(null);
+  const [isDesignerOpen, setIsDesignerOpen] = useState<boolean>(false);
+  const [brandTemplates, setBrandTemplates] = useState<Record<string, DocumentTemplateConfig>>({});
+  const [versionHistories, setVersionHistories] = useState<Record<string, TemplateVersionRecord[]>>({});
+  const [viewHistoryBrandId, setViewHistoryBrandId] = useState<string | null>(null);
 
-  // New Invoice Multi-Template Upload Form State
-  const [showUploadInvoiceModal, setShowUploadInvoiceModal] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [newClientName, setNewClientName] = useState('');
-  const [newTemplateRemarks, setNewTemplateRemarks] = useState('');
-  const [newFile, setNewFile] = useState<File | null>(null);
+  const fetchBrandTemplates = async () => {
+    const templatesMap: Record<string, DocumentTemplateConfig> = {};
+    const historyMap: Record<string, TemplateVersionRecord[]> = {};
 
-  // Version Upload State
-  const [versionTarget, setVersionTarget] = useState<DocumentTemplateConfig | null>(null);
-  const [versionFile, setVersionFile] = useState<File | null>(null);
-  const [versionRemarks, setVersionRemarks] = useState('');
+    for (const brand of brandList) {
+      const tmpl = await offerTemplateService.getOfferTemplateByBrand(brand.id, brand.brandName, selectedDocType);
+      templatesMap[brand.id] = tmpl;
 
-  // Find existing config or prepare default for single doc types
-  const existingConfig = templates.find(
-    (t) => t.type.toLowerCase() === selectedType.toLowerCase() || t.id === slugify(selectedType)
-  );
-
-  const matchedMeta = STANDARD_DOCUMENT_TYPES.find((d) => d.type === selectedType);
-  const category = existingConfig?.category || matchedMeta?.category || 'HR';
-  const format = existingConfig?.format || matchedMeta?.format || 'DOCX';
-
-  const defaultSigId = existingConfig?.assignedSignatureId || existingConfig?.defaultSignatureId || company?.signatures[0]?.id || '';
-
-  const [form, setForm] = useState<DocumentTemplateConfig>(
-    existingConfig || {
-      id: slugify(selectedType),
-      templateName: `${selectedType} Configuration`,
-      type: selectedType,
-      category,
-      format,
-      templateFileUrl: '',
-      templateStoragePath: '',
-      activeVersion: 'v1.0',
-      previousVersions: [],
-      assignedSignatureId: defaultSigId,
-      defaultSignatureId: defaultSigId,
-      useCompanyLetterhead: category === 'HR',
-      includeLetterhead: category === 'HR',
-      useCompanyFooter: category === 'HR',
-      includeFooter: category === 'HR',
-      useOfficialStamp: true,
-      includeStamp: true,
-      brandingProfileId: 'profile-default',
-      placeholders: ['employee_name', 'designation', 'date', 'company_name', 'amount'],
-      isActive: true,
+      const history = await offerTemplateService.getTemplateVersions(brand.id, selectedDocType);
+      historyMap[brand.id] = history;
     }
-  );
 
-  const [previewResult, setPreviewResult] = useState<DocumentResult | null>(null);
-
-  const invoiceTemplatesList = templates.filter(
-    (t) => t.type.toLowerCase() === 'invoice' || (t as { documentType?: string }).documentType?.toLowerCase() === 'invoice'
-  );
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      const payload: DocumentTemplateConfig = {
-        ...form,
-        defaultSignatureId: form.assignedSignatureId || form.defaultSignatureId || '',
-        includeStamp: form.useOfficialStamp ?? form.includeStamp ?? true,
-        includeLetterhead: form.useCompanyLetterhead ?? form.includeLetterhead ?? (form.category === 'HR'),
-        includeFooter: form.useCompanyFooter ?? form.includeFooter ?? (form.category === 'HR'),
-      };
-      await saveTemplate(payload);
-      setStatusMsg(`Template configuration for '${form.type}' saved successfully.`);
-      setTimeout(() => setStatusMsg(''), 4000);
-    } catch {
-      setStatusMsg('Error saving template configuration.');
-    } finally {
-      setIsSaving(false);
-    }
+    setBrandTemplates(templatesMap);
+    setVersionHistories(historyMap);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    fetchBrandTemplates();
+  }, [company, selectedDocType]);
 
-    setUploading(true);
-    setStatusMsg('');
-    try {
-      const versionNumber = (form.previousVersions?.length || 0) + 1;
-      const nextVerStr = `v${versionNumber + 1}.0`;
-      const res = await uploadTemplateFile(form.type, file, nextVerStr);
-
-      const historyItem: TemplateHistoryEntry = {
-        version: form.activeVersion || 'v1.0',
-        fileUrl: form.templateFileUrl,
-        fileName: `${form.type}_${form.activeVersion || 'v1.0'}`,
-        uploadedBy: 'Super Admin',
-        uploadedAt: new Date().toISOString(),
-        storagePath: form.templateStoragePath || '',
-      };
-
-      const updatedHistory = form.templateFileUrl
-        ? [historyItem, ...(form.previousVersions || [])]
-        : form.previousVersions || [];
-
-      const updated: DocumentTemplateConfig = {
-        ...form,
-        templateFileUrl: res.url,
-        templateStoragePath: res.path,
-        activeVersion: nextVerStr,
-        previousVersions: updatedHistory,
-      };
-
-      setForm(updated);
-      await saveTemplate(updated);
-      setStatusMsg(`New template version ${nextVerStr} uploaded successfully.`);
-    } catch {
-      setStatusMsg('Failed to upload template file.');
-    } finally {
-      setUploading(false);
-    }
+  const handleOpenDesigner = (brandId: string) => {
+    setSelectedBrandForDesigner(brandId);
+    setIsDesignerOpen(true);
   };
 
-  const handleUploadNewInvoiceTemplate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFile || !newTemplateName.trim() || !newClientName.trim()) {
-      setStatusMsg('Please select a file and enter template and client names.');
-      return;
-    }
-    setUploading(true);
-    try {
-      const res = await uploadTemplateFile('Invoice', newFile, 'v1.0');
-      const templateId = slugify(`tmpl-${newTemplateName}`);
-
-      const newTemplate: DocumentTemplateConfig = {
-        id: templateId,
-        templateId,
-        templateName: newTemplateName.trim(),
-        type: 'Invoice',
-        clientName: newClientName.trim(),
-        companyName: newClientName.trim(),
-        category: 'Finance',
-        format: newFile.name.endsWith('.pdf') ? 'PDF' : 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: res.url,
-        templateStoragePath: res.path,
-        fileName: newFile.name,
-        fileSize: newFile.size,
-        mimeType: newFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        uploadedBy: 'Super Admin',
-        uploadedAt: new Date().toISOString(),
-        remarks: newTemplateRemarks,
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-      };
-
-      await saveTemplate(newTemplate);
-      setShowUploadInvoiceModal(false);
-      setNewTemplateName('');
-      setNewClientName('');
-      setNewTemplateRemarks('');
-      setNewFile(null);
-      setStatusMsg(`Invoice template '${newTemplateName}' created successfully.`);
-    } catch {
-      setStatusMsg('Failed to upload invoice template.');
-    } finally {
-      setUploading(false);
-    }
+  const handleCloseDesigner = () => {
+    setIsDesignerOpen(false);
+    setSelectedBrandForDesigner(null);
+    fetchBrandTemplates();
   };
-
-  const handleUploadVersionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!versionTarget || !versionFile) return;
-    setUploading(true);
-    try {
-      const newVerNum = (versionTarget.version || 1) + 1;
-      const verStr = `v${newVerNum}.0`;
-      const res = await uploadTemplateFile(versionTarget.type || 'Invoice', versionFile, verStr);
-
-      const historyItem: TemplateHistoryEntry = {
-        version: versionTarget.activeVersion || `v${versionTarget.version || 1}.0`,
-        fileUrl: versionTarget.templateFileUrl,
-        fileName: versionTarget.fileName || `${versionTarget.templateName}_v${versionTarget.version || 1}`,
-        uploadedBy: versionTarget.uploadedBy || 'Super Admin',
-        uploadedAt: versionTarget.uploadedAt || new Date().toISOString(),
-        storagePath: versionTarget.templateStoragePath || '',
-      };
-
-      const updatedConfig: DocumentTemplateConfig = {
-        ...versionTarget,
-        activeVersion: verStr,
-        version: newVerNum,
-        templateFileUrl: res.url,
-        templateStoragePath: res.path,
-        fileName: versionFile.name,
-        fileSize: versionFile.size,
-        mimeType: versionFile.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        previousVersions: [historyItem, ...(versionTarget.previousVersions || [])],
-        updatedAt: new Date().toISOString(),
-        remarks: versionRemarks || `Version ${newVerNum} update`,
-      };
-
-      await saveTemplate(updatedConfig);
-      setVersionTarget(null);
-      setVersionFile(null);
-      setVersionRemarks('');
-      setStatusMsg(`New version v${newVerNum} uploaded for '${versionTarget.templateName}'.`);
-    } catch {
-      setStatusMsg('Failed to upload template version.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleToggleStatus = async (tmpl: DocumentTemplateConfig) => {
-    const newStatus = (tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')) === 'Active' ? 'Inactive' : 'Active';
-    await saveTemplate({
-      ...tmpl,
-      status: newStatus,
-      isActive: newStatus === 'Active',
-    });
-    setStatusMsg(`Template '${tmpl.templateName}' set to ${newStatus}.`);
-  };
-
-  const handleDeleteTemplate = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete '${name}'?`)) return;
-    await deleteTemplate(id);
-    setStatusMsg(`Template '${name}' deleted.`);
-  };
-
-  const handleOpenPreview = async () => {
-    const res = await documentEngine.generate({
-      module: (form.category === 'Custom' ? 'HR' : form.category) as 'HR' | 'Finance' | 'Payroll',
-      type: form.type,
-      identifier: 'PREVIEW_SAMPLE',
-      generatedBy: 'admin',
-      generatedByName: 'Super Admin',
-      context: {
-        employee: {
-          fullName: 'Rohan Sharma (Sample)',
-          designation: 'Senior HR Manager',
-          department: 'Human Resources',
-          joiningDate: new Date().toLocaleDateString(),
-          ctc: '₹12,00,000 LPA',
-        },
-      },
-    });
-    setPreviewResult(res);
-  };
-
-  if (isLoading) {
-    return <div className="p-8 text-center text-slate-500 font-medium text-xs">Loading Template Engine…</div>;
-  }
-
-  const allDocTypes = [
-    ...STANDARD_DOCUMENT_TYPES.map((d) => d.type),
-    ...templates.map((t) => t.type).filter((t) => !STANDARD_DOCUMENT_TYPES.some((s) => s.type === t)),
-  ];
 
   return (
-    <div className="space-y-6 text-xs text-slate-700">
-      {/* Top Header & Document Type Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-            <FileText size={18} className="text-emerald-600" />
-            Document Template Configuration Engine (Single Source of Truth)
-          </h3>
-          <p className="text-slate-500 text-xs">
-            Manage all ERP templates in Firestore <code className="font-mono text-emerald-800">document_templates</code> collection.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="font-bold text-slate-700">Document Type:</label>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-800 focus:border-emerald-500 focus:outline-none"
-            >
-              {allDocTypes.map((t) => {
-                const count = templates.filter((item) => item.type.toLowerCase() === t.toLowerCase()).length;
-                return (
-                  <option key={t} value={t}>
-                    {t} {count > 0 ? `(${count})` : ''}
-                  </option>
-                );
-              })}
-            </select>
+    <div className="w-full space-y-6 text-slate-100 font-sans">
+      {/* Top Banner Header */}
+      <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-sky-950 border border-sky-800 rounded-xl text-sky-400">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-100">Native ERP Document Template Designer</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Brand-Specific Document Templates • Structured Block Engine • Native PDF Generation
+              </p>
+            </div>
           </div>
 
-          {selectedType === 'Invoice' ? (
-            <button
-              type="button"
-              onClick={() => setShowUploadInvoiceModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition"
-            >
-              <Plus size={16} /> New Client Template
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowUploadInvoiceModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-xs transition"
-            >
-              <Plus size={16} /> New Document Type
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full text-xs font-mono font-bold flex items-center gap-1.5">
+              <CheckCircle2 size={14} />
+              <span>Native Engine Active</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Category Switcher Tabs */}
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+          <button
+            type="button"
+            onClick={() => setSelectedDocType('OFFER_LETTER')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              selectedDocType === 'OFFER_LETTER'
+                ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Offer Letter Templates
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDocType('RELIEVING_LETTER')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              selectedDocType === 'RELIEVING_LETTER'
+                ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Relieving Letter Templates
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDocType('INCREMENT_LETTER')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              selectedDocType === 'INCREMENT_LETTER'
+                ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Increment Letter Templates
+          </button>
         </div>
       </div>
 
-      {statusMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-2">
-          <CheckCircle2 size={16} />
-          <span className="font-semibold">{statusMsg}</span>
-        </div>
-      )}
-
-      {/* SPECIAL MULTI-TEMPLATE LIST FOR INVOICE TYPE */}
-      {selectedType === 'Invoice' ? (
-        <div className="space-y-4">
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs">
-                <FileSpreadsheet size={20} />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Multi-Client Invoice Templates (document_templates)</h3>
-                <p className="text-slate-600 text-xs">
-                  Central Firestore repository for client invoice formats (Blinkit, ElasticRun, BigBasket, Zepto, Amazon, Standard).
-                </p>
-              </div>
-            </div>
+      {/* Brand Document Templates Grid */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-sky-400" />
+              <span>
+                Brand {selectedDocType === 'RELIEVING_LETTER' ? 'Relieving Letter' : selectedDocType === 'INCREMENT_LETTER' ? 'Increment Letter' : 'Offer Letter'} Configurations
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Each brand maintains its own published immutable template. Super Admin can edit drafts & publish new versions.
+            </p>
           </div>
+        </div>
 
-          {showUploadInvoiceModal && (
-            <form onSubmit={handleUploadNewInvoiceTemplate} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2 font-bold text-slate-900 text-xs">
-                <span>Upload New Client Invoice Template (.xlsx / .pdf)</span>
-                <button type="button" onClick={() => setShowUploadInvoiceModal(false)} className="text-slate-400">✕</button>
-              </div>
+        {brandList.length === 0 ? (
+          <div className="p-8 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-950 space-y-3">
+            <div className="w-12 h-12 bg-amber-950 border border-amber-800 text-amber-400 rounded-2xl flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-300">No Brand Profiles Configured</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+              Please configure at least one active Brand Profile in <span className="text-sky-400 font-semibold">Company Settings → Brands</span> to manage {selectedDocType === 'RELIEVING_LETTER' ? 'Relieving Letter' : selectedDocType === 'INCREMENT_LETTER' ? 'Increment Letter' : 'Offer Letter'} templates.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {brandList.map((brand) => {
+            const tmpl = brandTemplates[brand.id];
+            const history = versionHistories[brand.id] || [];
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Template Name *</label>
-                  <input
-                    type="text"
-                    value={newTemplateName}
-                    onChange={(e) => setNewTemplateName(e.target.value)}
-                    placeholder="e.g. Zepto Invoice"
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Client / Legal Name *</label>
-                  <input
-                    type="text"
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    placeholder="e.g. KIRANAKART TECHNOLOGIES"
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Template File *</label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.pdf,.docx"
-                  onChange={(e) => setNewFile(e.target.files?.[0] || null)}
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadInvoiceModal(false)}
-                  className="px-3.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploading}
-                  className="px-4 py-1.5 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-xs"
-                >
-                  {uploading ? 'Uploading...' : 'Save Template Record'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {versionTarget && (
-            <form onSubmit={handleUploadVersionSubmit} className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 shadow-xs">
-              <div className="flex items-center justify-between border-b border-amber-200 pb-2 font-bold text-amber-950 text-xs">
-                <span>Upload Version {(versionTarget.version || 1) + 1} for '{versionTarget.templateName}'</span>
-                <button type="button" onClick={() => setVersionTarget(null)} className="text-amber-700">✕</button>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">New Template File *</label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.pdf,.docx"
-                  onChange={(e) => setVersionFile(e.target.files?.[0] || null)}
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Version Notes</label>
-                <input
-                  type="text"
-                  value={versionRemarks}
-                  onChange={(e) => setVersionRemarks(e.target.value)}
-                  placeholder="e.g. Layout update"
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setVersionTarget(null)} className="px-3 py-1.5 bg-white border rounded-xl">Cancel</button>
-                <button type="submit" disabled={uploading} className="px-3.5 py-1.5 bg-amber-600 text-white font-bold rounded-xl shadow-xs">
-                  {uploading ? 'Uploading...' : 'Save New Version'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="space-y-3">
-            {invoiceTemplatesList.map((tmpl) => (
+            return (
               <div
-                key={tmpl.id}
-                className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                key={brand.id}
+                className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-700 transition"
               >
-                <div className="space-y-1">
+                {/* Brand Header */}
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-3">
+                    {brand.logoUrl ? (
+                      <img src={brand.logoUrl} alt={brand.brandName} className="h-8 max-w-[100px] object-contain" />
+                    ) : (
+                      <div className="h-8 w-8 rounded-lg bg-sky-950 border border-sky-800 text-sky-400 flex items-center justify-center font-bold text-xs">
+                        {brand.brandName[0]}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-100">{brand.brandName}</h3>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {selectedDocType === 'RELIEVING_LETTER' ? 'Relieving Letter Template' : selectedDocType === 'INCREMENT_LETTER' ? 'Increment Letter Template' : 'Offer Letter Template'}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-sm">{tmpl.templateName}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                      (tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')) === 'Active'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-600 border-slate-200'
-                    }`}>
-                      {tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-mono text-[10px] font-bold border border-blue-200">
-                      v{tmpl.version || 1}
-                    </span>
-                  </div>
-
-                  <p className="text-slate-600 text-xs font-medium">{tmpl.clientName || tmpl.companyName || 'Hire Huub'}</p>
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400 font-mono">
-                    <span>File: <strong className="text-slate-700">{tmpl.fileName || 'template.xlsx'}</strong></span>
-                    <span>•</span>
-                    <span>Uploaded By: {tmpl.uploadedBy || tmpl.modifiedBy || 'Admin'}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setVersionTarget(tmpl)}
-                    className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-semibold flex items-center gap-1 border border-amber-200"
-                  >
-                    <RefreshCw size={14} /> <span>New Version</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStatus(tmpl)}
-                    className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border ${
-                      (tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')) === 'Active'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}
-                  >
-                    {(tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')) === 'Active' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
-                    <span>{(tmpl.status || (tmpl.isActive ? 'Active' : 'Inactive')) === 'Active' ? 'Deactivate' : 'Activate'}</span>
-                  </button>
-
-                  {tmpl.templateFileUrl && (
-                    <a
-                      href={tmpl.templateFileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      download={tmpl.fileName || 'template.xlsx'}
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1"
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+                        tmpl?.lifecycleState === 'Published'
+                          ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                          : 'bg-amber-950 text-amber-400 border-amber-800'
+                      }`}
                     >
-                      <Download size={14} />
-                    </a>
-                  )}
+                      {tmpl?.lifecycleState || 'Draft'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md">
+                      {tmpl?.activeVersion || 'v1.0'}
+                    </span>
+                  </div>
+                </div>
 
+                {/* Template Details Summary */}
+                <div className="space-y-2 text-xs text-slate-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Total Canvas Blocks:</span>
+                    <span className="font-mono font-bold text-slate-200">
+                      {tmpl?.offerSchema?.blocks?.length || 0} blocks
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Last Updated:</span>
+                    <span className="font-mono text-slate-400">
+                      {tmpl?.updatedAt ? new Date(tmpl.updatedAt).toLocaleDateString() : 'Initial'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Actions */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
                   <button
                     type="button"
-                    onClick={() => handleDeleteTemplate(tmpl.id, tmpl.templateName)}
-                    className="p-2 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 rounded-xl"
+                    onClick={() => handleOpenDesigner(brand.id)}
+                    className="flex-1 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-sky-600/20"
                   >
-                    <Trash2 size={14} />
+                    <Edit3 size={14} />
+                    <span>Open Template Designer</span>
                   </button>
+
+                  {history.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setViewHistoryBrandId(viewHistoryBrandId === brand.id ? null : brand.id)}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+                      title="View Published Versions History"
+                    >
+                      <History size={14} />
+                      <span className="font-mono font-bold">{history.length}</span>
+                    </button>
+                  )}
                 </div>
+
+                {/* Published Version History Subpanel */}
+                {viewHistoryBrandId === brand.id && (
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-[11px] bg-slate-900/60 p-3 rounded-xl">
+                    <div className="font-bold text-slate-300 flex items-center gap-1.5 text-xs">
+                      <GitBranch size={13} className="text-sky-400" />
+                      <span>Published Version History</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {history.map((ver) => (
+                        <div
+                          key={ver.versionNumber}
+                          className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800 text-slate-300"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-sky-400">v{ver.versionNumber}.0</span>
+                            <span className="text-[10px] text-slate-500">
+                              {ver.publishedAt ? new Date(ver.publishedAt).toLocaleDateString() : ''}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">By {ver.publishedBy || 'Admin'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      ) : (
-        /* STANDARD SINGLE-TYPE FORM FOR HR & PAYROLL DOCUMENTS */
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 font-bold text-slate-900 text-sm">
-              <div className="flex items-center gap-2">
-                <Layers size={18} className="text-emerald-600" />
-                <span>Configuring Template: <span className="text-emerald-700">{form.type}</span></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full bg-slate-100 font-mono font-bold text-slate-700 text-[10px]">
-                  {form.category} Module
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-50 font-mono font-bold text-emerald-700 text-[10px]">
-                  Required Format: {form.format}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleOpenPreview}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition"
-                >
-                  <FileText size={14} /> Preview Document
-                </button>
-              </div>
-            </div>
+        )}
+      </div>
 
-            {/* Template Master Document File */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900 block text-xs">Uploaded Master Template File</span>
-                  <span className="text-[11px] text-slate-500">
-                    {form.templateFileUrl
-                      ? `Active Version: ${form.activeVersion || 'v1.0'} | Path: ${form.templateStoragePath}`
-                      : 'No custom template uploaded. System will use standard built-in layout.'}
-                  </span>
-                </div>
-                <label className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition">
-                  <Upload size={14} />
-                  <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
-                  <input type="file" onChange={handleFileUpload} disabled={uploading} className="hidden" />
-                </label>
-              </div>
-
-              {form.templateFileUrl && (
-                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs font-mono">
-                  <a href={form.templateFileUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline font-bold">
-                    Download Current Master ({form.activeVersion})
-                  </a>
-                  <span className="text-slate-400">History: {form.previousVersions?.length || 0} previous versions</span>
-                </div>
-              )}
-            </div>
-
-            {/* Save Action Bar */}
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50"
-              >
-                <Save size={16} />
-                <span>{isSaving ? 'Saving Config…' : `Save ${form.type} Config`}</span>
-              </button>
-            </div>
-          </div>
-        </form>
+      {/* Document Designer Modals */}
+      {isDesignerOpen && selectedBrandForDesigner && selectedDocType === 'RELIEVING_LETTER' && (
+        <RelievingTemplateDesignerModal
+          isOpen={isDesignerOpen}
+          onClose={handleCloseDesigner}
+          initialBrandId={selectedBrandForDesigner}
+        />
       )}
 
-      {/* Preview Modal */}
-      {previewResult && (
-        <DocumentPreviewModal result={previewResult} onClose={() => setPreviewResult(null)} />
+      {isDesignerOpen && selectedBrandForDesigner && selectedDocType === 'OFFER_LETTER' && (
+        <OfferTemplateDesignerModal
+          isOpen={isDesignerOpen}
+          onClose={handleCloseDesigner}
+          initialBrandId={selectedBrandForDesigner}
+        />
+      )}
+
+      {isDesignerOpen && selectedBrandForDesigner && selectedDocType === 'INCREMENT_LETTER' && (
+        <IncrementTemplateDesignerModal
+          isOpen={isDesignerOpen}
+          onClose={handleCloseDesigner}
+          initialBrandId={selectedBrandForDesigner}
+        />
       )}
     </div>
   );

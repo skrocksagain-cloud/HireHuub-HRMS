@@ -1,105 +1,34 @@
-import { DataTable } from '../../ui/DataTable';
-import type { DataTableColumn } from '../../ui/DataTable/types';
-import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import { getSimplifiedModuleScope } from '../../core/authorization/authorizationResolver';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import SectionHeader from '../../ui/SectionHeader';
 import { AttendanceApprovalQueue } from './components/AttendanceApprovalQueue';
 import { AttendanceCalendar } from './components/AttendanceCalendar';
 import { AttendanceRequestForm } from './components/AttendanceRequestForm';
 import { AttendanceSummary } from './components/AttendanceSummary';
-import { ATTENDANCE_STATUS_STYLES } from './constants/attendance';
 import { useAttendance } from './hooks/useAttendance';
-import { formatDuration, getAttendanceSummary } from './utils/attendance';
-import type { AttendanceActor, AttendanceStatus, DailyAttendance } from './types/attendance';
-import { Smartphone } from 'lucide-react';
-
-const statusOptions: AttendanceStatus[] = [
-  'Present',
-  'Absent',
-  'Late',
-  'Half Day',
-  'Holiday',
-  'Week Off',
-  'Leave',
-  'WFH',
-  'Regularization Pending',
-];
-
-const columns: DataTableColumn<DailyAttendance>[] = [
-  { key: 'attendanceDate', title: 'Date', sortable: true },
-  { key: 'employeeName', title: 'Employee', sortable: true },
-  { key: 'department', title: 'Department', sortable: true },
-  {
-    key: 'status',
-    title: 'Status',
-    sortable: true,
-    render: (value) => (
-      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ATTENDANCE_STATUS_STYLES[value as AttendanceStatus]}`}>
-        {String(value)}
-      </span>
-    ),
-  },
-  {
-    key: 'totalWorkMinutes',
-    title: 'Work Time',
-    sortable: true,
-    render: (value) => formatDuration(Number(value)),
-  },
-];
-
-const downloadCsv = (records: DailyAttendance[]): void => {
-  const rows = [
-    ['Date', 'Employee ID', 'Employee', 'Department', 'Status', 'Work minutes'],
-    ...records.map((record) => [
-      record.attendanceDate,
-      record.employeeId,
-      record.employeeName,
-      record.department,
-      record.status,
-      String(record.totalWorkMinutes),
-    ]),
-  ];
-  const url = URL.createObjectURL(
-    new Blob([rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\n')], {
-      type: 'text/csv',
-    })
-  );
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'attendance-report.csv';
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
-const downloadPdf = (records: DailyAttendance[]): void => {
-  const report = new jsPDF();
-  report.setFontSize(16);
-  report.text('HireHuub Attendance Report', 14, 18);
-  report.setFontSize(9);
-  records.slice(0, 30).forEach((record, index) =>
-    report.text(
-      `${record.attendanceDate}  ${record.employeeName}  ${record.department}  ${record.status}  ${formatDuration(record.totalWorkMinutes)}`,
-      14,
-      30 + index * 7
-    )
-  );
-  report.save('attendance-report.pdf');
-};
+import { formatDuration } from './utils/attendance';
+import type { AttendanceActor } from './types/attendance';
+import { Smartphone, User } from 'lucide-react';
 
 export default function AttendancePage() {
   const { user } = useAuth();
 
-  const actor: AttendanceActor = {
+  const actor: AttendanceActor & { assignedRole?: string } = {
     employeeId: user?.employeeId || user?.id || '',
     name: user?.name || '',
     role: user?.role || '',
     department: user?.department || '',
+    assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
   };
 
+  const { canApprove: checkCanApprove } = usePermissions();
   const attendance = useAttendance(actor);
-  const canApprove = ['Admin', 'Super Admin', 'Department Admin', 'Manager'].includes(actor.role);
-  const summary = getAttendanceSummary(attendance.records);
+  const canApprove = checkCanApprove('attendance');
+  
+  const activeScope = getSimplifiedModuleScope(actor.assignedRole);
+  const isOrganizationAdmin = activeScope === 'GLOBAL' || activeScope === 'DEPARTMENT';
 
   const todayRecord = attendance.data.today;
   const currentStatus = !todayRecord?.loginTime
@@ -108,6 +37,13 @@ export default function AttendancePage() {
     ? 'Signed Out'
     : 'Working';
 
+  const selectedEmployeeObj = attendance.employeesList.find(
+    (e) => e.employeeId === attendance.selectedEmployeeId || e.id === attendance.selectedEmployeeId
+  );
+  const activeEmployeeName = selectedEmployeeObj
+    ? selectedEmployeeObj.fullName || `${selectedEmployeeObj.firstName} ${selectedEmployeeObj.lastName}`
+    : actor.name;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -115,9 +51,31 @@ export default function AttendancePage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <SectionHeader
             title="Attendance Workspace"
-            subtitle={`${actor.name} • ${actor.role} • ${actor.department || 'Hire Huub ERP'}`}
+            subtitle={`${activeEmployeeName} • ${actor.role} • ${actor.department || 'Hire Huub ERP'}`}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Employee Selector for Admins / Managers */}
+            {isOrganizationAdmin && attendance.employeesList.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                <User size={14} className="text-slate-500" />
+                <select
+                  aria-label="Select Employee"
+                  value={attendance.selectedEmployeeId}
+                  onChange={(e) => attendance.setSelectedEmployeeId(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value={actor.employeeId}>Self: {actor.name}</option>
+                  {attendance.employeesList
+                    .filter((e) => e.employeeId !== actor.employeeId && e.id !== actor.employeeId)
+                    .map((emp) => (
+                      <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
+                        {emp.employeeCode || emp.employeeId} — {emp.fullName || `${emp.firstName} ${emp.lastName}`}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={attendance.login}
@@ -209,13 +167,21 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Monthly Summary Statistics */}
-        <AttendanceSummary data={attendance.data} />
+        {/* Monthly Summary Statistics Cards */}
+        <AttendanceSummary summary={attendance.summaryMetrics} />
 
-        {/* Request Form & Calendar */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <AttendanceRequestForm disabled={attendance.isSaving} onSubmit={attendance.submitRequest} />
-          <AttendanceCalendar month={attendance.filters.month} records={attendance.data.monthRecords} />
+        {/* Request Form & Redesigned Keka-style Attendance Calendar */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <AttendanceRequestForm disabled={attendance.isSaving} onSubmit={attendance.submitRequest} />
+          </div>
+          <div className="lg:col-span-8">
+            <AttendanceCalendar
+              month={attendance.filters.month}
+              resolvedDays={attendance.resolvedDays}
+              onMonthChange={(newMonth) => attendance.setFilters({ ...attendance.filters, month: newMonth })}
+            />
+          </div>
         </div>
 
         {/* Approval Queue for Managers/Admins */}
@@ -226,77 +192,6 @@ export default function AttendancePage() {
             onDecision={attendance.decideRequest}
           />
         )}
-
-        {/* Attendance History Table */}
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Attendance History & Reports</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Working days: {summary.workingDays} • LOP: {summary.lopDays} • Half days: {summary.halfDayCount}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => downloadCsv(attendance.records)}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-              >
-                Export Excel
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadPdf(attendance.records)}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-              >
-                Export PDF
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <input
-              aria-label="Search attendance"
-              value={attendance.filters.search}
-              onChange={(event) => attendance.setFilters({ ...attendance.filters, search: event.target.value })}
-              placeholder="Search employee, department or date"
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-emerald-500"
-            />
-            <input
-              aria-label="Attendance month"
-              type="month"
-              value={attendance.filters.month}
-              onChange={(event) => attendance.setFilters({ ...attendance.filters, month: event.target.value })}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-emerald-500"
-            />
-            <select
-              aria-label="Attendance status"
-              value={attendance.filters.status}
-              onChange={(event) =>
-                attendance.setFilters({ ...attendance.filters, status: event.target.value as AttendanceStatus | '' })
-              }
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-emerald-500"
-            >
-              <option value="">All statuses</option>
-              {statusOptions.map((status) => (
-                <option key={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mt-4">
-            <DataTable
-              data={attendance.records}
-              columns={columns}
-              loading={attendance.isLoading}
-              onRefresh={() => void attendance.refresh()}
-              onExport={() => downloadCsv(attendance.records)}
-              searchPlaceholder="Search current attendance"
-              emptyTitle="No attendance records"
-              emptyDescription="There are no attendance records for these filters."
-            />
-          </div>
-        </section>
       </div>
     </DashboardLayout>
   );

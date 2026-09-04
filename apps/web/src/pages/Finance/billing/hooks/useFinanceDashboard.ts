@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoiceService } from '../services/invoiceService';
 import { creditNoteService } from '../services/creditNoteService';
-import { permissionService } from '../../../../core/permissions/permissionService';
+import { canReadFinanceGlobally, type FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
 import type { Invoice } from '../../../../types/Invoice';
 import type { CreditNote } from '../../../../types/CreditNote';
 
@@ -29,8 +29,8 @@ export interface UseFinanceDashboardReturn {
   refresh: () => Promise<void>;
 }
 
-export function useFinanceDashboard(userRole: string): UseFinanceDashboardReturn {
-  const hasAccess = permissionService.canAccessFinance(userRole);
+export function useFinanceDashboard(actor: FinanceAuthorizationContext): UseFinanceDashboardReturn {
+  const hasAccess = canReadFinanceGlobally(actor);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -59,8 +59,8 @@ export function useFinanceDashboard(userRole: string): UseFinanceDashboardReturn
     setError('');
     try {
       const [invList, cnList] = await Promise.all([
-        invoiceService.getInvoiceHistory().catch(() => []),
-        creditNoteService.getCreditNoteHistory().catch(() => []),
+        invoiceService.getInvoiceHistory(actor).catch(() => []),
+        creditNoteService.getCreditNoteHistory(actor).catch(() => []),
       ]);
 
       setInvoices(invList);

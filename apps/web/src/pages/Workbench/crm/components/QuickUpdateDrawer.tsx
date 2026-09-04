@@ -52,11 +52,12 @@ export default function QuickUpdateDrawer({
 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [interactionId, setInteractionId] = useState<string>('');
 
   useEffect(() => {
-    if (candidate) {
-      setStatus(candidate.status);
-      setClientId(candidate.currentClientId || '');
+    if (isOpen && candidate) {
+      setStatus(candidate.currentCrmStatus ?? 'Interested');
+      setClientId(candidate.currentClientId ?? '');
       setNotes('');
       setIssueDescription(candidate.issueDescription || '');
       setFollowUpDate(candidate.followUpDate || '');
@@ -65,8 +66,9 @@ export default function QuickUpdateDrawer({
       setDateOfBirth(candidate.dateOfBirth || '');
       setFormError(null);
       setShowConfirmation(false);
+      setInteractionId(crypto.randomUUID());
     }
-  }, [candidate]);
+  }, [candidate, isOpen]);
 
   if (!isOpen || !candidate) return null;
 
@@ -76,15 +78,18 @@ export default function QuickUpdateDrawer({
 
   // Dynamic Rule Analysis from Centralized Status Rule Engine
   const rules = statusRuleEngine.getRulesForStatus(status);
-  const isPayroll = status === 'Active' && selectedClient?.type === 'Payroll';
+  const isPayroll = status === 'Active' && selectedClient?.commercial?.type === 'Payroll';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!candidate) return;
+
     setFormError(null);
 
     // Rule validation check
     const validation = statusRuleEngine.validateUpdateInput(
       {
+        interactionId,
         candidateId: candidate.id,
         status,
         clientId,
@@ -96,7 +101,7 @@ export default function QuickUpdateDrawer({
         payrollEmployeeId,
         dateOfBirth,
       },
-      selectedClient?.type === 'Payroll' ? 'Payroll' : 'OTS'
+      selectedClient?.commercial?.type === 'Payroll' ? 'Payroll' : 'OTS'
     );
 
     if (!validation.isValid) {
@@ -111,6 +116,7 @@ export default function QuickUpdateDrawer({
     }
 
     const input: QuickUpdateInput = {
+      interactionId,
       candidateId: candidate.id,
       status,
       clientId: clientId || undefined,

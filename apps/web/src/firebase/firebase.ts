@@ -1,10 +1,8 @@
 import { initializeApp } from "firebase/app";
-
 import { getAuth } from "firebase/auth";
-
 import { getFirestore } from "firebase/firestore";
-
 import { getStorage } from "firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBselGx7GmvCmickXwgwDgCucBGoQFhWUY",
@@ -31,5 +29,26 @@ export const auth = getAuth(app);
  * Firebase Storage
  */
 export const storage = getStorage(app);
+
+/**
+ * Firebase Functions
+ */
+export const functions = getFunctions(app);
+
+if (
+  typeof import.meta !== 'undefined' &&
+  import.meta.env?.VITE_USE_EMULATOR === 'true' &&
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+) {
+  if (!(functions as any)._emulatorConnected) {
+    try {
+      connectFunctionsEmulator(functions, 'localhost', 5001);
+      (functions as any)._emulatorConnected = true;
+    } catch {
+      // Ignore if already connected
+    }
+  }
+}
 
 export default app;

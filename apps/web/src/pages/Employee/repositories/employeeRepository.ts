@@ -90,39 +90,87 @@ export const toEmployee = (id: string, data: Record<string, unknown>): Employee 
     address: readString(data, 'address') || readString(data, 'currentAddress'),
     emergencyContact: readString(data, 'emergencyContact') || readString(data, 'emergencyPrimaryMobile'),
     notes: readString(data, 'notes') || readString(data, 'remarks'),
+    fatherName: readString(data, 'fatherName') || readString(data, 'fathersName') || undefined,
+    motherName: readString(data, 'motherName') || readString(data, 'mothersName') || undefined,
+    aadhaarNumber: readString(data, 'aadhaarNumber') || readString(data, 'aadhaar') || undefined,
+    panNumber: readString(data, 'panNumber') || readString(data, 'pan') || undefined,
+    accountNumber: readString(data, 'accountNumber') || readString(data, 'bankAccount') || undefined,
+    ifscCode: readString(data, 'ifscCode') || readString(data, 'ifsc') || undefined,
+    branchName: readString(data, 'branchName') || readString(data, 'bankBranch') || undefined,
+    bankName: readString(data, 'bankName') || undefined,
+    monthlyGross: typeof data.monthlyGross === 'number' ? data.monthlyGross : (typeof data.grossSalary === 'number' ? data.grossSalary : undefined),
+    salary: typeof data.salary === 'number' ? data.salary : (typeof data.grossSalary === 'number' ? data.grossSalary : undefined),
+    grossSalary: typeof data.grossSalary === 'number' ? data.grossSalary : (typeof data.monthlyGross === 'number' ? data.monthlyGross : (typeof data.salary === 'number' ? data.salary : undefined)),
+    pfApplicable: typeof data.pfApplicable === 'boolean' ? data.pfApplicable : false,
+    esicApplicable: typeof data.esicApplicable === 'boolean' ? data.esicApplicable : false,
+    ptApplicable: typeof data.ptApplicable === 'boolean' ? data.ptApplicable : false,
+    calculatedPf: typeof data.calculatedPf === 'number' ? data.calculatedPf : 0,
+    calculatedEsic: typeof data.calculatedEsic === 'number' ? data.calculatedEsic : 0,
+    calculatedPt: typeof data.calculatedPt === 'number' ? data.calculatedPt : 0,
+    totalDeductions: typeof data.totalDeductions === 'number' ? data.totalDeductions : 0,
+    netTakeHome: typeof data.netTakeHome === 'number' ? data.netTakeHome : undefined,
+    lastWorkingDate: readString(data, 'lastWorkingDate') || undefined,
+    exitRecord: (data.exitRecord as any) || undefined,
+    assignedRole: readString(data, 'assignedRole') as any,
     createdAt: readTimestamp(data, 'createdAt'),
     updatedAt: readTimestamp(data, 'updatedAt'),
   };
 };
 
+const safeTrim = (val: string | undefined | null): string => (val || '').trim();
+
 export const createEmployeeRecord = (employee: EmployeeFormData): Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> => ({
-  employeeId: employee.employeeId.trim(),
-  employeeCode: employee.employeeCode.trim(),
-  firstName: employee.firstName.trim(),
-  lastName: employee.lastName.trim(),
-  fullName: `${employee.firstName.trim()} ${employee.lastName.trim()}`.trim(),
-  gender: employee.gender,
-  dateOfBirth: employee.dateOfBirth.trim(),
-  mobileNumber: employee.mobileNumber.trim(),
-  email: employee.email.trim(),
-  department: employee.department.trim(),
-  designation: employee.designation.trim(),
-  employmentType: employee.employmentType,
-  joiningDate: employee.joiningDate.trim(),
-  reportingManager: employee.reportingManager.trim(),
-  workLocation: employee.workLocation.trim(),
-  employmentStatus: employee.employmentStatus,
-  photoUrl: employee.photoUrl.trim(),
-  address: employee.address.trim(),
-  emergencyContact: employee.emergencyContact.trim(),
-  notes: employee.notes.trim(),
+  employeeId: safeTrim(employee.employeeId),
+  employeeCode: safeTrim(employee.employeeCode),
+  firstName: safeTrim(employee.firstName),
+  lastName: safeTrim(employee.lastName),
+  fullName: `${safeTrim(employee.firstName)} ${safeTrim(employee.lastName)}`.trim(),
+  gender: employee.gender || 'Male',
+  dateOfBirth: safeTrim(employee.dateOfBirth),
+  mobileNumber: safeTrim(employee.mobileNumber),
+  email: safeTrim(employee.email),
+  departmentId: safeTrim(employee.departmentId),
+  department: safeTrim(employee.department),
+  designation: safeTrim(employee.designation),
+  employmentType: employee.employmentType || 'Permanent',
+  joiningDate: safeTrim(employee.joiningDate),
+  reportingManagerId: safeTrim(employee.reportingManagerId),
+  reportingManager: safeTrim(employee.reportingManager),
+  workLocation: safeTrim(employee.workLocation),
+  employmentStatus: employee.employmentStatus || 'Active',
+  photoUrl: safeTrim(employee.photoUrl),
+  address: safeTrim(employee.address),
+  emergencyContact: safeTrim(employee.emergencyContact),
+  notes: safeTrim(employee.notes),
+  fatherName: safeTrim((employee as any).fatherName),
+  motherName: safeTrim((employee as any).motherName),
+  aadhaarNumber: safeTrim((employee as any).aadhaarNumber),
+  panNumber: safeTrim((employee as any).panNumber),
+  bankName: safeTrim((employee as any).bankName),
+  branchName: safeTrim((employee as any).branchName),
+  accountNumber: safeTrim((employee as any).accountNumber),
+  ifscCode: safeTrim((employee as any).ifscCode),
+  grossSalary: typeof employee.grossSalary === 'number' && !isNaN(employee.grossSalary) ? employee.grossSalary : undefined,
+  monthlyGross: typeof employee.grossSalary === 'number' && !isNaN(employee.grossSalary) ? employee.grossSalary : undefined,
+  salary: typeof employee.grossSalary === 'number' && !isNaN(employee.grossSalary) ? employee.grossSalary : undefined,
+  pfApplicable: Boolean(employee.pfApplicable),
+  esicApplicable: Boolean(employee.esicApplicable),
+  ptApplicable: Boolean(employee.ptApplicable),
+  calculatedPf: typeof employee.calculatedPf === 'number' ? employee.calculatedPf : 0,
+  calculatedEsic: typeof employee.calculatedEsic === 'number' ? employee.calculatedEsic : 0,
+  calculatedPt: typeof employee.calculatedPt === 'number' ? employee.calculatedPt : 0,
+  totalDeductions: typeof employee.totalDeductions === 'number' ? employee.totalDeductions : 0,
+  netTakeHome: typeof employee.netTakeHome === 'number' ? employee.netTakeHome : undefined,
 });
 
 export interface EmployeeRepository {
   getEmployees: () => Promise<Employee[]>;
+  getAllEmployeesGlobal: () => Promise<Employee[]>;
+  getEmployeesForDepartment: (departmentId: string) => Promise<Employee[]>;
   getEmployeeById: (employeeId: string) => Promise<Employee | null>;
   createEmployee: (employee: EmployeeFormData) => Promise<string>;
   updateEmployee: (employeeId: string, employee: EmployeeFormData) => Promise<void>;
+  updateEmployeeFields: (employeeId: string, fields: Record<string, unknown>) => Promise<void>;
   deleteEmployee: (employeeId: string) => Promise<void>;
 }
 
@@ -149,7 +197,17 @@ export class FirestoreEmployeeRepository implements EmployeeRepository {
   }
 
   async getEmployees(): Promise<Employee[]> {
+    return this.getAllEmployeesGlobal();
+  }
+
+  async getAllEmployeesGlobal(): Promise<Employee[]> {
     const snapshot = await getDocs(collection(db, EMPLOYEES_COLLECTION));
+    return snapshot.docs.map((docSnap) => toEmployee(docSnap.id, docSnap.data()));
+  }
+
+  async getEmployeesForDepartment(departmentId: string): Promise<Employee[]> {
+    if (!departmentId?.trim()) return [];
+    const snapshot = await getDocs(query(collection(db, EMPLOYEES_COLLECTION), where('departmentId', '==', departmentId)));
     return snapshot.docs.map((docSnap) => toEmployee(docSnap.id, docSnap.data()));
   }
 
@@ -196,6 +254,14 @@ export class FirestoreEmployeeRepository implements EmployeeRepository {
 
     await updateDoc(employeeDocument, {
       ...createEmployeeRecord(employee),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  async updateEmployeeFields(employeeId: string, fields: Record<string, unknown>): Promise<void> {
+    const employeeDocument = doc(db, EMPLOYEES_COLLECTION, employeeId);
+    await updateDoc(employeeDocument, {
+      ...fields,
       updatedAt: serverTimestamp(),
     });
   }

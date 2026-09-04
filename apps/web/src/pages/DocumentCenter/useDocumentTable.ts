@@ -4,11 +4,12 @@ import {
   archiveDocument,
   assignDocument,
   deleteDocument,
-  getDocuments,
+  getAllDocumentsGlobally,
+  getDocumentsByReference,
 } from "../../services/document/documentService";
 import { useAuth } from "../../context/AuthContext";
 import { permissionService } from "../../core/permissions/permissionService";
-import { employeeService } from "../Employee/services/employeeService";
+import { getAuthorizationScope } from "../../core/authorization/authorizationResolver";
 
 export interface UseDocumentTableReturn {
   loading: boolean;
@@ -57,39 +58,17 @@ export default function useDocumentTable(): UseDocumentTableReturn {
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
-      const allDocs = await getDocuments();
-      const allEmps = await employeeService.getEmployees();
+      const canonicalRole = user?.authorization?.role || user?.assignedRole || "";
+      const scope = getAuthorizationScope(canonicalRole);
+      const userEmpId = user?.employeeId || user?.id || "";
 
-      // Role-Based Document Filtering (Sprint 02.9.5 Spec)
       let allowedDocs: Document[] = [];
 
-      if (permissionService.isSuperAdmin(userRole) || userRole === "Admin") {
-        allowedDocs = allDocs;
-      } else if (userRole === "Department Admin") {
-        const deptEmpIds = new Set(
-          allEmps
-            .filter((e) => e.department === user?.department)
-            .map((e) => e.employeeId || e.employeeCode || e.id)
-        );
-        allowedDocs = allDocs.filter(
-          (d) =>
-            d.referenceId === userEmpId ||
-            deptEmpIds.has(d.referenceId) ||
-            d.sharedWith?.includes(user?.department || "")
-        );
-      } else if (userRole === "Team Lead" || userRole === "Team Leader" || userRole === "Manager") {
-        const teamEmpIds = new Set(
-          allEmps
-            .filter((e) => e.reportingManager === user?.name || e.reportingManagerId === userEmpId)
-            .map((e) => e.employeeId || e.employeeCode || e.id)
-        );
-        allowedDocs = allDocs.filter(
-          (d) => d.referenceId === userEmpId || teamEmpIds.has(d.referenceId)
-        );
+      if (scope === 'GLOBAL') {
+        allowedDocs = await getAllDocumentsGlobally(canonicalRole);
       } else {
-        allowedDocs = allDocs.filter(
-          (d) => d.referenceId === userEmpId || d.sharedWith?.includes(userEmpId)
-        );
+        // Fallback for non-GLOBAL canonical roles: strictly bounded query for own documents.
+        allowedDocs = await getDocumentsByReference(userEmpId);
       }
 
       setDocuments(allowedDocs);

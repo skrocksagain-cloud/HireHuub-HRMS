@@ -42,35 +42,58 @@ export interface PlacementRecord {
   payrollEmployeeId?: string;
   dateOfBirth?: string;
   status: 'Active' | 'Completed' | 'Terminated' | 'Transferred';
+  lastWorkingDate?: string;
+  reason?: string;
   createdAt: string;
 }
 
-export interface AssignmentHistoryRecord {
+export interface AssignmentRecord {
   id: string;
-  candidateId: string;
-  fromRecruiterId: string;
-  fromRecruiterName: string;
+  fromRecruiterId: string | null;
+  fromRecruiterName: string | null;
   toRecruiterId: string;
   toRecruiterName: string;
   assignedByUserId: string;
   assignedByUserName: string;
   assignedAt: string;
-  reason?: string;
+  reason: string;
 }
 
-export interface InteractionTimelineRecord {
+export interface InteractionRecord {
   id: string;
-  candidateId: string;
+  timestamp: string;
   recruiterId: string;
   recruiterName: string;
-  status: CandidateStatus;
-  clientId?: string;
-  clientName?: string;
+  teamId?: string;
+  departmentId?: string;
+  previousStatus: CandidateStatus | null;
+  selectedStatus: CandidateStatus;
   notes: string;
-  issueDescription?: string;
-  followUpDate?: string;
-  interviewDate?: string;
-  createdAt: string;
+  clientId?: string | null;
+  clientName?: string | null;
+  followUpDate?: string | null;
+  interviewDate?: string | null;
+  issueDescription?: string | null;
+}
+
+export interface StatusHistoryRecord {
+  id: string;
+  timestamp: string;
+  interactionId: string;
+  recruiterId: string;
+  recruiterName: string;
+  previousStatus: CandidateStatus | null;
+  newStatus: CandidateStatus;
+}
+
+export interface FollowUpRecord {
+  id: string;
+  timestamp: string;
+  recruiterId: string;
+  recruiterName: string;
+  followUpDate: string;
+  notes: string;
+  status: 'Pending' | 'Completed';
 }
 
 export interface CareerJourneyStep {
@@ -80,19 +103,6 @@ export interface CareerJourneyStep {
   completed: boolean;
 }
 
-export interface FollowUpRecord {
-  id: string;
-  candidateId: string;
-  candidateName: string;
-  candidatePhone: string;
-  recruiterId: string;
-  recruiterName: string;
-  followUpDate: string; // YYYY-MM-DD
-  notes: string;
-  status: 'Pending' | 'Completed' | 'Overdue';
-  createdAt: string;
-}
-
 export interface CandidateDocument {
   id: string;
   documentType: 'Resume' | 'Aadhaar Card' | 'PAN Card' | 'Driving Licence' | 'Bank Details';
@@ -100,6 +110,8 @@ export interface CandidateDocument {
   fileUrl?: string;
   accountNumber?: string;
   ifscCode?: string;
+  documentNumber?: string; // Used for Aadhaar, PAN, Driving Licence
+  documentDetails?: string; // Used for Resume or other general details
   uploadedAt?: string;
   isVerified: boolean;
   ocrPlaceholderText?: string;
@@ -116,7 +128,7 @@ export interface CandidateAttachment {
 
 export interface SystemAuditRecord {
   id: string;
-  action: 'Created' | 'Imported' | 'Assigned' | 'Status Changed' | 'Client Changed' | 'Employee ID Updated' | 'Blacklisted';
+  action: 'Created' | 'Imported' | 'Assigned' | 'Status Changed' | 'Client Changed' | 'Employee ID Updated' | 'Blacklisted' | 'Terminated' | 'Completed' | 'Transferred';
   performedBy: string;
   timestamp: string;
   details: string;
@@ -129,13 +141,14 @@ export interface Candidate {
   area: string;
   city: string;
   role: string; // Smart text
-  status: CandidateStatus;
+  currentCrmStatus: CandidateStatus | null; // Phase 2: null = Not Contacted
   
   // Assignment
   assignedRecruiterId: string;
   assignedRecruiterName: string;
   teamId?: string;
   teamName?: string;
+  departmentId?: string; // added to match scopes if needed
 
   // Source & Details
   source: CandidateSource;
@@ -146,10 +159,11 @@ export interface Candidate {
   currentPlacement?: PlacementRecord;
   placementHistory: PlacementRecord[];
 
-  // Timeline & History
-  interactionTimeline: InteractionTimelineRecord[];
-  assignmentHistory: AssignmentHistoryRecord[];
-  followUps: FollowUpRecord[];
+  // Legacy arrays (marked for removal/migration)
+  interactionTimeline?: any[];
+  assignmentHistory?: any[];
+  followUps?: any[];
+
   documents: CandidateDocument[];
   attachments: CandidateAttachment[];
   systemAudit: SystemAuditRecord[];
@@ -158,13 +172,14 @@ export interface Candidate {
   payrollEmployeeId?: string;
   dateOfBirth?: string;
   activeDate?: string;
-  followUpDate?: string;
-  interviewDate?: string;
-  currentClientId?: string;
-  currentClientName?: string;
+  joiningDate?: string;
+  followUpDate?: string | null;
+  interviewDate?: string | null;
+  currentClientId?: string | null;
+  currentClientName?: string | null;
 
   // Issues & Blacklist
-  issueDescription?: string;
+  issueDescription?: string | null;
   isBlacklisted: boolean;
   blacklistReason?: string;
   blacklistedBy?: string;
@@ -172,6 +187,7 @@ export interface Candidate {
 
   // Metrics
   callsCount: number;
+  lastCalledAt?: string;
 
   createdAt: string;
   updatedAt: string;
@@ -184,8 +200,10 @@ export interface CreateCandidateInput {
   city: string;
   role: string;
   source: CandidateSource;
-  assignedRecruiterId?: string;
-  assignedRecruiterName?: string;
+  assignedRecruiterId?: string | null;
+  assignedRecruiterName?: string | null;
+  targetTeamId?: string | null;
+  targetDepartmentId?: string | null;
 }
 
 export interface DuplicateCheckResult {
@@ -200,6 +218,7 @@ export interface BulkImportRow {
   area: string;
   city: string;
   role: string;
+  assignedRecruiterName?: string;
   isValid: boolean;
   validationErrors: string[];
   isDuplicate: boolean;
@@ -216,6 +235,7 @@ export interface ImportHistoryItem {
 }
 
 export interface QuickUpdateInput {
+  interactionId: string; // Phase 2: Used as idempotency key
   candidateId: string;
   status: CandidateStatus;
   clientId?: string;

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Building2, Briefcase, UserCheck, Banknote, FileCheck, ShieldAlert, Plus, Check } from 'lucide-react';
+import { X, Building2, Briefcase, UserCheck, Banknote, FileCheck, ShieldAlert, Plus, Check, Paperclip, Trash2 } from 'lucide-react';
 import Drawer from '../../../../ui/Drawer';
 import { clientService } from '../../Network/clients/services/clientService';
+import { attachmentStorageService } from '../services/attachmentStorageService';
+import { getIndianStates, getCitiesForState, isValidCityForState } from '../../../../core/location/indiaLocationMaster';
 import type { Client } from '../../../../types/Client';
-import type { Opening, OpeningStatus, OpeningPriority, SalaryType, GenderPreference } from '../../../../types/Opening';
+import type { Opening, OpeningStatus, OpeningPriority, SalaryType, GenderPreference, OpeningAttachment } from '../../../../types/Opening';
 
 interface NewOpeningDrawerProps {
   isOpen: boolean;
@@ -60,8 +62,8 @@ export default function NewOpeningDrawer({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
-  const [city, setCity] = useState('');
   const [state, setState] = useState('Maharashtra');
+  const [city, setCity] = useState('Pune');
   const [openPositions, setOpenPositions] = useState<number>(5);
   const [priority, setPriority] = useState<OpeningPriority>('Medium');
   const [interviewDate, setInterviewDate] = useState('');
@@ -81,13 +83,16 @@ export default function NewOpeningDrawer({
   const [salaryType, setSalaryType] = useState<SalaryType>('Monthly');
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
 
-  // Documents Required
+  // Documents & Attachments Required
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<OpeningAttachment[]>([]);
 
   // Status & Outsourcing
   const [status, setStatus] = useState<OpeningStatus>('Active');
   const [isOutsourced, setIsOutsourced] = useState(false);
-  const [outsourcedVendor, setOutsourcedVendor] = useState('');
+
+  const availableStates = getIndianStates();
+  const availableCities = getCitiesForState(state);
 
   useEffect(() => {
     async function loadClients() {
@@ -113,8 +118,9 @@ export default function NewOpeningDrawer({
       setTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setLocation(initialData.location || '');
-      setCity(initialData.city || '');
-      setState(initialData.state || 'Maharashtra');
+      const st = initialData.state || 'Maharashtra';
+      setState(st);
+      setCity(initialData.city || (getCitiesForState(st)[0] || 'Pune'));
       setOpenPositions(initialData.openPositions || 1);
       setPriority(initialData.priority || 'Medium');
       setInterviewDate(initialData.interviewDate || '');
@@ -129,17 +135,17 @@ export default function NewOpeningDrawer({
       setSalaryType(initialData.salaryType || 'Monthly');
       setSelectedBenefits(initialData.benefits || []);
       setSelectedDocuments(initialData.requiredDocuments || []);
+      setAttachments(initialData.attachments || []);
       setStatus(initialData.status || 'Active');
       setIsOutsourced(Boolean(initialData.isOutsourced));
-      setOutsourcedVendor(initialData.outsourcedVendor || '');
     } else {
       setSelectedClientId('');
       setClientName('');
       setTitle('');
       setDescription('');
       setLocation('');
-      setCity('');
       setState('Maharashtra');
+      setCity('Pune');
       setOpenPositions(5);
       setPriority('Medium');
       setInterviewDate('');
@@ -154,23 +160,52 @@ export default function NewOpeningDrawer({
       setSalaryType('Monthly');
       setSelectedBenefits([]);
       setSelectedDocuments([]);
+      setAttachments([]);
       setStatus('Active');
       setIsOutsourced(false);
-      setOutsourcedVendor('');
     }
     setFormError('');
   }, [initialData, isOpen]);
+
+  const handleStateChange = (newState: string) => {
+    setState(newState);
+    const validCities = getCitiesForState(newState);
+    if (!validCities.includes(city)) {
+      setCity(validCities[0] || '');
+    }
+  };
 
   const handleClientChange = (cId: string) => {
     setSelectedClientId(cId);
     const selected = clients.find((c) => c.id === cId);
     if (selected) {
       setClientName(selected.name);
-      setState(selected.state || 'Maharashtra');
+      if (selected.state) {
+        handleStateChange(selected.state);
+      }
       if (selected.billingAddress?.city) {
         setCity(selected.billingAddress.city);
       }
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const uploaded: OpeningAttachment[] = [];
+      for (const f of Array.from(files)) {
+        const att = await attachmentStorageService.uploadAttachment(f, initialData?.id || 'new');
+        uploaded.push(att);
+      }
+      setAttachments((prev) => [...prev, ...uploaded]);
+    } catch {
+      setFormError('Failed to upload file attachment.');
+    }
+  };
+
+  const removeAttachment = (attId: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== attId));
   };
 
   const toggleBenefit = (benefit: string) => {
@@ -207,6 +242,18 @@ export default function NewOpeningDrawer({
       setFormError('Position Title is required.');
       return;
     }
+    if (!state) {
+      setFormError('Please select a valid Indian State.');
+      return;
+    }
+    if (!city) {
+      setFormError('Please select a valid City for the selected State.');
+      return;
+    }
+    if (!isValidCityForState(state, city)) {
+      setFormError(`City "${city}" is not valid for State "${state}". Please select a valid City.`);
+      return;
+    }
     if (openPositions <= 0) {
       setFormError('Number of Openings must be greater than 0.');
       return;
@@ -228,7 +275,6 @@ export default function NewOpeningDrawer({
         priority,
         interviewDate,
         isOutsourced,
-        outsourcedVendor: isOutsourced ? outsourcedVendor.trim() : undefined,
         minExperience: Number(minExperience),
         maxExperience: Number(maxExperience),
         qualification: qualification.trim(),
@@ -240,6 +286,7 @@ export default function NewOpeningDrawer({
         salaryType,
         benefits: selectedBenefits,
         requiredDocuments: selectedDocuments,
+        attachments,
       });
       onClose();
     } catch (err) {
@@ -252,6 +299,43 @@ export default function NewOpeningDrawer({
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title={mode === 'edit' ? 'Edit Opening' : 'Create New Opening'}>
       <form onSubmit={handleSubmit} className="space-y-6 pb-12 text-xs">
+        {/* Supporting Document / Image Attachment (Reference Only) */}
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+              <Paperclip size={14} className="text-emerald-600" /> Reference Image / Document Attachment
+            </span>
+            <span className="text-[10px] text-slate-500">Supports JPG, PNG, PDF, Excel</span>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg font-semibold text-xs transition">
+              <Paperclip size={13} className="text-slate-600" />
+              <span>Attach File</span>
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/jpg,image/png,application/pdf,.xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+            <span className="text-[11px] text-slate-500">Attach requisition image/document for reference.</span>
+          </div>
+
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-slate-800 text-[11px] font-medium shadow-2xs">
+                  <span className="truncate max-w-[140px]">{att.fileName}</span>
+                  <button type="button" onClick={() => removeAttachment(att.id)} className="text-slate-400 hover:text-rose-600 p-0.5">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {formError && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-center gap-2">
             <ShieldAlert size={16} className="shrink-0 text-rose-600" />
@@ -314,24 +398,37 @@ export default function NewOpeningDrawer({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className="block font-semibold text-slate-700 mb-1">State *</label>
+              <select
+                value={state}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                {availableStates.map((s) => (
+                  <option key={s.stateCode} value={s.stateName}>
+                    {s.stateName} {s.isUT ? '(UT)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block font-semibold text-slate-700 mb-1">City *</label>
-              <input
-                type="text"
+              <select
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="e.g. Pune, Bengaluru"
-                className="w-full p-2 bg-white border border-slate-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">State *</label>
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="e.g. Maharashtra"
-                className="w-full p-2 bg-white border border-slate-300 rounded-lg"
-              />
+                className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 outline-none"
+              >
+                {availableCities.length > 0 ? (
+                  availableCities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No cities found for {state}</option>
+                )}
+              </select>
             </div>
           </div>
 
@@ -601,19 +698,6 @@ export default function NewOpeningDrawer({
               </label>
             </div>
           </div>
-
-          {isOutsourced && (
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Outsourced Sub-Vendor Name *</label>
-              <input
-                type="text"
-                value={outsourcedVendor}
-                onChange={(e) => setOutsourcedVendor(e.target.value)}
-                placeholder="e.g. QuickStaff Solutions / Vendor Partner Name"
-                className="w-full p-2 bg-amber-50 border border-amber-300 text-amber-900 rounded-lg font-semibold"
-              />
-            </div>
-          )}
         </div>
 
         {/* Submit Actions */}

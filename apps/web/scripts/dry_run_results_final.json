@@ -1,0 +1,148 @@
+{
+  "report": {
+    "candidates": {
+      "totalLegacy": 61,
+      "uniqueMobiles": 61,
+      "duplicateGroups": 0,
+      "duplicateRecords": 0,
+      "expectedV2": 61,
+      "missingMobile": 0
+    },
+    "placements": {
+      "totalLegacy": 2,
+      "active": 0,
+      "transferred": 0,
+      "terminated": 1,
+      "other": 1,
+      "duplicateActiveConflicts": 0
+    },
+    "clients": {
+      "validPayroll": 0,
+      "validOTS": 2,
+      "missingClient": 0,
+      "invalidClient": 0,
+      "missingClientType": 0
+    },
+    "employees": {
+      "payrollMissingId": 0,
+      "otsMissingId": 0,
+      "invalidOtsFormat": 0,
+      "wrongType": 0
+    },
+    "ap": {
+      "found": 1,
+      "notFound": 0,
+      "joined": 0,
+      "notJoined": 0,
+      "ambiguous": 0
+    },
+    "payouts": {
+      "totalRows": 28,
+      "validEmpId": 28,
+      "missingEmpId": 0,
+      "invalidEmpId": 0,
+      "validClient": 9,
+      "unmatchedClient": 0,
+      "matchedToPlacement": 28,
+      "unmatchedToPlacement": 0,
+      "totalEarnings": 25650,
+      "totalOrders": 1040
+    },
+    "interactions": {
+      "total": 0,
+      "validCandidate": 0,
+      "missingCandidate": 0
+    },
+    "assignments": {
+      "current": 0,
+      "history": 0,
+      "invalidRecruiter": 0,
+      "missingTeam": 0
+    }
+  },
+  "conflicts": [],
+  "mappings": {
+    "candidates": {
+      "1zA8zMFJY6jskQ9kd2L1": "1zA8zMFJY6jskQ9kd2L1",
+      "29m9I6OXradvS0lIOH0h": "29m9I6OXradvS0lIOH0h",
+      "2T3qGtLv82D0JecN3D2M": "2T3qGtLv82D0JecN3D2M",
+      "3l2Q9Vo7iFjSom16GvPM": "3l2Q9Vo7iFjSom16GvPM",
+      "3xNA9sffOBo4LOSo8Kxd": "3xNA9sffOBo4LOSo8Kxd",
+      "4PBNd2bydclleyMWSYjg": "4PBNd2bydclleyMWSYjg",
+      "4m5IXKBpX5s70APpIchr": "4m5IXKBpX5s70APpIchr",
+      "5Uz5ca3QJpGAjEJ2QRk2": "5Uz5ca3QJpGAjEJ2QRk2",
+      "5hsM3yqeoO2HZYWg7ZY4": "5hsM3yqeoO2HZYWg7ZY4",
+      "60NrCJZRkUxcEbg7fqDb": "60NrCJZRkUxcEbg7fqDb",
+      "65Hv7abs2lC8WSoBggMc": "65Hv7abs2lC8WSoBggMc",
+      "92RdPzlGandWyYMLwVI4": "92RdPzlGandWyYMLwVI4",
+      "A1jxzVft32K0EdY4Fh4g": "A1jxzVft32K0EdY4Fh4g",
+      "A4WADNoRyW3OmEZUW0hV": "A4WADNoRyW3OmEZUW0hV",
+      "BzrdAvqYpukM6x7ccbhh": "BzrdAvqYpukM6x7ccbhh",
+      "EorvRHf4ys0OOwjvtIsN": "EorvRHf4ys0OOwjvtIsN",
+      "EtV2uZhYMHMnlMI8CNTt": "EtV2uZhYMHMnlMI8CNTt",
+      "G2upe7vKNwDAMgaRsblB": "G2upe7vKNwDAMgaRsblB",
+      "HYMYnOW2fSUfpiZ9tTAd": "HYMYnOW2fSUfpiZ9tTAd",
+      "HdE7qvBYOGDIAdPG5Ee9": "HdE7qvBYOGDIAdPG5Ee9",
+      "HsscFxWXFpikvOtcvQiR": "HsscFxWXFpikvOtcvQiR",
+      "I8TdXFPh8fGIi4wulsYQ": "I8TdXFPh8fGIi4wulsYQ",
+      "LZUn9Wd8eHThEJcihIuz": "LZUn9Wd8eHThEJcihIuz",
+      "NQd7a21CYagkUVAznDyj": "NQd7a21CYagkUVAznDyj",
+      "NQq891OX1y22KmqeYqJL": "NQq891OX1y22KmqeYqJL",
+      "OLIYdjMmzZdXovVn9keG": "OLIYdjMmzZdXovVn9keG",
+      "PJm4cPhdueOT5ijxTVTx": "PJm4cPhdueOT5ijxTVTx",
+      "PqiDb7cN75I04NkptkNi": "PqiDb7cN75I04NkptkNi",
+      "QIEs7EOl4aPSxbrW9LIM": "QIEs7EOl4aPSxbrW9LIM",
+      "RYsEesaQ0WHBV0XJhLyT": "RYsEesaQ0WHBV0XJhLyT",
+      "SqvW9ZciTKhWoDXu1azH": "SqvW9ZciTKhWoDXu1azH",
+      "TfLt8NVWsmzRiX6rSlHe": "TfLt8NVWsmzRiX6rSlHe",
+      "TxbeQFctFH3zHcgcWcLr": "TxbeQFctFH3zHcgcWcLr",
+      "WB6k4OkSrxX7epSbLU6f": "WB6k4OkSrxX7epSbLU6f",
+      "WUrYelbYRRnCjr75JB4B": "WUrYelbYRRnCjr75JB4B",
+      "XMNvlutYKrIrfSQl898M": "XMNvlutYKrIrfSQl898M",
+      "YrIwAL2GMU4TGetZx9tU": "YrIwAL2GMU4TGetZx9tU",
+      "Z6O6aGMzyxvS8jq9B0Sm": "Z6O6aGMzyxvS8jq9B0Sm",
+      "aIOLiXi1d9SX09RvpzHZ": "aIOLiXi1d9SX09RvpzHZ",
+      "aRS4ZD8l9NKyOWvk6lpf": "aRS4ZD8l9NKyOWvk6lpf",
+      "b9yX0zS3PyZWeCkqvpoL": "b9yX0zS3PyZWeCkqvpoL",
+      "goq6q9b5elsl22Bizbo5": "goq6q9b5elsl22Bizbo5",
+      "hL610bgSmX04w5w1ersb": "hL610bgSmX04w5w1ersb",
+      "i2UPVZuZedRQBUxSa0mQ": "i2UPVZuZedRQBUxSa0mQ",
+      "i3pW65GkCMRDSl0sP1od": "i3pW65GkCMRDSl0sP1od",
+      "ksjozCD5VV4sfnzoWzKc": "ksjozCD5VV4sfnzoWzKc",
+      "m8aVpyY1CeyHd7BUWyf6": "m8aVpyY1CeyHd7BUWyf6",
+      "mayRjo0IzRHmK0VefriS": "mayRjo0IzRHmK0VefriS",
+      "nz8lRud47PL2zGCXGFwy": "nz8lRud47PL2zGCXGFwy",
+      "pOHZjRU4xAqZkY9p5wzU": "pOHZjRU4xAqZkY9p5wzU",
+      "pPCow4vUxlecaKg7v4gb": "pPCow4vUxlecaKg7v4gb",
+      "pzHp8uP4r5BYXd1gcvF9": "pzHp8uP4r5BYXd1gcvF9",
+      "q8sfzzz8r7ZZqOoSXetV": "q8sfzzz8r7ZZqOoSXetV",
+      "qjNvHPb0pwQAafPkd05n": "qjNvHPb0pwQAafPkd05n",
+      "r7jgodeo8YH3iknUzq2T": "r7jgodeo8YH3iknUzq2T",
+      "sVbNGx8bRFbbHqFJHzyf": "sVbNGx8bRFbbHqFJHzyf",
+      "t0Iy7bkVLTRMwvWJ0oaU": "t0Iy7bkVLTRMwvWJ0oaU",
+      "vloKkuyepj6hBFGHm5gG": "vloKkuyepj6hBFGHm5gG",
+      "wwJM69QE1zOHjW5yAd9e": "wwJM69QE1zOHjW5yAd9e",
+      "x14ztdvuvgTEgZmakyO4": "x14ztdvuvgTEgZmakyO4",
+      "xZEyTRyRoxSXImbInrww": "xZEyTRyRoxSXImbInrww"
+    },
+    "placements": {
+      "WF-1zA8zMFJY6jskQ9kd2L1": "HHPL6527",
+      "xUUBMbrB4gxqv7ouraYE": "HHPL5226"
+    },
+    "payouts": {
+      "client-001-2026-07-xUUBMbrB4gxqv7ouraYE": "PAYOUT-xUUBMbrB4gxqv7ouraYE",
+      "client-001-2026-07-WF-29m9I6OXradvS0lIOH0h": "PAYOUT-WF-29m9I6OXradvS0lIOH0h",
+      "client-001-2026-07-WF-G2upe7vKNwDAMgaRsblB": "PAYOUT-WF-G2upe7vKNwDAMgaRsblB",
+      "client-001-2026-07-WF-TfLt8NVWsmzRiX6rSlHe": "PAYOUT-WF-TfLt8NVWsmzRiX6rSlHe",
+      "client-001-2026-07-WF-OLIYdjMmzZdXovVn9keG": "PAYOUT-WF-OLIYdjMmzZdXovVn9keG",
+      "client-001-2026-07-WF-aIOLiXi1d9SX09RvpzHZ": "PAYOUT-WF-aIOLiXi1d9SX09RvpzHZ",
+      "client-001-2026-08-WF-29m9I6OXradvS0lIOH0h": "PAYOUT-WF-29m9I6OXradvS0lIOH0h",
+      "client-001-2026-08-WF-G2upe7vKNwDAMgaRsblB": "PAYOUT-WF-G2upe7vKNwDAMgaRsblB",
+      "client-001-2026-08-WF-OLIYdjMmzZdXovVn9keG": "PAYOUT-WF-OLIYdjMmzZdXovVn9keG",
+      "client-001-2026-08-WF-TfLt8NVWsmzRiX6rSlHe": "PAYOUT-WF-TfLt8NVWsmzRiX6rSlHe",
+      "client-001-2026-08-WF-aIOLiXi1d9SX09RvpzHZ": "PAYOUT-WF-aIOLiXi1d9SX09RvpzHZ",
+      "client-001-2026-08-WF-4m5IXKBpX5s70APpIchr": "PAYOUT-WF-4m5IXKBpX5s70APpIchr",
+      "client-001-2026-08-xUUBMbrB4gxqv7ouraYE": "PAYOUT-xUUBMbrB4gxqv7ouraYE"
+    }
+  }
+}

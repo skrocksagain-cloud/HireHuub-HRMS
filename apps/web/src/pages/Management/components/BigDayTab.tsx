@@ -2,23 +2,28 @@ import { useState } from 'react';
 import { Sparkles, Plus, CheckCircle2, Calendar } from 'lucide-react';
 import { useAdminBigDay } from '../../../hooks/admin/useAdmin';
 import type { BigDayConfig } from '../../../types/Admin';
+import { useClients } from '../../../pages/Workbench/Network/clients/hooks/useClients';
 
 export default function BigDayTab() {
   const { bigDays, isLoading, saveBigDay, updateBigDay } = useAdminBigDay();
+  const { clients } = useClients();
   const [showModal, setShowModal] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
   const [date, setDate] = useState('');
-  const [clientsText, setClientsText] = useState('Big Basket, Taco Bell, Sasta Sundar');
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [bonus, setBonus] = useState(0.5);
   const [description, setDescription] = useState('Big Day bonus campaign for key staffing clients.');
 
+  const activeClients = clients.filter(c => c.status === 'Active');
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date) return;
+    if (!date || selectedClientIds.length === 0) return;
 
-    const clientNames = clientsText.split(',').map((c) => c.trim()).filter(Boolean);
-    const clientIds = clientNames.map((c) => c.toLowerCase().replace(/\s+/g, '-'));
+    const selectedClientsList = activeClients.filter(c => selectedClientIds.includes(c.id));
+    const clientIds = selectedClientsList.map(c => c.id);
+    const clientNames = selectedClientsList.map(c => c.name);
 
     const newBigDay: BigDayConfig = {
       id: `bigday-${Date.now()}`,
@@ -34,6 +39,14 @@ export default function BigDayTab() {
     setShowModal(false);
     setStatusMsg('Big Day configuration added successfully!');
     setTimeout(() => setStatusMsg(''), 3000);
+    setSelectedClientIds([]);
+    setDate('');
+  };
+
+  const handleClientToggle = (clientId: string) => {
+    setSelectedClientIds(prev =>
+      prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]
+    );
   };
 
   const toggleStatus = async (bd: BigDayConfig) => {
@@ -155,15 +168,24 @@ export default function BigDayTab() {
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Active Clients (Comma separated) *</label>
-                <input
-                  type="text"
-                  value={clientsText}
-                  onChange={(e) => setClientsText(e.target.value)}
-                  placeholder="Big Basket, Taco Bell, Sasta Sundar"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-                  required
-                />
+                <label className="block font-semibold mb-1">Select Active Clients *</label>
+                <div className="border border-slate-200 rounded-xl max-h-40 overflow-y-auto p-2 bg-slate-50">
+                  {activeClients.length === 0 ? (
+                    <div className="text-slate-400 text-sm p-2">No active clients found.</div>
+                  ) : (
+                    activeClients.map((client) => (
+                      <label key={client.id} className="flex items-center gap-2 p-1 hover:bg-slate-100 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedClientIds.includes(client.id)}
+                          onChange={() => handleClientToggle(client.id)}
+                          className="rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-sm font-medium">{client.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
 
               <div>

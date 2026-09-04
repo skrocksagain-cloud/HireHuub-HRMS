@@ -5,7 +5,6 @@ import {
   Search,
   Eye,
   Archive,
-  Sparkles,
   ShieldAlert,
 } from 'lucide-react';
 
@@ -13,6 +12,7 @@ import DashboardLayout from '../../../../layouts/DashboardLayout';
 import PageHeader from '../../../../ui/PageHeader';
 import StatusBadge from '../../../../ui/StatusBadge';
 import CreateCampaignDrawer from '../components/CreateCampaignDrawer';
+import JobPortalAnalytics from '../components/JobPortalAnalytics';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useAuth } from '../../../../context/AuthContext';
 import { formatINR } from '../utils/campaignUtils';
@@ -63,14 +63,7 @@ export default function CampaignHubPage() {
     return Array.from(set);
   }, [campaigns]);
 
-  // Aggregate KPI Calculations
-  const totalCampaigns = campaigns.length;
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Running').length;
-  const totalLeads = campaigns.reduce((acc, c) => acc + (c.actualLeads || 0), 0);
-  const totalJoins = campaigns.reduce((acc, c) => acc + (c.actualJoins || 0), 0);
-  const avgConversion = totalLeads > 0 ? Number(((totalJoins / totalLeads) * 100).toFixed(1)) : 0;
-  const totalSpend = campaigns.reduce((acc, c) => acc + (c.actualSpend || 0), 0);
-  const avgCostPerJoin = totalJoins > 0 ? Math.round(totalSpend / totalJoins) : 0;
+  // Removed legacy aggregate KPI calculations
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
@@ -132,59 +125,8 @@ export default function CampaignHubPage() {
           </button>
         </div>
 
-        {/* 6 KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Total Campaigns
-            </span>
-            <span className="text-xl font-extrabold text-slate-900 mt-1 block">{totalCampaigns}</span>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Active Campaigns
-            </span>
-            <span className="text-xl font-extrabold text-emerald-700 mt-1 block">{activeCampaigns}</span>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Total Candidates Gen.
-            </span>
-            <span className="text-xl font-extrabold text-blue-700 mt-1 block">
-              {totalLeads.toLocaleString('en-IN')}
-            </span>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Conversion %
-            </span>
-            <span className="text-xl font-extrabold text-indigo-700 mt-1 block">{avgConversion}%</span>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Avg Cost / Join
-            </span>
-            <span className="text-xl font-extrabold text-purple-700 mt-1 block">
-              {formatINR(avgCostPerJoin)}
-            </span>
-          </div>
-
-          {/* ORBIT Retention Future Ready Card */}
-          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl p-4 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider block">
-                ORBIT Retention
-              </span>
-              <Sparkles className="text-amber-400" size={14} />
-            </div>
-            <span className="text-xs font-extrabold text-amber-300 block mt-1">Future Ready</span>
-            <span className="text-[9px] text-indigo-300 block mt-1">Engine Prepared</span>
-          </div>
-        </div>
+        {/* Job Portal Analytics & KPIs */}
+        <JobPortalAnalytics campaigns={campaigns} />
 
         {/* Search & Filters */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">

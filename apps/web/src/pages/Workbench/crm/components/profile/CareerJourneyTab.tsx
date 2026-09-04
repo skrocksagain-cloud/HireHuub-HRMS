@@ -15,21 +15,21 @@ export default function CareerJourneyTab({ candidate }: CareerJourneyTabProps) {
     },
     {
       stage: 'Interested',
-      completed: ['Interested', 'Line Up', 'Active'].includes(candidate.status) || candidate.placementHistory.length > 0,
+      completed: ['Interested', 'Line Up', 'Active'].includes(candidate.currentCrmStatus as string) || candidate.placementHistory.length > 0,
       date: candidate.createdAt.split('T')[0],
       details: 'Candidate screened and interested',
     },
     {
       stage: 'Interview',
-      completed: ['Line Up', 'Active'].includes(candidate.status) || candidate.placementHistory.length > 0,
-      date: candidate.interviewDate || '—',
-      details: candidate.currentClientName ? `Interview with ${candidate.currentClientName}` : 'Line up phase',
+      completed: ['Line Up', 'Active'].includes(candidate.currentCrmStatus as string) || candidate.placementHistory.length > 0,
+      date: candidate.interviewDate || 'Not Scheduled',
+      details: candidate.interviewDate ? `Interview Scheduled for ${candidate.interviewDate}` : 'Pending schedule',
     },
     {
       stage: 'Joined',
-      completed: candidate.status === 'Active' || candidate.placementHistory.length > 0,
-      date: candidate.activeDate || '—',
-      details: candidate.currentPlacement ? `Joined ${candidate.currentPlacement.clientName}` : 'Placement active',
+      completed: candidate.currentCrmStatus === 'Active' || candidate.placementHistory.length > 0,
+      date: candidate.activeDate || 'Not Joined',
+      details: candidate.currentPlacement ? `Joined ${candidate.currentPlacement.clientName}` : 'Pending placement',
     },
     {
       stage: 'Client Change',

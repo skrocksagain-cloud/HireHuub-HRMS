@@ -50,7 +50,7 @@ class BillingService {
     if (!adminCompany?.invoicePrefix) missingFields.push('Invoice Prefix');
     if (!invoiceTemplate) missingFields.push('Active Invoice Document Template');
 
-    if (missingFields.length > 0) {
+    if (missingFields.length > 0 || !adminCompany) {
       throw new Error(
         `Invoice cannot be generated.\nMissing in Administration -> Management -> Company Settings:\n• ${missingFields.join('\n• ')}`
       );

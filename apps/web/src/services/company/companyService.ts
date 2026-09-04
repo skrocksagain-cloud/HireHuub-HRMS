@@ -4,6 +4,7 @@ import { adminService } from "../admin/adminService";
 export async function getCompany(): Promise<Company | null> {
   try {
     const adminCompany = await adminService.getCompanySettings();
+    if (!adminCompany) return null;
     return {
       companyName: adminCompany.companyName,
       legalName: adminCompany.companyName,
@@ -24,7 +25,22 @@ export async function getCompany(): Promise<Company | null> {
 }
 
 export async function updateCompany(company: Company): Promise<void> {
-  const current = await adminService.getCompanySettings();
+  const current = (await adminService.getCompanySettings()) || {
+    id: 'hirehuub_company_settings',
+    companyName: '',
+    brandName: '',
+    gstin: '',
+    pan: '',
+    cin: '',
+    address: '',
+    bankDetails: { bankName: '', accountNumber: '', ifscCode: '', branchName: '' },
+    website: '',
+    email: '',
+    phone: '',
+    logoUrl: '',
+    stampUrl: '',
+    signatures: [],
+  };
   await adminService.updateCompanySettings(
     {
       ...current,

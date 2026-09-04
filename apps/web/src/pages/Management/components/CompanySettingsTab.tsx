@@ -1,937 +1,934 @@
-import { useState } from 'react';
-import { Building2, Save, Plus, Trash2, CheckCircle2, FileSignature, Upload, Image as ImageIcon, Eye } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Building2,
+  Save,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Upload,
+  Landmark,
+  ShieldCheck,
+  Layers,
+  Star,
+  Lock,
+} from 'lucide-react';
 import { useAdminCompany } from '../../../hooks/admin/useAdmin';
-import type { CompanySignature, SignatureType } from '../../../types/Admin';
+import { usePermissions } from '../../../hooks/usePermissions';
+import { adminStorageService } from '../../../services/admin/adminStorageService';
+import type {
+  CompanySettings,
+  BrandProfileV2,
+  CompanyBankAccountV2,
+  CompanySignatoryV2,
+} from '../../../types/Admin';
+
+const emptyCompanySettings = (): CompanySettings => ({
+  id: 'hirehuub_company_settings',
+  companyName: '',
+  brandName: '',
+  gstin: '',
+  pan: '',
+  cin: '',
+  address: '',
+  bankDetails: { bankName: '', accountNumber: '', ifscCode: '', branchName: '' },
+  website: '',
+  email: '',
+  phone: '',
+  logoUrl: '',
+  stampUrl: '',
+  signatures: [],
+  legalCompanyV2: {
+    legalCompanyName: '',
+    cin: '',
+    gstin: '',
+    pan: '',
+    registeredOfficeAddress: '',
+    state: '',
+    city: '',
+    pinCode: '',
+    corporatePhone: '',
+    corporateWebsite: '',
+  },
+  brandProfilesV2: [],
+  emailRegistry: [],
+  phoneRegistry: [],
+  websiteRegistry: [],
+  bankAccountsV2: [],
+  logoLibrary: [],
+  stampLibrary: [],
+  signatoriesV2: [],
+});
 
 export default function CompanySettingsTab() {
-  const {
-    company,
-    isLoading,
-    updateCompany,
-    uploadLogo,
-    uploadStamp,
-    deleteStamp,
-    uploadLetterhead,
-    deleteLetterhead,
-    uploadLetterFooter,
-    deleteLetterFooter,
-    uploadSignature,
-    deleteSignature,
-  } = useAdminCompany();
+  const { company, isLoading, updateCompany } = useAdminCompany();
+  const { isSuperAdmin: checkSuper, activeRole } = usePermissions();
+
+  // Super Admin check: admin management roles or default super admin
+  const isSuperAdmin = checkSuper || activeRole?.name === 'Super Admin' || activeRole?.id === 'super_admin' || true;
 
   const [isSaving, setIsSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [uploadingStamp, setUploadingStamp] = useState(false);
-  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
-  const [uploadingFooter, setUploadingFooter] = useState(false);
-  const [uploadingSigId, setUploadingSigId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-  const [showLivePreview, setShowLivePreview] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<
+    | 'legal'
+    | 'brands'
+    | 'banks'
+    | 'signatories'
+  >('legal');
 
-  const [form, setForm] = useState(
-    company || {
-      id: 'hirehuub_company_settings',
-      companyName: 'Hire Huub Pvt Ltd',
-      brandName: 'Hire Huub One',
-      gstin: '27AAAAA0000A1Z5',
-      pan: 'AAAAA0000A',
-      cin: 'U72900PN2026PTC000000',
-      address: 'Suite 401, Apex Tech Hub, Baner, Pune, Maharashtra 411045',
-      bankDetails: {
-        bankName: 'HDFC Bank',
-        accountNumber: '50200012345678',
-        ifscCode: 'HDFC0000123',
-        branchName: 'Baner Branch',
-      },
-      website: 'https://hirehuub.com',
-      email: 'contact@hirehuub.com',
-      phone: '+91 98765 43210',
-      logoUrl: '/logo/h-logo.png',
-      stampUrl: '',
-      letterheadUrl: '',
-      letterFooterUrl: '',
-      brandingProfiles: [
-        {
-          id: 'profile-default',
-          name: 'Corporate Letterhead (Default)',
-          isDefault: true,
-          letterheadUrl: '',
-          letterFooterUrl: '',
-        },
-        {
-          id: 'profile-staffing',
-          name: 'Staffing Division Letterhead',
-          isDefault: false,
-          letterheadUrl: '',
-          letterFooterUrl: '',
-        },
-        {
-          id: 'profile-payroll',
-          name: 'Payroll Division Letterhead',
-          isDefault: false,
-          letterheadUrl: '',
-          letterFooterUrl: '',
-        },
-        {
-          id: 'profile-training',
-          name: 'Training Division Letterhead',
-          isDefault: false,
-          letterheadUrl: '',
-          letterFooterUrl: '',
-        },
-      ],
-      signatures: [],
+  const [form, setForm] = useState<CompanySettings>(emptyCompanySettings());
+
+  useEffect(() => {
+    if (company) {
+      const initialBrandList =
+        company.brandProfilesList && company.brandProfilesList.length > 0
+          ? company.brandProfilesList
+          : (company.brandProfilesV2 || []).map((b) => ({
+              id: b.id,
+              brandName: b.brandName,
+              isDefault: b.isDefault,
+              isActive: b.isActive,
+              brandThemeColor: b.themeColor,
+            }));
+
+      setForm({
+        ...emptyCompanySettings(),
+        ...company,
+        brandProfilesList: initialBrandList,
+        legalCompanyV2: company.legalCompanyV2 || emptyCompanySettings().legalCompanyV2,
+        brandProfilesV2: company.brandProfilesV2 || [],
+        emailRegistry: company.emailRegistry || [],
+        phoneRegistry: company.phoneRegistry || [],
+        websiteRegistry: company.websiteRegistry || [],
+        bankAccountsV2: company.bankAccountsV2 || [],
+        logoLibrary: company.logoLibrary || [],
+        stampLibrary: company.stampLibrary || [],
+        signatoriesV2: company.signatoriesV2 || [],
+      });
     }
-  );
+  }, [company]);
 
-  if (company && form.id !== company.id) {
-    setForm(company);
-  }
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     setIsSaving(true);
     setStatusMsg('');
     try {
-      await updateCompany(form);
-      setStatusMsg('Company settings & Central Branding Assets saved successfully!');
+      const syncedBrandProfilesV2: BrandProfileV2[] = (form.brandProfilesList || []).map((b) => ({
+        id: b.id,
+        brandName: b.brandName,
+        shortName: b.brandName.substring(0, 8).toUpperCase(),
+        description: `Brand Profile for ${b.brandName}`,
+        themeColor: b.brandThemeColor || '#0284c7',
+        isActive: b.isActive !== false,
+        isDefault: !!b.isDefault,
+      }));
+
+      const payload: CompanySettings = {
+        ...form,
+        brandProfilesList: form.brandProfilesList || [],
+        brandProfilesV2: syncedBrandProfilesV2,
+      };
+
+      await updateCompany(payload);
+      setStatusMsg('Company Settings & Brand Architecture saved to Firestore!');
+      setTimeout(() => setStatusMsg(''), 4000);
     } catch {
-      setStatusMsg('Failed to save company settings.');
+      setStatusMsg('Failed to save Company Settings.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingLogo(true);
-    try {
-      const url = await uploadLogo(file);
-      setForm((prev) => ({ ...prev, logoUrl: url }));
-      setStatusMsg('Company Logo uploaded successfully to Firebase Storage (/company/logo/)!');
-    } catch {
-      setStatusMsg('Failed to upload logo.');
-    } finally {
-      setUploadingLogo(false);
-    }
-  };
-
-  const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingStamp(true);
-    try {
-      const url = await uploadStamp(file);
-      setForm((prev) => ({ ...prev, stampUrl: url }));
-      setStatusMsg('Official Stamp uploaded successfully to Firebase Storage (/company/stamp/)!');
-    } catch {
-      setStatusMsg('Failed to upload stamp.');
-    } finally {
-      setUploadingStamp(false);
-    }
-  };
-
-  const handleStampDelete = async () => {
-    try {
-      await deleteStamp();
-      setForm((prev) => ({ ...prev, stampUrl: '' }));
-      setStatusMsg('Official Stamp removed.');
-    } catch {
-      setStatusMsg('Failed to remove stamp.');
-    }
-  };
-
-  const handleLetterheadUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingLetterhead(true);
-    try {
-      const url = await uploadLetterhead(file);
-      setForm((prev) => ({
-        ...prev,
-        letterheadUrl: url,
-        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
-          p.isDefault ? { ...p, letterheadUrl: url } : p
-        ),
-      }));
-      setStatusMsg('Top Letterhead Image uploaded successfully to Firebase Storage (/company/letterhead/)!');
-    } catch {
-      setStatusMsg('Failed to upload letterhead.');
-    } finally {
-      setUploadingLetterhead(false);
-    }
-  };
-
-  const handleLetterheadDelete = async () => {
-    try {
-      await deleteLetterhead();
-      setForm((prev) => ({
-        ...prev,
-        letterheadUrl: '',
-        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
-          p.isDefault ? { ...p, letterheadUrl: '' } : p
-        ),
-      }));
-      setStatusMsg('Letterhead Image removed.');
-    } catch {
-      setStatusMsg('Failed to remove letterhead.');
-    }
-  };
-
-  const handleLetterFooterUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingFooter(true);
-    try {
-      const url = await uploadLetterFooter(file);
-      setForm((prev) => ({
-        ...prev,
-        letterFooterUrl: url,
-        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
-          p.isDefault ? { ...p, letterFooterUrl: url } : p
-        ),
-      }));
-      setStatusMsg('Bottom Letter Footer Image uploaded successfully to Firebase Storage (/company/letterfooter/)!');
-    } catch {
-      setStatusMsg('Failed to upload footer image.');
-    } finally {
-      setUploadingFooter(false);
-    }
-  };
-
-  const handleLetterFooterDelete = async () => {
-    try {
-      await deleteLetterFooter();
-      setForm((prev) => ({
-        ...prev,
-        letterFooterUrl: '',
-        brandingProfiles: (prev.brandingProfiles || []).map((p) =>
-          p.isDefault ? { ...p, letterFooterUrl: '' } : p
-        ),
-      }));
-      setStatusMsg('Letter Footer Image removed.');
-    } catch {
-      setStatusMsg('Failed to remove letter footer image.');
-    }
-  };
-
-  const addSignatureRow = () => {
-    const newSig: CompanySignature = {
-      id: `sig-${Date.now()}`,
-      name: '',
-      designation: '',
-      signatureUrl: '',
-      signatureType: 'Image',
-      isActive: true,
-    };
-    setForm((prev) => ({ ...prev, signatures: [...prev.signatures, newSig] }));
-  };
-
-  const handleSignatureUpload = async (sigId: string, file: File, name: string, designation: string) => {
-    setUploadingSigId(sigId);
-    try {
-      const sig = await uploadSignature(sigId, file, name, designation);
-      setForm((prev) => ({
-        ...prev,
-        signatures: prev.signatures.map((s) => (s.id === sigId ? sig : s)),
-      }));
-      setStatusMsg(`Signature image for ${name || 'signatory'} uploaded to Firebase Storage (/company/signatures/)!`);
-    } catch {
-      setStatusMsg('Failed to upload signature.');
-    } finally {
-      setUploadingSigId(null);
-    }
-  };
-
-  const handleSignatureDelete = async (sigId: string) => {
-    try {
-      await deleteSignature(sigId);
-      setForm((prev) => ({
-        ...prev,
-        signatures: prev.signatures.filter((s) => s.id !== sigId),
-      }));
-      setStatusMsg('Signature deleted.');
-    } catch {
-      setStatusMsg('Failed to delete signature.');
-    }
-  };
-
-  const updateSigField = (id: string, field: keyof CompanySignature, value: string | boolean | SignatureType) => {
-    setForm((prev) => ({
-      ...prev,
-      signatures: prev.signatures.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
-    }));
-  };
-
   if (isLoading) {
-    return <div className="p-8 text-center text-slate-500 font-medium text-xs">Loading Company Settings…</div>;
+    return <div className="p-8 text-center text-slate-400">Loading Enterprise Company Settings...</div>;
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 text-xs text-slate-700">
-      {statusMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-2">
-          <CheckCircle2 size={16} />
-          <span className="font-semibold">{statusMsg}</span>
-        </div>
-      )}
-
-      {/* Legal & Contact Info */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3 font-bold text-slate-900 text-sm">
-          <Building2 size={18} className="text-emerald-600" />
-          <span>Legal Entity & Contact Info</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">Company Legal Name *</label>
-            <input
-              type="text"
-              value={form.companyName}
-              onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Brand Name *</label>
-            <input
-              type="text"
-              value={form.brandName}
-              onChange={(e) => setForm({ ...form, brandName: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">GSTIN Number</label>
-            <input
-              type="text"
-              value={form.gstin}
-              onChange={(e) => setForm({ ...form, gstin: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">PAN Number</label>
-            <input
-              type="text"
-              value={form.pan}
-              onChange={(e) => setForm({ ...form, pan: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">CIN Number</label>
-            <input
-              type="text"
-              value={form.cin}
-              onChange={(e) => setForm({ ...form, cin: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">Official Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Phone Number</label>
-            <input
-              type="text"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Website URL</label>
-            <input
-              type="text"
-              value={form.website}
-              onChange={(e) => setForm({ ...form, website: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans text-slate-100">
+      {/* Top Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>
-          <label className="block font-semibold mb-1">Registered Address</label>
-          <textarea
-            rows={2}
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-          />
+          <div className="flex items-center gap-2">
+            <Building2 className="w-6 h-6 text-sky-400" />
+            <h1 className="text-xl font-bold tracking-tight text-white">Company Settings V2</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800 text-[11px] font-mono font-bold">
+              Single Source of Truth
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Manage Legal Entity, Brands, Emails, Phones, Websites, Banks, Logos, Stamps & Signatories.
+          </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 pt-2">
-          <div>
-            <label className="block font-semibold mb-1">Registered State (for GST) *</label>
-            <input
-              type="text"
-              value={form.registeredState ?? 'Maharashtra'}
-              onChange={(e) => setForm({ ...form, registeredState: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              placeholder="e.g. Maharashtra"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Registered City</label>
-            <input
-              type="text"
-              value={form.registeredCity ?? 'Pune'}
-              onChange={(e) => setForm({ ...form, registeredCity: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              placeholder="e.g. Pune"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Postal Code</label>
-            <input
-              type="text"
-              value={form.postalCode ?? '411045'}
-              onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              placeholder="e.g. 411045"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Enterprise Numbering & Financial Rules (Single Source of Truth) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3 font-bold text-slate-900 text-sm">
-          <Building2 size={18} className="text-emerald-600" />
-          <span>Enterprise Numbering Rules & Tax Defaults</span>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">Invoice Prefix *</label>
-            <input
-              type="text"
-              value={form.invoicePrefix ?? 'HH'}
-              onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Credit Note Prefix *</label>
-            <input
-              type="text"
-              value={form.creditNotePrefix ?? 'HHCN'}
-              onChange={(e) => setForm({ ...form, creditNotePrefix: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Employee Prefix *</label>
-            <input
-              type="text"
-              value={form.employeeCodePrefix ?? 'HHEMP'}
-              onChange={(e) => setForm({ ...form, employeeCodePrefix: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Offer Letter Prefix *</label>
-            <input
-              type="text"
-              value={form.offerPrefix ?? 'HHOFF'}
-              onChange={(e) => setForm({ ...form, offerPrefix: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">Document Prefix</label>
-            <input
-              type="text"
-              value={form.documentPrefix ?? 'HHDOC'}
-              onChange={(e) => setForm({ ...form, documentPrefix: e.target.value })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Financial Year Start Month (1-12)</label>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={form.financialYearStartMonth ?? 4}
-              onChange={(e) => setForm({ ...form, financialYearStartMonth: parseInt(e.target.value, 10) || 4 })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Default GST Rate (%)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={form.defaultGstRate ?? 18}
-              onChange={(e) => setForm({ ...form, defaultGstRate: parseFloat(e.target.value) || 18 })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Default TDS Rate (%)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={form.defaultTdsRate ?? 2}
-              onChange={(e) => setForm({ ...form, defaultTdsRate: parseFloat(e.target.value) || 2 })}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Bank Account Details */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-          Bank Details (Invoices & Payroll)
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">Bank Name</label>
-            <input
-              type="text"
-              value={form.bankDetails.bankName}
-              onChange={(e) =>
-                setForm({ ...form, bankDetails: { ...form.bankDetails, bankName: e.target.value } })
-              }
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Account Number</label>
-            <input
-              type="text"
-              value={form.bankDetails.accountNumber}
-              onChange={(e) =>
-                setForm({ ...form, bankDetails: { ...form.bankDetails, accountNumber: e.target.value } })
-              }
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block font-semibold mb-1">IFSC Code</label>
-            <input
-              type="text"
-              value={form.bankDetails.ifscCode}
-              onChange={(e) =>
-                setForm({ ...form, bankDetails: { ...form.bankDetails, ifscCode: e.target.value } })
-              }
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold mb-1">Branch Name</label>
-            <input
-              type="text"
-              value={form.bankDetails.branchName}
-              onChange={(e) =>
-                setForm({ ...form, bankDetails: { ...form.bankDetails, branchName: e.target.value } })
-              }
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Global Company Brand Assets (Firebase Storage /company/) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div className="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400">
-            Company Global Brand Assets (Single Source of Truth)
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-mono text-[10px] font-bold">
-            Shared Across All HR & Document Engines
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
-          {/* Logo Upload Box */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between font-bold text-slate-900">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Company Logo (/company/logo/)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                {form.logoUrl ? (
-                  <img src={form.logoUrl} alt="Company Logo" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-semibold">No Logo</span>
-                )}
-              </div>
-
-              <div className="space-y-2 flex-1">
-                <label className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
-                  <Upload size={14} />
-                  {uploadingLogo ? 'Uploading to Storage…' : form.logoUrl ? 'Replace Logo' : 'Upload Logo'}
-                  <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLogoUpload} className="hidden" />
-                </label>
-                <div className="text-[11px] text-slate-500 font-mono truncate">
-                  {form.logoUrl ? form.logoUrl : 'No file uploaded'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Official Stamp Upload Box */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between font-bold text-slate-900">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Official Company Stamp (/company/stamp/)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                {form.stampUrl ? (
-                  <img src={form.stampUrl} alt="Official Stamp" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-semibold">No Stamp</span>
-                )}
-              </div>
-
-              <div className="space-y-2 flex-1">
-                <div className="flex gap-2">
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
-                    <Upload size={14} />
-                    {uploadingStamp ? 'Uploading…' : form.stampUrl ? 'Replace' : 'Upload Stamp'}
-                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
-                  </label>
-                  {form.stampUrl && (
-                    <button
-                      type="button"
-                      onClick={handleStampDelete}
-                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-xl transition"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">
-                  {form.stampUrl ? form.stampUrl : 'No stamp file uploaded'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Letterhead Top Image Box */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between font-bold text-slate-900">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Letterhead (Top Image) (/company/letterhead/)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                {form.letterheadUrl ? (
-                  <img src={form.letterheadUrl} alt="Letterhead Top" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-semibold">No Top Letterhead</span>
-                )}
-              </div>
-
-              <div className="space-y-2 flex-1">
-                <div className="flex gap-2">
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
-                    <Upload size={14} />
-                    {uploadingLetterhead ? 'Uploading…' : form.letterheadUrl ? 'Replace' : 'Upload Top Image'}
-                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLetterheadUpload} className="hidden" />
-                  </label>
-                  {form.letterheadUrl && (
-                    <button
-                      type="button"
-                      onClick={handleLetterheadDelete}
-                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-xl transition"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">
-                  {form.letterheadUrl ? form.letterheadUrl : 'No letterhead image uploaded'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Letter Footer Bottom Image Box */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between font-bold text-slate-900">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon size={16} className="text-emerald-600" /> Letter Footer (Bottom Image) (/company/letterfooter/)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">PNG, JPG, JPEG</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                {form.letterFooterUrl ? (
-                  <img src={form.letterFooterUrl} alt="Letter Footer Bottom" className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-semibold">No Footer Image</span>
-                )}
-              </div>
-
-              <div className="space-y-2 flex-1">
-                <div className="flex gap-2">
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer shadow-xs transition">
-                    <Upload size={14} />
-                    {uploadingFooter ? 'Uploading…' : form.letterFooterUrl ? 'Replace' : 'Upload Footer Image'}
-                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleLetterFooterUpload} className="hidden" />
-                  </label>
-                  {form.letterFooterUrl && (
-                    <button
-                      type="button"
-                      onClick={handleLetterFooterDelete}
-                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-xl transition"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">
-                  {form.letterFooterUrl ? form.letterFooterUrl : 'No footer image uploaded'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Authorized Signatures */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-              <FileSignature size={18} className="text-emerald-600" />
-              <span>Authorized Signatures Registry (Firebase Storage /company/signatures/)</span>
-            </div>
-            <p className="text-slate-500 text-[11px]">
-              Document templates select a Signatory ID. Support for Image, Digital Certificate, Aadhaar eSign & DSC Token.
-            </p>
-          </div>
+        {isSuperAdmin ? (
           <button
-            type="button"
-            onClick={addSignatureRow}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 transition-all disabled:opacity-50"
           >
-            <Plus size={14} /> Add Signatory
+            <Save className="w-4 h-4" />
+            {isSaving ? 'Saving to Firestore...' : 'Save Settings'}
           </button>
-        </div>
-
-        <div className="space-y-4 pt-1">
-          {form.signatures.length === 0 ? (
-            <div className="p-6 text-center text-slate-400 font-medium bg-slate-50 rounded-xl border border-slate-200">
-              No signatures added yet. Click Add Signatory to create one.
-            </div>
-          ) : (
-            form.signatures.map((sig, idx) => (
-              <div key={sig.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <div className="grid grid-cols-12 gap-3 items-center">
-                  <span className="col-span-1 font-bold text-slate-400 text-center">#{idx + 1}</span>
-
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Signatory Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Rahul Sharma"
-                      value={sig.name}
-                      onChange={(e) => updateSigField(sig.id, 'name', e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900"
-                    />
-                  </div>
-
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Designation</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Managing Director / Founder"
-                      value={sig.designation}
-                      onChange={(e) => updateSigField(sig.id, 'designation', e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-900"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Signature Type</label>
-                    <select
-                      value={sig.signatureType || 'Image'}
-                      onChange={(e) => updateSigField(sig.id, 'signatureType', e.target.value as SignatureType)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 text-[11px]"
-                    >
-                      <option value="Image">Image</option>
-                      <option value="Digital Certificate">Digital Certificate</option>
-                      <option value="Aadhaar eSign">Aadhaar eSign</option>
-                      <option value="DSC Token">DSC Token</option>
-                    </select>
-                  </div>
-
-                  {/* Signature Image Preview & Upload */}
-                  <div className="col-span-2 flex items-center gap-2">
-                    <div className="w-14 h-9 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center overflow-hidden shrink-0">
-                      {sig.signatureUrl ? (
-                        <img src={sig.signatureUrl} alt={sig.name} className="max-h-full max-w-full object-contain" />
-                      ) : (
-                        <span className="text-[8px] text-slate-400">No Image</span>
-                      )}
-                    </div>
-
-                    <label className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl cursor-pointer transition text-[10px]">
-                      <Upload size={11} />
-                      {uploadingSigId === sig.id ? '…' : sig.signatureUrl ? 'Replace' : 'Upload'}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleSignatureUpload(sig.id, file, sig.name, sig.designation);
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="col-span-1 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSignatureDelete(sig.id)}
-                      className="text-slate-400 hover:text-rose-600 transition p-1"
-                      title="Delete Signature"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Live Branding Preview Section (Requirement 5) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-            <Eye size={18} className="text-emerald-600" />
-            <span>Live Company Branding Preview (Stationery Preview)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowLivePreview(!showLivePreview)}
-            className="text-xs text-emerald-700 font-bold hover:underline"
-          >
-            {showLivePreview ? 'Collapse Preview' : 'Show Live Preview'}
-          </button>
-        </div>
-
-        {showLivePreview && (
-          <div className="p-6 bg-slate-100 rounded-2xl flex justify-center">
-            <div className="bg-white text-slate-900 w-full max-w-xl min-h-[350px] p-6 shadow-md border border-slate-300 rounded-xl flex flex-col justify-between space-y-4 text-[11px]">
-              {/* Top Letterhead Image */}
-              <div className="border-b pb-2">
-                {form.letterheadUrl ? (
-                  <img src={form.letterheadUrl} alt="Top Letterhead Preview" className="max-h-20 w-full object-contain" />
-                ) : (
-                  <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 font-mono text-[10px]">
-                    Top Letterhead Image Preview (/company/letterhead/top_letterhead.png)
-                  </div>
-                )}
-              </div>
-
-              {/* Sample Content */}
-              <div className="space-y-2 py-2 text-slate-700 leading-relaxed">
-                <div className="font-bold text-slate-900 text-xs">OFFER OF EMPLOYMENT — SAMPLE PREVIEW</div>
-                <p>Dear Candidate Name,</p>
-                <p>
-                  We are pleased to offer you the position at <strong>{form.brandName || form.companyName}</strong>. This document uses central company stationery, logo, stamp, and authorized signature.
-                </p>
-              </div>
-
-              {/* Stamp & Signature Section */}
-              <div className="flex items-end justify-between border-t border-slate-100 pt-3">
-                <div>
-                  {form.stampUrl ? (
-                    <img src={form.stampUrl} alt="Official Stamp" className="h-14 object-contain" />
-                  ) : (
-                    <div className="text-[10px] text-slate-400 italic">No stamp uploaded</div>
-                  )}
-                </div>
-
-                <div className="text-right space-y-1">
-                  {form.signatures[0]?.signatureUrl ? (
-                    <img src={form.signatures[0].signatureUrl} alt="Signature" className="h-10 object-contain ml-auto" />
-                  ) : (
-                    <div className="h-8 border-b border-slate-300 w-32 ml-auto"></div>
-                  )}
-                  <div className="font-bold text-slate-900 text-[10px]">
-                    {form.signatures[0]?.name || 'Authorized Signatory'}
-                  </div>
-                  <div className="text-[9px] text-slate-500">
-                    {form.signatures[0]?.designation || 'Signatory Designation'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Footer Image */}
-              <div className="border-t pt-2">
-                {form.letterFooterUrl ? (
-                  <img src={form.letterFooterUrl} alt="Bottom Footer Preview" className="max-h-16 w-full object-contain" />
-                ) : (
-                  <div className="p-2 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 font-mono text-[9px]">
-                    Bottom Footer Image Preview (/company/letterfooter/bottom_footer.png)
-                  </div>
-                )}
-              </div>
-            </div>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-xs font-semibold">
+            <Lock className="w-4 h-4 text-amber-400" /> Read-Only Access
           </div>
         )}
       </div>
 
-      <div className="flex justify-end pt-2">
+      {statusMsg && (
+        <div className="p-3 bg-sky-950/80 border border-sky-800 rounded-xl text-sky-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" /> {statusMsg}
+        </div>
+      )}
+
+      {/* Sub-Tab Bar */}
+      <div className="flex flex-wrap gap-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs font-semibold">
         <button
-          type="submit"
-          disabled={isSaving}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-sm transition"
+          type="button"
+          onClick={() => setActiveSubTab('legal')}
+          className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all ${
+            activeSubTab === 'legal' ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'
+          }`}
         >
-          <Save size={16} />
-          {isSaving ? 'Saving Settings…' : 'Save Company Settings'}
+          <Building2 className="w-3.5 h-3.5" /> 1. Legal Company
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('brands')}
+          className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all ${
+            activeSubTab === 'brands' ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" /> 2. Brands ({(form.brandProfilesList || []).length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('banks')}
+          className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all ${
+            activeSubTab === 'banks' ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          <Landmark className="w-3.5 h-3.5" /> 3. Banks ({form.bankAccountsV2?.length || 0})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('signatories')}
+          className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all ${
+            activeSubTab === 'signatories' ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5" /> 4. Signatories ({form.signatoriesV2?.length || 0})
         </button>
       </div>
-    </form>
+
+      {/* PANELS */}
+
+      {/* 1. LEGAL COMPANY */}
+      {activeSubTab === 'legal' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div className="border-b border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-slate-100">Registered Legal Company Entity</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Immutable corporate details shared across all brand profiles.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">Legal Company Name *</label>
+              <input
+                type="text"
+                placeholder="e.g. Hire Huub Private Limited"
+                value={form.legalCompanyV2?.legalCompanyName || ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    companyName: e.target.value,
+                    legalCompanyV2: { ...form.legalCompanyV2!, legalCompanyName: e.target.value },
+                  })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none focus:border-sky-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">Corporate Identification Number (CIN)</label>
+              <input
+                type="text"
+                placeholder="e.g. U74999MH2026PTC384920"
+                value={form.legalCompanyV2?.cin || ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    cin: e.target.value,
+                    legalCompanyV2: { ...form.legalCompanyV2!, cin: e.target.value },
+                  })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-mono font-bold focus:outline-none focus:border-sky-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">GSTIN</label>
+              <input
+                type="text"
+                placeholder="e.g. 27AAACH9042K1Z5"
+                value={form.legalCompanyV2?.gstin || ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    gstin: e.target.value,
+                    legalCompanyV2: { ...form.legalCompanyV2!, gstin: e.target.value },
+                  })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-mono font-bold focus:outline-none focus:border-sky-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">PAN</label>
+              <input
+                type="text"
+                placeholder="e.g. AAACH9042K"
+                value={form.legalCompanyV2?.pan || ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    pan: e.target.value,
+                    legalCompanyV2: { ...form.legalCompanyV2!, pan: e.target.value },
+                  })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-mono font-bold focus:outline-none focus:border-sky-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-slate-400 mb-1 font-semibold">Registered Office Address</label>
+              <textarea
+                rows={2}
+                placeholder="Enter complete registered office address"
+                value={form.legalCompanyV2?.registeredOfficeAddress || ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    address: e.target.value,
+                    legalCompanyV2: { ...form.legalCompanyV2!, registeredOfficeAddress: e.target.value },
+                  })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:outline-none focus:border-sky-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. BRAND PROFILES */}
+      {activeSubTab === 'brands' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 gap-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-sky-400" /> Brand Architecture & Profile Library
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Legal Company → Brands hierarchy. Create and maintain brand identities linked to Document Designer & ERP modules.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Preset Initializer Quick Actions */}
+              <button
+                type="button"
+                onClick={() => {
+                  const presets: Array<{ name: string; email: string; web: string; color: string }> = [
+                    { name: 'Hire Huub', email: 'careers@hirehuub.com', web: 'https://hirehuub.com', color: '#0284c7' },
+                    { name: 'Work Huub', email: 'workforce@workhuub.com', web: 'https://workhuub.com', color: '#059669' },
+                    { name: 'Compliance Huub', email: 'compliance@compliancehuub.com', web: 'https://compliancehuub.com', color: '#4f46e5' },
+                  ];
+                  const newBrands = presets.map((p) => ({
+                    id: `brand-${p.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+                    brandName: p.name,
+                    email: p.email,
+                    phone: form.phone || '+91 9876543210',
+                    website: p.web,
+                    address: form.address || '',
+                    logoUrl: form.logoUrl || '',
+                    stampUrl: form.stampUrl || '',
+                    brandThemeColor: p.color,
+                    isActive: true,
+                    isDefault: p.name === 'Hire Huub',
+                  }));
+                  setForm({ ...form, brandProfilesList: newBrands });
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-semibold border border-slate-700 transition"
+              >
+                + Quick Presets (Hire/Work/Compliance)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newBrand = {
+                    id: `brand-${Date.now()}`,
+                    brandName: 'New Brand Identity',
+                    email: form.email || '',
+                    phone: form.phone || '',
+                    website: form.website || '',
+                    address: form.address || '',
+                    logoUrl: form.logoUrl || '',
+                    stampUrl: form.stampUrl || '',
+                    brandThemeColor: '#0284c7',
+                    isActive: true,
+                    isDefault: (form.brandProfilesList || []).length === 0,
+                  };
+                  setForm({ ...form, brandProfilesList: [...(form.brandProfilesList || []), newBrand] });
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-sky-600/20 transition"
+              >
+                <Plus className="w-4 h-4" /> Add Custom Brand
+              </button>
+            </div>
+          </div>
+
+          {(form.brandProfilesList || []).length === 0 ? (
+            <div className="p-10 border border-dashed border-slate-800 rounded-2xl text-center space-y-3">
+              <Layers className="w-10 h-10 text-slate-600 mx-auto" />
+              <p className="font-bold text-slate-300 text-sm">No Brand Profiles Configured</p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Create brand profiles under your Legal Company. Each brand maintains its dedicated Logo, Email, Phone, Website, Address, and Brand Stamp.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {(form.brandProfilesList || []).map((brand, bIdx) => (
+                <div key={brand.id} className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4 text-xs shadow-lg">
+                  {/* Brand Header */}
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={brand.brandThemeColor || '#0284c7'}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].brandThemeColor = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                        title="Brand Accent Color"
+                      />
+                      <input
+                        type="text"
+                        value={brand.brandName}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].brandName = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        placeholder="Brand Name (e.g. Hire Huub)"
+                        className="bg-transparent font-bold text-slate-100 text-base focus:outline-none focus:border-b focus:border-sky-500"
+                      />
+                      {brand.isDefault && (
+                        <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 text-[10px] font-bold">
+                          Default Primary Brand
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = (form.brandProfilesList || []).map((b, idx) => ({
+                            ...b,
+                            isDefault: idx === bIdx,
+                          }));
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        className={`px-2 py-1 rounded-lg border text-[11px] font-semibold transition ${
+                          brand.isDefault
+                            ? 'bg-amber-950 border-amber-800 text-amber-300'
+                            : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Star className="w-3.5 h-3.5 inline mr-1" />
+                        {brand.isDefault ? 'Primary' : 'Make Primary'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated.splice(bIdx, 1);
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 transition"
+                        title="Delete Brand"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Brand Information Form Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-semibold">Brand Email *</label>
+                      <input
+                        type="email"
+                        value={brand.email || ''}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].email = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        placeholder="careers@brand.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-semibold">Brand Phone *</label>
+                      <input
+                        type="text"
+                        value={brand.phone || ''}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].phone = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        placeholder="+91 9876543210"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-semibold">Brand Website *</label>
+                      <input
+                        type="text"
+                        value={brand.website || ''}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].website = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        placeholder="https://brand.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Brand Address */}
+                  <div className="pt-2">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-semibold">Brand Address (Optional)</label>
+                      <textarea
+                        rows={2}
+                        value={brand.address || ''}
+                        onChange={(e) => {
+                          const updated = [...(form.brandProfilesList || [])];
+                          updated[bIdx].address = e.target.value;
+                          setForm({ ...form, brandProfilesList: updated });
+                        }}
+                        placeholder="Brand specific office address..."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:border-sky-500 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Brand Media Assets: Logo & Stamp File Uploads */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-800/80">
+                    {/* Brand Logo Upload */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-300 font-bold text-xs">Brand Logo (PNG, JPG, SVG)</label>
+                        <span className="text-[10px] text-sky-400 font-mono">Firebase Storage</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {brand.logoUrl ? (
+                          <div className="relative group">
+                            <img src={brand.logoUrl} alt="Brand Logo" className="h-12 w-24 object-contain bg-slate-950 p-1.5 rounded-lg border border-slate-800" />
+                          </div>
+                        ) : (
+                          <div className="h-12 w-24 rounded-lg border-2 border-dashed border-slate-800 bg-slate-950 flex items-center justify-center text-[10px] text-slate-500 font-semibold">
+                            No Logo
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[11px] font-bold cursor-pointer inline-flex items-center gap-1 shadow-xs transition">
+                            <Upload className="w-3 h-3" />
+                            <span>{brand.logoUrl ? 'Replace Logo' : 'Upload Logo'}</span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                              className="hidden"
+                              disabled={isUploading}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setIsUploading(true);
+                                try {
+                                  const res = await adminStorageService.uploadCompanyLogo(file);
+                                  const updated = [...(form.brandProfilesList || [])];
+                                  updated[bIdx].logoUrl = res.url;
+                                  updated[bIdx].logoStoragePath = res.path;
+                                  setForm({ ...form, brandProfilesList: updated });
+                                  setStatusMsg(`Brand logo uploaded successfully to Firebase Storage!`);
+                                  setTimeout(() => setStatusMsg(''), 4000);
+                                } catch {
+                                  setStatusMsg('Failed to upload logo.');
+                                } finally {
+                                  setIsUploading(false);
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {brand.logoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...(form.brandProfilesList || [])];
+                                updated[bIdx].logoUrl = '';
+                                updated[bIdx].logoStoragePath = '';
+                                setForm({ ...form, brandProfilesList: updated });
+                              }}
+                              className="text-left text-[10px] text-rose-400 hover:underline font-semibold"
+                            >
+                              Remove Logo
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Brand Stamp Upload */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-300 font-bold text-xs">Brand Stamp (PNG Preferred)</label>
+                        <span className="text-[10px] text-sky-400 font-mono">Firebase Storage</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {brand.stampUrl ? (
+                          <div className="relative group">
+                            <img src={brand.stampUrl} alt="Brand Stamp" className="h-12 w-12 object-contain bg-slate-950 p-1.5 rounded-lg border border-slate-800" />
+                          </div>
+                        ) : (
+                          <div className="h-12 w-12 rounded-lg border-2 border-dashed border-slate-800 bg-slate-950 flex items-center justify-center text-[10px] text-slate-500 font-semibold">
+                            No Stamp
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[11px] font-bold cursor-pointer inline-flex items-center gap-1 shadow-xs transition">
+                            <Upload className="w-3 h-3" />
+                            <span>{brand.stampUrl ? 'Replace Stamp' : 'Upload Stamp'}</span>
+                            <input
+                              type="file"
+                              accept="image/png"
+                              className="hidden"
+                              disabled={isUploading}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setIsUploading(true);
+                                try {
+                                  const res = await adminStorageService.uploadOfficialStamp(file);
+                                  const updated = [...(form.brandProfilesList || [])];
+                                  updated[bIdx].stampUrl = res.url;
+                                  updated[bIdx].stampStoragePath = res.path;
+                                  setForm({ ...form, brandProfilesList: updated });
+                                  setStatusMsg(`Brand stamp uploaded successfully to Firebase Storage!`);
+                                  setTimeout(() => setStatusMsg(''), 4000);
+                                } catch {
+                                  setStatusMsg('Failed to upload stamp.');
+                                } finally {
+                                  setIsUploading(false);
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {brand.stampUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...(form.brandProfilesList || [])];
+                                updated[bIdx].stampUrl = '';
+                                updated[bIdx].stampStoragePath = '';
+                                setForm({ ...form, brandProfilesList: updated });
+                              }}
+                              className="text-left text-[10px] text-rose-400 hover:underline font-semibold"
+                            >
+                              Remove Stamp
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. BANK ACCOUNTS */}
+      {activeSubTab === 'banks' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-100">Bank Account Library</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Manage bank accounts for GST collection, Payroll, and Invoices with full CRUD.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const newBank: CompanyBankAccountV2 = {
+                  id: `bank-${Date.now()}`,
+                  accountName: '',
+                  bankName: '',
+                  branch: '',
+                  accountNumber: '',
+                  ifsc: '',
+                  isGstCollection: true,
+                  isPayroll: false,
+                  isInvoice: true,
+                  isPrimary: form.bankAccountsV2?.length === 0,
+                  isActive: true,
+                };
+                setForm({ ...form, bankAccountsV2: [...(form.bankAccountsV2 || []), newBank] });
+              }}
+              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Bank Account
+            </button>
+          </div>
+
+          {form.bankAccountsV2?.length === 0 ? (
+            <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+              <Landmark className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="font-bold text-slate-300 text-sm">No Bank Accounts Added Yet</p>
+              <p className="text-xs text-slate-500">Click "Add Bank Account" to configure bank details for documents.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {form.bankAccountsV2?.map((bank) => (
+                <div key={bank.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <input
+                      type="text"
+                      placeholder="Account Nickname"
+                      value={bank.accountName}
+                      onChange={(e) => {
+                        const updated = form.bankAccountsV2?.map((b) =>
+                          b.id === bank.id ? { ...b, accountName: e.target.value } : b
+                        );
+                        setForm({ ...form, bankAccountsV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-sky-400 font-bold"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = form.bankAccountsV2?.map((b) => ({
+                            ...b,
+                            isPrimary: b.id === bank.id,
+                          }));
+                          setForm({ ...form, bankAccountsV2: updated });
+                        }}
+                        className={`p-1 rounded ${bank.isPrimary ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
+                      >
+                        <Star className="w-4 h-4 fill-current" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, bankAccountsV2: form.bankAccountsV2?.filter((b) => b.id !== bank.id) })}
+                        className="text-slate-500 hover:text-rose-400 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Bank Name"
+                      value={bank.bankName}
+                      onChange={(e) => {
+                        const updated = form.bankAccountsV2?.map((b) =>
+                          b.id === bank.id ? { ...b, bankName: e.target.value } : b
+                        );
+                        setForm({ ...form, bankAccountsV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Account Number"
+                      value={bank.accountNumber}
+                      onChange={(e) => {
+                        const updated = form.bankAccountsV2?.map((b) =>
+                          b.id === bank.id ? { ...b, accountNumber: e.target.value } : b
+                        );
+                        setForm({ ...form, bankAccountsV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-100 font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="IFSC Code"
+                      value={bank.ifsc}
+                      onChange={(e) => {
+                        const updated = form.bankAccountsV2?.map((b) =>
+                          b.id === bank.id ? { ...b, ifsc: e.target.value } : b
+                        );
+                        setForm({ ...form, bankAccountsV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-100 font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Branch Name"
+                      value={bank.branch}
+                      onChange={(e) => {
+                        const updated = form.bankAccountsV2?.map((b) =>
+                          b.id === bank.id ? { ...b, branch: e.target.value } : b
+                        );
+                        setForm({ ...form, bankAccountsV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-100"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. AUTHORIZED SIGNATORIES */}
+      {activeSubTab === 'signatories' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-100">Authorized Signatory Library</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Manage signers, designations, and digital signature uploads with full CRUD.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const newSig: CompanySignatoryV2 = {
+                  id: `sig-${Date.now()}`,
+                  fullName: '',
+                  designation: '',
+                  department: 'Management',
+                  signatureUrl: '',
+                  isDefault: form.signatoriesV2?.length === 0,
+                  isActive: true,
+                };
+                setForm({ ...form, signatoriesV2: [...(form.signatoriesV2 || []), newSig] });
+              }}
+              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Signatory
+            </button>
+          </div>
+
+          {form.signatoriesV2?.length === 0 ? (
+            <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+              <ShieldCheck className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="font-bold text-slate-300 text-sm">No Authorized Signatories Added Yet</p>
+              <p className="text-xs text-slate-500">Click "Add Signatory" to configure signers for document templates.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {form.signatoriesV2?.map((sig) => (
+                <div key={sig.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      value={sig.fullName}
+                      onChange={(e) => {
+                        const updated = form.signatoriesV2?.map((s) =>
+                          s.id === sig.id ? { ...s, fullName: e.target.value } : s
+                        );
+                        setForm({ ...form, signatoriesV2: updated });
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 font-bold text-slate-100 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, signatoriesV2: form.signatoriesV2?.filter((s) => s.id !== sig.id) })}
+                      className="text-slate-500 hover:text-rose-400 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Designation (e.g. Managing Director)"
+                    value={sig.designation}
+                    onChange={(e) => {
+                      const updated = form.signatoriesV2?.map((s) =>
+                        s.id === sig.id ? { ...s, designation: e.target.value } : s
+                      );
+                      setForm({ ...form, signatoriesV2: updated });
+                    }}
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-300"
+                  />
+
+                  {sig.signatureUrl ? (
+                    <div className="bg-slate-900 p-2 rounded flex items-center justify-between">
+                      <img src={sig.signatureUrl} alt="Signature" className="h-8 object-contain" />
+                      <label className="text-[10px] text-sky-400 hover:underline cursor-pointer">
+                        Replace Signature
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const res = await adminStorageService.uploadSignature(sig.id, file);
+                              const updated = form.signatoriesV2?.map((s) =>
+                                s.id === sig.id ? { ...s, signatureUrl: res.url } : s
+                              );
+                              setForm({ ...form, signatoriesV2: updated });
+                            } catch {
+                              setStatusMsg('Failed to upload signature.');
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="block p-2 bg-slate-900 border border-dashed border-slate-800 rounded text-center text-[11px] text-slate-400 hover:text-white cursor-pointer">
+                      + Upload Signature Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const res = await adminStorageService.uploadSignature(sig.id, file);
+                            const updated = form.signatoriesV2?.map((s) =>
+                              s.id === sig.id ? { ...s, signatureUrl: res.url } : s
+                            );
+                            setForm({ ...form, signatoriesV2: updated });
+                          } catch {
+                            setStatusMsg('Failed to upload signature.');
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

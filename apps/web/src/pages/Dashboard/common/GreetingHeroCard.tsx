@@ -11,11 +11,13 @@ interface GreetingHeroCardProps {
 
 export default function GreetingHeroCard({
   serverTime,
-  employeeName = 'Somnath',
-  departmentName = 'Engineering & Talent Operations',
-  designation = 'Senior Talent Architect',
-  companyName = 'Hire Huub Pvt Ltd',
+  employeeName = '',
+  departmentName = '',
+  designation = '',
+  companyName = '',
 }: GreetingHeroCardProps) {
+  const displayName = employeeName || 'User';
+
   return (
     <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-slate-800 relative overflow-hidden">
       <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -28,18 +30,22 @@ export default function GreetingHeroCard({
           </div>
 
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            {serverTime.greeting}, {employeeName}
+            {serverTime.greeting}, {displayName}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-2 font-medium">
-            <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
-              <Building2 size={14} className="text-emerald-400" /> {companyName}
-            </span>
-            <span className="text-slate-600">•</span>
-            <span>{departmentName}</span>
-            <span className="text-slate-600">•</span>
-            <span className="text-emerald-300 font-mono">{designation}</span>
-          </div>
+          {(companyName || departmentName || designation) && (
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-2 font-medium">
+              {companyName && (
+                <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
+                  <Building2 size={14} className="text-emerald-400" /> {companyName}
+                </span>
+              )}
+              {companyName && departmentName && <span className="text-slate-600">•</span>}
+              {departmentName && <span>{departmentName}</span>}
+              {(companyName || departmentName) && designation && <span className="text-slate-600">•</span>}
+              {designation && <span className="text-emerald-300 font-mono">{designation}</span>}
+            </div>
+          )}
         </div>
 
         {/* Server Time & Date Badge */}

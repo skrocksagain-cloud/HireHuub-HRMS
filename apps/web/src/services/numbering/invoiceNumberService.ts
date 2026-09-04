@@ -5,12 +5,15 @@ import type { InvoiceNumber } from '../../types/BillingCompany';
 export class InvoiceNumberService {
   private async getPrefixes() {
     const company = await adminService.getCompanySettings();
-    const required = ['invoicePrefix', 'creditNotePrefix', 'expensePrefix'] as const;
+    if (!company) {
+      throw new Error('Administration → Company Settings is missing. Please configure Company Settings before using numbering features.');
+    }
+    const required = ['invoicePrefix', 'creditNotePrefix'] as const;
     const missing = required.filter((key) => !company[key]?.trim());
     if (missing.length) {
       throw new Error(`Administration → Company Settings is missing numbering configuration: ${missing.join(', ')}.`);
     }
-    return { invoicePrefix: company.invoicePrefix!, creditNotePrefix: company.creditNotePrefix!, expensePrefix: company.expensePrefix!, padding: 4 };
+    return { invoicePrefix: company.invoicePrefix!, creditNotePrefix: company.creditNotePrefix!, padding: 4 };
   }
 
   /**
@@ -21,9 +24,8 @@ export class InvoiceNumberService {
     const year = invoiceDate.getFullYear();
     const financialYear = String(year);
     const sequence = await billingRepository.nextInvoiceSequence(billingCompanyId, financialYear);
-    const { invoicePrefix, padding } = await this.getPrefixes();
 
-    const value = `${invoicePrefix}${year}-${String(sequence).padStart(padding, '0')}`;
+    const value = `${year}/${String(sequence).padStart(5, '0')}`;
 
     return {
       value,
@@ -33,20 +35,19 @@ export class InvoiceNumberService {
   }
 
   /**
-   * Previews next Invoice Number for read-only UI display using Administration prefix.
+   * Previews next Invoice Number for read-only UI display using approved YYYY/SEQUENCE format.
    */
   async previewNextInvoiceNumber(billingCompanyId: string, invoiceDate: Date = new Date(), knownCount = 0): Promise<string> {
     const year = invoiceDate.getFullYear();
     const financialYear = String(year);
-    const { invoicePrefix, padding } = await this.getPrefixes();
 
     try {
       const currentSeq = await billingRepository.getCurrentInvoiceSequence(billingCompanyId, financialYear);
       const nextSeq = Math.max(currentSeq + 1, knownCount + 1);
-      return `${invoicePrefix}${year}-${String(nextSeq).padStart(padding, '0')}`;
+      return `${year}/${String(nextSeq).padStart(5, '0')}`;
     } catch {
       const nextSeq = knownCount + 1;
-      return `${invoicePrefix}${year}-${String(nextSeq).padStart(padding, '0')}`;
+      return `${year}/${String(nextSeq).padStart(5, '0')}`;
     }
   }
 
@@ -78,15 +79,6 @@ export class InvoiceNumberService {
     return `${creditNotePrefix}${year}-${String(nextSeq).padStart(padding, '0')}`;
   }
 
-  /**
-   * Previews / Generates next Expense Number using Administration prefix.
-   */
-  async previewNextExpenseNumber(knownCount = 0, date: Date = new Date()): Promise<string> {
-    const year = date.getFullYear();
-    const nextSeq = knownCount + 1;
-    const { expensePrefix, padding } = await this.getPrefixes();
-    return `${expensePrefix}${year}-${String(nextSeq).padStart(padding, '0')}`;
-  }
 }
 
 export const invoiceNumberService = new InvoiceNumberService();

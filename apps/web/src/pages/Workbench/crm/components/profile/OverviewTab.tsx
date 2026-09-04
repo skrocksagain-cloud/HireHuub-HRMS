@@ -62,7 +62,7 @@ export default function OverviewTab({ candidate, onQuickUpdate, onToggleBlacklis
 
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Current Status</span>
-          <span className="font-bold text-emerald-800 text-xs">{candidate.status}</span>
+          <span className="font-bold text-emerald-800 text-xs">{candidate.currentCrmStatus ?? 'Not Contacted'}</span>
         </div>
 
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
@@ -102,6 +102,26 @@ export default function OverviewTab({ candidate, onQuickUpdate, onToggleBlacklis
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Date of Birth</span>
             <span className="font-mono text-slate-800 text-xs">{candidate.dateOfBirth || '—'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Source, Issue, and Notes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Source</span>
+          <span className="font-bold text-slate-800 text-xs">
+            {candidate.source.category} {candidate.source.detailOption ? `- ${candidate.source.detailOption}` : ''}
+          </span>
+        </div>
+
+        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Issue (If applicable)</span>
+          <span className="text-slate-800 text-xs">{candidate.issueDescription || '—'}</span>
+        </div>
+
+        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Latest Feedback / Notes</span>
+          <span className="text-slate-800 text-xs italic">{candidate.interactionTimeline?.[0]?.notes || '—'}</span>
         </div>
       </div>
 

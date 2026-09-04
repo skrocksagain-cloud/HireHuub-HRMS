@@ -28,9 +28,12 @@ import StatusBadge from '../../../../../ui/StatusBadge';
 import KpiCard from '../../../../../ui/KpiCard';
 import Drawer from '../../../../../ui/Drawer';
 import { useClientProfile } from '../hooks/useClients';
+import { formatTenureCondition } from '../../../../../types/ClientCommercial';
 import { useAuth } from '../../../../../context/AuthContext';
-import type { UserRole } from '../../../../../types/Client';
 import type { StateGSTRecord } from '../../../../../types/ClientGST';
+import type { ClientSPOC, SpocRole, SpocScope } from '../../../../../types/ClientSPOC';
+import { permissionService } from '../../../../../core/permissions/permissionService';
+import { getIndianStates, getStateCode } from '../../../../../core/location/indiaLocationMaster';
 
 const PREDEFINED_HIGHLIGHTS: string[] = [
   'Weekly Payment',
@@ -57,7 +60,7 @@ export default function ClientProfilePage() {
   const { user } = useAuth();
 
   // Role derived from authentication context
-  const currentRole: UserRole = (user?.role as UserRole) || 'Super Admin';
+  const activeRole = permissionService.getEffectiveRole(user?.assignedRole || user?.role, user?.department);
   const [activeTab, setActiveTab] = useState<'overview' | 'highlights' | 'commercial' | 'spocs' | 'finance' | 'gst' | 'templates' | 'recruitment' | 'history'>('overview');
 
   // Edit State
@@ -79,7 +82,117 @@ export default function ClientProfilePage() {
   const [newStateStreet, setNewStateStreet] = useState('');
   const [newStateCity, setNewStateCity] = useState('');
   const [newStatePostal, setNewStatePostal] = useState('');
-  const [newStateTemplateRef, setNewStateTemplateRef] = useState('sheet-template-state-v1');
+
+  // SPOC Add/Edit Drawer State
+  const [showSpocDrawer, setShowSpocDrawer] = useState(false);
+  const [editingSpoc, setEditingSpoc] = useState<ClientSPOC | null>(null);
+  const [spocRole, setSpocRole] = useState<SpocRole>('HR');
+  const [spocName, setSpocName] = useState('');
+  const [spocDesignation, setSpocDesignation] = useState('');
+  const [spocEmail, setSpocEmail] = useState('');
+  const [spocPhone, setSpocPhone] = useState('');
+  const [spocScope, setSpocScope] = useState<SpocScope>('All India');
+  const [spocScopeDetail, setSpocScopeDetail] = useState('');
+  const [spocIsPrimary, setSpocIsPrimary] = useState(false);
+  const [spocNotes, setSpocNotes] = useState('');
+  const [spocFormError, setSpocFormError] = useState('');
+
+  const handleOpenAddSpoc = () => {
+    setEditingSpoc(null);
+    setSpocRole('HR');
+    setSpocName('');
+    setSpocDesignation('');
+    setSpocEmail('');
+    setSpocPhone('');
+    setSpocScope('All India');
+    setSpocScopeDetail('');
+    setSpocIsPrimary(false);
+    setSpocNotes('');
+    setSpocFormError('');
+    setShowSpocDrawer(true);
+  };
+
+  const handleOpenEditSpoc = (spoc: ClientSPOC) => {
+    setEditingSpoc(spoc);
+    setSpocRole(spoc.role);
+    setSpocName(spoc.name);
+    setSpocDesignation(spoc.designation || '');
+    setSpocEmail(spoc.email || '');
+    setSpocPhone(spoc.phone || '');
+    setSpocScope(spoc.scope || 'All India');
+    setSpocScopeDetail(spoc.scopeDetail || '');
+    setSpocIsPrimary(Boolean(spoc.isPrimary));
+    setSpocNotes(spoc.notes || '');
+    setSpocFormError('');
+    setShowSpocDrawer(true);
+  };
+
+  const handleSaveSpoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSpocFormError('');
+
+    if (!spocName.trim()) {
+      setSpocFormError('SPOC Contact Name is required.');
+      return;
+    }
+    if (!spocEmail.trim()) {
+      setSpocFormError('Email address is required.');
+      return;
+    }
+    if (!spocPhone.trim()) {
+      setSpocFormError('Phone number is required.');
+      return;
+    }
+
+    try {
+      let updatedSpocs: ClientSPOC[] = [];
+      const currentSpocs = client?.spocs || [];
+      if (editingSpoc) {
+        updatedSpocs = currentSpocs.map((s) =>
+          s.id === editingSpoc.id
+            ? {
+                ...s,
+                role: spocRole,
+                name: spocName.trim(),
+                designation: spocDesignation.trim(),
+                email: spocEmail.trim(),
+                phone: spocPhone.trim(),
+                scope: spocScope,
+                scopeDetail: spocScopeDetail.trim(),
+                isPrimary: spocIsPrimary,
+                notes: spocNotes.trim(),
+              }
+            : spocIsPrimary ? { ...s, isPrimary: false } : s
+        );
+      } else {
+        const newId = `spoc-${Math.random().toString(36).substring(2, 9)}`;
+        const newSpoc: ClientSPOC = {
+          id: newId,
+          role: spocRole,
+          name: spocName.trim(),
+          designation: spocDesignation.trim() || `${spocRole} Contact`,
+          email: spocEmail.trim(),
+          phone: spocPhone.trim(),
+          scope: spocScope,
+          scopeDetail: spocScopeDetail.trim(),
+          isPrimary: spocIsPrimary || currentSpocs.length === 0,
+          notes: spocNotes.trim(),
+        };
+
+        if (spocIsPrimary) {
+          updatedSpocs = currentSpocs.map((s) => ({ ...s, isPrimary: false })).concat(newSpoc);
+        } else {
+          updatedSpocs = [...currentSpocs, newSpoc];
+        }
+      }
+
+      await updateProfile({ spocs: updatedSpocs });
+      setShowSpocDrawer(false);
+      setActionSuccess(editingSpoc ? `Contact SPOC '${spocName}' updated successfully.` : `New Contact SPOC '${spocName}' added successfully.`);
+    } catch (err: unknown) {
+      setSpocFormError(err instanceof Error ? err.message : 'Failed to save SPOC contact.');
+    }
+  };
 
   if (loading) {
     return (
@@ -109,14 +222,15 @@ export default function ClientProfilePage() {
   }
 
   // Access Control Checks
-  const canEditShortName = currentRole === 'Super Admin' || currentRole === 'Marketing';
-  const canEditBilling = currentRole === 'Super Admin' || currentRole === 'Finance';
-  const canEditCommercial = currentRole === 'Super Admin' || currentRole === 'Finance';
-  const canAddState = (currentRole === 'Super Admin' || currentRole === 'Finance') && client.status === 'Active';
-  const canChangeStatus = currentRole === 'Super Admin';
+  const canEditClient = permissionService.canEdit(activeRole, 'Client');
+  const canEditShortName = canEditClient;
+  const canEditBilling = canEditClient;
+  const canEditCommercial = canEditClient;
+  const canAddState = canEditClient && client.status === 'Active';
+  const canChangeStatus = permissionService.isSuperAdmin(activeRole);
 
-  // Client Highlights Access Control: Marketing, Staffing, Super Admin can Edit; Finance is View Only
-  const canEditHighlights = currentRole === 'Super Admin' || currentRole === 'Marketing' || currentRole === 'Staffing';
+  // Client Highlights Access Control
+  const canEditHighlights = canEditClient;
 
   const handleToggleHighlight = async (highlightName: string) => {
     if (!canEditHighlights) return;
@@ -169,7 +283,7 @@ export default function ClientProfilePage() {
 
     const newRecord: StateGSTRecord = {
       id: `gst-rec-${Date.now()}`,
-      stateCode: newStateName === 'Karnataka' ? '29' : newStateName === 'Telangana' ? '36' : '19',
+      stateCode: getStateCode(newStateName),
       stateName: newStateName,
       gstin: newStateGstin,
       billingName: newStateBillingName || client.billingName,
@@ -180,8 +294,8 @@ export default function ClientProfilePage() {
         postalCode: newStatePostal,
         country: 'India',
       },
-      templateReference: newStateTemplateRef,
-      templateVersion: 1,
+      templateReference: client.invoiceConfig.templateReference,
+      templateVersion: client.invoiceConfig.templateVersion,
       isGstOptional: false,
       isPrimary: false,
       isActive: true,
@@ -281,6 +395,9 @@ export default function ClientProfilePage() {
                 )}
 
                 <StatusBadge status={client.status} />
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                  {client.clientId || client.id}
+                </span>
 
                 {canChangeStatus ? (
                   <button
@@ -667,7 +784,7 @@ export default function ClientProfilePage() {
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold rounded-full">
-                    <Lock size={12} /> View Only ({currentRole} Team)
+                    <Lock size={12} /> View Only ({activeRole.name} Team)
                   </span>
                 )}
               </div>
@@ -820,7 +937,7 @@ export default function ClientProfilePage() {
               <span className="text-slate-400 font-medium block">Tenure Condition</span>
               <span className="font-bold text-slate-800 text-sm">
                 {client.commercial.type === 'OTS' ? (
-                  <span className="text-amber-900">{client.commercial.tenureCondition || '90 Days'}</span>
+                  <span className="text-amber-900">{formatTenureCondition(client.commercial.tenureCondition)}</span>
                 ) : (
                   <span className="text-slate-400 font-normal">— (Payroll)</span>
                 )}
@@ -845,27 +962,60 @@ export default function ClientProfilePage() {
       {/* Tab 3: Contacts (SPOCs) */}
       {activeTab === 'spocs' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Users size={18} className="text-emerald-600" /> Key Contacts (HR, Operations, Accounts, Hiring Manager)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {client.spocs.map((spoc) => (
-              <div key={spoc.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                    Role: {spoc.role}
-                  </span>
-                  <span className="text-[10px] text-slate-400">Scope: {spoc.scope}</span>
-                </div>
-                <div className="font-bold text-slate-900 text-sm">{spoc.name}</div>
-                <div className="text-slate-500 font-medium">{spoc.designation}</div>
-                <div className="pt-2 border-t border-slate-200/60 text-slate-600 space-y-1">
-                  <div>Email: <span className="font-medium text-slate-800">{spoc.email}</span></div>
-                  <div>Phone: <span className="font-medium text-slate-800">{spoc.phone}</span></div>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Users size={18} className="text-emerald-600" /> Key Contacts (HR, Operations, Accounts, Hiring Manager)
+            </h3>
+            <button
+              type="button"
+              onClick={handleOpenAddSpoc}
+              className="inline-flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg shadow-xs transition"
+            >
+              <Plus size={14} /> + Add SPOC
+            </button>
           </div>
+
+          {(!client.spocs || client.spocs.length === 0) ? (
+            <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-slate-200/60">
+              No SPOC contact points recorded yet. Click "+ Add SPOC" to add key client contacts.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {client.spocs.map((spoc) => (
+                <div key={spoc.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Role: {spoc.role}
+                      </span>
+                      {spoc.isPrimary && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400">Scope: {spoc.scope}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditSpoc(spoc)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white text-slate-700 hover:text-emerald-600 hover:bg-emerald-50 border border-slate-200 text-[10px] font-semibold transition"
+                      >
+                        <Edit2 size={12} /> Edit
+                      </button>
+                    </div>
+                  </div>
+                  <div className="font-bold text-slate-900 text-sm">{spoc.name}</div>
+                  <div className="text-slate-500 font-medium">{spoc.designation}</div>
+                  <div className="pt-2 border-t border-slate-200/60 text-slate-600 space-y-1">
+                    <div>Email: <span className="font-medium text-slate-800">{spoc.email}</span></div>
+                    <div>Phone: <span className="font-medium text-slate-800">{spoc.phone}</span></div>
+                    {spoc.notes && <div className="text-[10px] text-slate-500 italic mt-1">{spoc.notes}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -954,10 +1104,10 @@ export default function ClientProfilePage() {
                         </span>
                       </div>
                     )}
-                    {rec.templateReference && (
+                    {client.invoiceConfig.templateReference && (
                       <div>
                         <span className="text-slate-400">Template Reference: </span>
-                        <span className="font-mono text-emerald-700 font-semibold">{rec.templateReference} (v{rec.templateVersion || 1})</span>
+                        <span className="font-mono text-emerald-700 font-semibold">{client.invoiceConfig.templateReference} (v{client.invoiceConfig.templateVersion || 1})</span>
                       </div>
                     )}
                   </div>
@@ -979,25 +1129,19 @@ export default function ClientProfilePage() {
       {activeTab === 'templates' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <FileSpreadsheet size={18} className="text-emerald-600" /> Invoice Configuration & Template References
+            <FileSpreadsheet size={18} className="text-emerald-600" /> Hire Huub Billing Configuration
           </h3>
-          <p className="text-xs text-slate-500">
-            Client Master stores only the assigned Template Reference. The actual document template definitions and Google Workspace integrations will be built under <strong className="text-slate-700">Administration → Document Templates</strong> in future sprints.
-          </p>
 
           <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-slate-400 font-semibold block">Primary Template Reference</span>
-                <span className="font-mono text-sm font-bold text-emerald-800">{client.invoiceConfig.templateReference}</span>
+                <span className="text-slate-400 font-semibold block">Assigned Hire Huub Invoice Template</span>
+                <span className="font-mono text-sm font-bold text-emerald-800">{client.invoiceConfig.templateReference || 'All'}</span>
               </div>
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl font-bold">
-                Version {client.invoiceConfig.templateVersion}
-              </span>
             </div>
             <div className="pt-3 border-t border-slate-200 text-slate-600 flex items-center gap-2">
               <ShieldCheck size={16} className="text-emerald-600" />
-              <span>Assigned template reference will be used dynamically during Finance invoice generation.</span>
+              <span>Client-level template assignment is automatically resolved during invoice creation.</span>
             </div>
           </div>
         </div>
@@ -1047,12 +1191,11 @@ export default function ClientProfilePage() {
               onChange={(e) => setNewStateName(e.target.value)}
               className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
             >
-              <option value="Karnataka">Karnataka (Code 29)</option>
-              <option value="Telangana">Telangana (Code 36)</option>
-              <option value="West Bengal">West Bengal (Code 19)</option>
-              <option value="Tamil Nadu">Tamil Nadu (Code 33)</option>
-              <option value="Gujarat">Gujarat (Code 24)</option>
-              <option value="Delhi">Delhi (Code 07)</option>
+              {getIndianStates().map((state) => (
+                <option key={state.stateName} value={state.stateName}>
+                  {state.stateName} (Code {state.stateCode})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -1114,17 +1257,6 @@ export default function ClientProfilePage() {
             </div>
           </div>
 
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">State Invoice Template Reference</label>
-            <input
-              type="text"
-              value={newStateTemplateRef}
-              onChange={(e) => setNewStateTemplateRef(e.target.value)}
-              placeholder="sheet-template-state-v1"
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
-              required
-            />
-          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button
@@ -1139,6 +1271,149 @@ export default function ClientProfilePage() {
               className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
             >
               Save New State GST Registration
+            </button>
+          </div>
+        </form>
+      </Drawer>
+
+      {/* SPOC Add/Edit Drawer */}
+      <Drawer
+        isOpen={showSpocDrawer}
+        onClose={() => setShowSpocDrawer(false)}
+        title={editingSpoc ? `Edit Contact SPOC: ${editingSpoc.name}` : 'Add New Contact SPOC'}
+      >
+        <form onSubmit={handleSaveSpoc} className="space-y-4 text-xs">
+          {spocFormError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl">
+              {spocFormError}
+            </div>
+          )}
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Role *</label>
+            <select
+              value={spocRole}
+              onChange={(e) => setSpocRole(e.target.value as SpocRole)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="HR">HR</option>
+              <option value="Operations">Operations</option>
+              <option value="Accounts">Accounts</option>
+              <option value="Hiring Manager">Hiring Manager</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Contact Name *</label>
+            <input
+              type="text"
+              value={spocName}
+              onChange={(e) => setSpocName(e.target.value)}
+              placeholder="e.g. Rajesh Kumar"
+              required
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Designation</label>
+            <input
+              type="text"
+              value={spocDesignation}
+              onChange={(e) => setSpocDesignation(e.target.value)}
+              placeholder="e.g. Talent Acquisition Lead"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Email Address *</label>
+              <input
+                type="email"
+                value={spocEmail}
+                onChange={(e) => setSpocEmail(e.target.value)}
+                placeholder="rajesh@client.com"
+                required
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Phone Number *</label>
+              <input
+                type="tel"
+                value={spocPhone}
+                onChange={(e) => setSpocPhone(e.target.value)}
+                placeholder="+91 9876543210"
+                required
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Coverage Scope</label>
+            <select
+              value={spocScope}
+              onChange={(e) => setSpocScope(e.target.value as SpocScope)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="All India">All India</option>
+              <option value="State">State</option>
+              <option value="Zone">Zone</option>
+              <option value="Department">Department</option>
+            </select>
+          </div>
+
+          {spocScope !== 'All India' && (
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Scope Details</label>
+              <input
+                type="text"
+                value={spocScopeDetail}
+                onChange={(e) => setSpocScopeDetail(e.target.value)}
+                placeholder="e.g. Karnataka State / North Zone / Engineering"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Notes / Remarks</label>
+            <textarea
+              value={spocNotes}
+              onChange={(e) => setSpocNotes(e.target.value)}
+              rows={2}
+              placeholder="e.g. Primary contact for escalations"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="pt-2">
+            <label className="flex items-center gap-2 cursor-pointer font-semibold text-xs text-slate-700">
+              <input
+                type="checkbox"
+                checked={spocIsPrimary}
+                onChange={(e) => setSpocIsPrimary(e.target.checked)}
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+              />
+              <span>Set as Primary Contact for this Client</span>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => setShowSpocDrawer(false)}
+              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+            >
+              {editingSpoc ? 'Update SPOC' : 'Save New SPOC'}
             </button>
           </div>
         </form>

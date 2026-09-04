@@ -28,7 +28,7 @@ export default function InvoiceProfilePage() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const currentRole = (user?.role as string) || 'Super Admin';
+  const actor = { role: user?.authorization?.role || user?.assignedRole, employeeId: user?.employeeId, departmentId: user?.departmentId };
 
   const {
     invoice,
@@ -43,7 +43,7 @@ export default function InvoiceProfilePage() {
     generatePDF,
     approveInvoice,
     recordPayment,
-  } = useInvoiceProfile(invoiceId, currentRole);
+  } = useInvoiceProfile(invoiceId, actor);
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showPaymentDrawer, setShowPaymentDrawer] = useState<boolean>(false);

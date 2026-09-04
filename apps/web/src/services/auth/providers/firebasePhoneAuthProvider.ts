@@ -10,6 +10,17 @@ declare global {
 }
 
 export class FirebasePhoneAuthProvider implements IOtpAuthProvider {
+  clearVerifier() {
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch {
+        // ignore errors during clear
+      }
+      window.recaptchaVerifier = undefined;
+    }
+  }
+
   async sendOtp(phoneNumber: string, recaptchaContainerId = 'recaptcha-container'): Promise<{ confirmationResult: ConfirmationResult }> {
     let formattedPhone = phoneNumber.trim();
     if (!formattedPhone.startsWith('+')) {
@@ -17,26 +28,43 @@ export class FirebasePhoneAuthProvider implements IOtpAuthProvider {
     }
 
     try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
-          size: 'invisible',
-          callback: () => {
-            // Recaptcha resolved
-          },
-        });
-      }
+      this.clearVerifier(); // Clean up any stale verifier from previous DOM/lifecycle
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+        size: 'invisible',
+        callback: () => {
+          // Recaptcha resolved
+        },
+      });
 
       const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
       return { confirmationResult };
     } catch (error) {
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch {
-          // ignore clear errors
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      this.clearVerifier();
+      throw error;
+    }
+  }
+
+  async linkPhoneOtp(phoneNumber: string, recaptchaContainerId = 'recaptcha-container'): Promise<{ confirmationResult: ConfirmationResult }> {
+    let formattedPhone = phoneNumber.trim();
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = `+91${formattedPhone.replace(/\D/g, '')}`;
+    }
+
+    try {
+      this.clearVerifier(); // Clean up any stale verifier from previous DOM/lifecycle
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+        size: 'invisible',
+        callback: () => {},
+      });
+
+      const { linkWithPhoneNumber } = await import('firebase/auth');
+      if (!auth.currentUser) throw new Error("Must be logged in to link phone number.");
+      const confirmationResult = await linkWithPhoneNumber(auth.currentUser, formattedPhone, window.recaptchaVerifier);
+      return { confirmationResult };
+    } catch (error) {
+      this.clearVerifier();
       throw error;
     }
   }

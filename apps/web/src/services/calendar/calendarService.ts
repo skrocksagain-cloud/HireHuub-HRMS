@@ -10,6 +10,7 @@ import type {
   HolidayItem,
 } from '../../types/Calendar';
 import type { HierarchyNode, RoleItem } from '../../types/Admin';
+import { resolveAudienceEmployeeIds } from '../audience/audienceService';
 
 export interface AvailabilityWarning {
   employeeId: string;
@@ -103,15 +104,26 @@ class CalendarService {
     }
 
     const now = new Date().toISOString();
+
+    // Dynamically resolve target audience employee IDs using shared audienceService
+    const targetInvitedEmployeeIds = await resolveAudienceEmployeeIds({
+      visibility: eventData.visibility,
+      departmentIds: eventData.departmentIds,
+      teamIds: eventData.teamIds,
+      selectedEmployeeIds: eventData.invitedEmployeeIds,
+    });
+
     const savedEvent = await calendarRepository.saveEvent({
       ...eventData,
+      invitedEmployeeIds: targetInvitedEmployeeIds,
       createdAt: eventData.createdAt || now,
       updatedAt: now,
     });
 
-    // Dispatch Notifications to all invited active employees
+    // Dispatch Notifications to all target active employees
     if (savedEvent.invitedEmployeeIds && savedEvent.invitedEmployeeIds.length > 0) {
       for (const empId of savedEvent.invitedEmployeeIds) {
+        if (!empId) continue;
         await calendarRepository.createNotification({
           userId: empId,
           eventId: savedEvent.id,

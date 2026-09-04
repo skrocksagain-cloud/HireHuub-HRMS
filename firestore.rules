@@ -1,0 +1,292 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // AUTHENTICATION & SESSION MANAGEMENT
+    match /user_sessions/{sessionId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /authentication_logs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /performanceTargets/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /clients/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /invoices/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /{path=**}/interactions/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    // GROUP A — Operational collections
+    match /placements/{placementId} {
+      allow read, write: if request.auth != null;
+    }
+    match /openings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /external_vacancies/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /associate_partners/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /associatePartners/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /document_templates/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_hierarchy/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /system_sequences/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /counters/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // GROUP B — FINANCE / RESTRICTED OPERATIONAL
+    match /finance_ots_billing/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /finance_payout_batches/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /finance_transactions/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /payrollRuns/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /generated_payslips/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /recruiterIncentivePayouts/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /associatePartnerPayouts/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /paymentHistory/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin() || request.auth.token.role == 'Finance');
+    }
+    match /crm_activity/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /crm_imports/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+
+    // GROUP C — ADMIN CONFIGURATION
+    match /admin_audit_logs/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_notifications/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /admin_big_day/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_departments/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_designations/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_roles/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_workflows/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /admin_password_reset_requests/{docId} {
+      allow read, write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /workforce_column_mappings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /settings/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isSuperAdmin() || isMasterAdmin() || isAdmin());
+    }
+    match /employees/{empId} {
+      allow read: if request.auth != null;
+      allow create: if isSuperAdmin() || isMasterAdmin() || isAdmin();
+      allow update: if isSuperAdmin() || isMasterAdmin() || isAdmin() || 
+                    (request.auth.uid == resource.data.firebaseUid && 
+                     !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                       'employeeId', 'employeeCode', 'fullName', 'joiningDate', 'department', 'departmentId',
+                       'designation', 'role', 'salary', 'monthlyGross', 'bankName', 'branchName', 'accountNumber', 
+                       'ifscCode', 'panNumber', 'accountStatus', 'teamId', 'status'
+                     ]));
+      allow delete: if isSuperAdmin() || isMasterAdmin();
+    }
+    
+    match /admin_company/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin() || isMasterAdmin() || isAdmin();
+    }
+    
+    function isSuperAdmin() { return request.auth.token.role == 'Super Admin'; }
+    function isMasterAdmin() { return request.auth.token.role == 'Master Admin'; }
+    function isAdmin() { return request.auth.token.role == 'Admin'; }
+    function isEmployee() { return request.auth.token.role == 'Employee' || request.auth.token.role == 'Recruiter'; }
+    
+    function isOwnCandidate(res) { return res.data.assignedRecruiterId == request.auth.token.employeeId; }
+    function isSameTeam(res) { return res.data.teamId == request.auth.token.teamId; }
+    function isSameDepartment(res) { return res.data.departmentId == request.auth.token.departmentId; }
+
+    function identityUnchanged(res, req) {
+      return res.data.createdAt == req.resource.data.createdAt
+          && res.data.normalizedPhone == req.resource.data.normalizedPhone;
+    }
+    
+    function ownershipUnchanged(res, req) {
+      return res.data.assignedRecruiterId == req.resource.data.assignedRecruiterId
+          && res.data.teamId == req.resource.data.teamId
+          && res.data.departmentId == req.resource.data.departmentId;
+    }
+
+    match /crm_candidates/{candidateId} {
+      
+      allow read: if isSuperAdmin() ||
+                     (isMasterAdmin() && isSameDepartment(resource)) ||
+                     (isAdmin() && isSameTeam(resource)) ||
+                     isOwnCandidate(resource);
+                     
+      allow create: if isSuperAdmin() ||
+                       (isMasterAdmin() && isSameDepartment(request.resource)) ||
+                       (isAdmin() && isSameTeam(request.resource)) ||
+                       (isEmployee() && isOwnCandidate(request.resource) && isSameTeam(request.resource) && isSameDepartment(request.resource));
+
+      allow update: if isSuperAdmin() ||
+                       (isMasterAdmin() && isSameDepartment(resource) && isSameDepartment(request.resource) && identityUnchanged(resource, request)) ||
+                       (isAdmin() && isSameTeam(resource) && isSameTeam(request.resource) && identityUnchanged(resource, request)) ||
+                       (isEmployee() && isOwnCandidate(resource) && ownershipUnchanged(resource, request) && identityUnchanged(resource, request));
+                       
+      function getCandidate() {
+        return get(/databases/$(database)/documents/crm_candidates/$(candidateId));
+      }
+      
+      function canViewCandidate() {
+        let parent = getCandidate();
+        return isSuperAdmin() ||
+               (isMasterAdmin() && isSameDepartment(parent)) ||
+               (isAdmin() && isSameTeam(parent)) ||
+               isOwnCandidate(parent);
+      }
+      
+      function canEditInteraction() {
+        let parent = getCandidate();
+        return isSuperAdmin() ||
+               (isMasterAdmin() && isSameDepartment(parent)) ||
+               (isAdmin() && isSameTeam(parent)) ||
+               isOwnCandidate(parent);
+      }
+
+      match /interactions/{docId} {
+        allow read: if canViewCandidate();
+        allow create: if canEditInteraction();
+        allow update, delete: if false; 
+      }
+      
+      match /assignments/{docId} {
+        allow read: if canViewCandidate();
+        allow create: if isSuperAdmin() || 
+                         (isMasterAdmin() && isSameDepartment(getCandidate())) ||
+                         (isAdmin() && isSameTeam(getCandidate()));
+        allow update, delete: if false;
+      }
+      
+      match /followUps/{docId} {
+        allow read: if canViewCandidate();
+        allow create: if canEditInteraction();
+        allow update, delete: if false;
+      }
+      
+      match /statusHistory/{docId} {
+        allow read: if canViewCandidate();
+        allow create: if canEditInteraction();
+        allow update, delete: if false;
+      }
+      
+      match /placements/{docId} {
+        allow read: if canViewCandidate();
+        allow write: if isSuperAdmin(); 
+      }
+      
+      match /points/{docId} {
+        allow read: if canViewCandidate();
+        allow write: if false; 
+      }
+    }
+    
+    match /crm_phone_registry/{phone} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    function isOwnWorkforce(res) { return res.data.recruiterId == request.auth.token.employeeId; }
+    function isSameTeamWorkforce(res) { 
+      return res.data.get('teamLeadId', null) == request.auth.token.employeeId || 
+             (request.auth.token.teamId != null && res.data.get('teamId', null) == request.auth.token.teamId); 
+    }
+
+    function workforceOwnershipUnchanged(res, req) {
+      return res.data.recruiterId == req.resource.data.recruiterId
+          && res.data.get('teamLeadId', null) == req.resource.data.get('teamLeadId', null)
+          && res.data.get('teamId', null) == req.resource.data.get('teamId', null)
+          && res.data.get('departmentId', null) == req.resource.data.get('departmentId', null);
+    }
+
+    match /workforce/{workforceId} {
+      allow read: if isSuperAdmin() ||
+                     isMasterAdmin() ||
+                     (request.auth.token.role == 'Department Admin') ||
+                     (request.auth.token.role == 'Finance') ||
+                     (isAdmin() && (isOwnWorkforce(resource) || isSameTeamWorkforce(resource))) ||
+                     ((request.auth.token.role == 'Team Leader' || request.auth.token.role == 'Team Lead') && (isOwnWorkforce(resource) || isSameTeamWorkforce(resource))) ||
+                     (isEmployee() && isOwnWorkforce(resource));
+
+      allow create: if isSuperAdmin() ||
+                       isMasterAdmin() ||
+                       (request.auth.token.role == 'Department Admin') ||
+                       (isAdmin() && (isOwnWorkforce(request.resource) || isSameTeamWorkforce(request.resource))) ||
+                       ((request.auth.token.role == 'Team Leader' || request.auth.token.role == 'Team Lead') && (isOwnWorkforce(request.resource) || isSameTeamWorkforce(request.resource))) ||
+                       (isEmployee() && isOwnWorkforce(request.resource));
+
+      allow update: if isSuperAdmin() ||
+                       isMasterAdmin() ||
+                       (request.auth.token.role == 'Department Admin') ||
+                       (request.auth.token.role == 'Finance') ||
+                       (isAdmin() && (isOwnWorkforce(resource) || isSameTeamWorkforce(resource))) ||
+                       ((request.auth.token.role == 'Team Leader' || request.auth.token.role == 'Team Lead') && (isOwnWorkforce(resource) || isSameTeamWorkforce(resource))) ||
+                       (isEmployee() && isOwnWorkforce(resource) && workforceOwnershipUnchanged(resource, request));
+    }
+    
+    match /workforce_imports/{importId} {
+      allow read, write: if isSuperAdmin() || request.auth.token.role == 'Finance';
+    }
+  }
+}

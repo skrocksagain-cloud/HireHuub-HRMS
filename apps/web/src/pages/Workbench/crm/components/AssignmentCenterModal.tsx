@@ -12,9 +12,12 @@ interface AssignmentCenterModalProps {
   onBulkAssign: (toRecruiterId: string, toRecruiterName: string) => Promise<void>;
   onBulkTransfer: (fromRecruiterId: string, toRecruiterId: string, toRecruiterName: string) => Promise<void>;
   userRole: string;
+  userAssignedRole?: string;
   assignableEmployees?: Employee[];
   allActiveEmployees?: Employee[];
 }
+
+import { getAuthorizationScope } from '../../../../core/authorization/authorizationResolver';
 
 export default function AssignmentCenterModal({
   isOpen,
@@ -25,6 +28,7 @@ export default function AssignmentCenterModal({
   onBulkAssign,
   onBulkTransfer,
   userRole,
+  userAssignedRole,
   assignableEmployees = [],
   allActiveEmployees = [],
 }: AssignmentCenterModalProps) {
@@ -62,7 +66,8 @@ export default function AssignmentCenterModal({
   const activeTargetId = targetRecruiterId || (recruiters[0]?.id ?? '');
   const activeFromId = fromRecruiterId || (recruiters[0]?.id ?? '');
 
-  const canAssign = ['Team Leader', 'Manager', 'Admin', 'Staffing', 'Super Admin'].includes(userRole);
+  const scope = getAuthorizationScope(userAssignedRole || userRole);
+  const canAssign = scope !== 'SELF';
 
   if (!isOpen) return null;
 

@@ -16,6 +16,7 @@ import {
 import GlobalSearchBar from "../../pages/Dashboard/common/GlobalSearchBar";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useAuth } from "../../context/AuthContext";
+import { useDashboard } from "../../hooks/useDashboard";
 
 export default function Topbar() {
   const { pathname } = useLocation();
@@ -24,11 +25,12 @@ export default function Topbar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const { activeRole } = usePermissions();
   const { user, logout } = useAuth();
+  const { notifications, unreadNotificationCount, markNotificationRead } = useDashboard();
 
-  const displayName = user?.name || "Somnath";
-  const displayEmail = user?.email || `${user?.employeeId || "admin"}@hirehuub.com`;
+  const displayName = user?.name || user?.email || "User";
+  const displayEmail = user?.email || "";
   const displayRole = user?.role || activeRole.name || "Administrator";
-  const avatarInitial = displayName.charAt(0).toUpperCase() || "S";
+  const avatarInitial = displayName.charAt(0).toUpperCase() || "U";
 
   const handleSignOut = async () => {
     await logout();
@@ -99,7 +101,9 @@ export default function Topbar() {
             title="Notifications"
           >
             <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            {unreadNotificationCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            )}
           </button>
 
           {/* Notifications Popover */}
@@ -108,7 +112,11 @@ export default function Topbar() {
               <div className="flex items-center justify-between px-4 pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Notifications</h3>
-                  <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">2 New</span>
+                  {unreadNotificationCount > 0 && (
+                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {unreadNotificationCount} New
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -119,35 +127,46 @@ export default function Topbar() {
                 </button>
               </div>
 
-              <div className="divide-y divide-slate-100 text-xs">
-                <div className="p-3 hover:bg-slate-50 transition cursor-pointer flex gap-3">
-                  <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 size={14} />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800">Invoice Draft Approved</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Client Acme Corp invoice #HH2026-0004 approved.</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">10 mins ago</span>
-                  </div>
+              {notifications.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 text-xs font-medium">
+                  No notifications.
                 </div>
-
-                <div className="p-3 hover:bg-slate-50 transition cursor-pointer flex gap-3">
-                  <div className="h-7 w-7 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <Clock size={14} />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800">2 Leave Requests Pending</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Rahul Verma and Priya Sharma submitted leave requests.</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">1 hour ago</span>
-                  </div>
+              ) : (
+                <div className="divide-y divide-slate-100 text-xs max-h-64 overflow-y-auto">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => void markNotificationRead(n.id)}
+                      className={`p-3 hover:bg-slate-50 transition cursor-pointer flex gap-3 ${
+                        n.isRead ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                        {n.category === 'Leave' ? <Clock size={14} /> : <CheckCircle2 size={14} />}
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-800">{n.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
+                        <span className="text-[10px] text-slate-400 mt-1 block">{n.timestamp}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
 
-              <div className="pt-2 border-t border-slate-100 px-4 text-center">
-                <button type="button" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">
-                  Mark all as read
-                </button>
-              </div>
+              {notifications.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 px-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      notifications.forEach((n) => void markNotificationRead(n.id));
+                    }}
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                  >
+                    Mark all as read
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

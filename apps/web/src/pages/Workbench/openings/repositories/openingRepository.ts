@@ -1,176 +1,146 @@
-import type { Opening } from '../../../../types/Opening';
-import { openingNumberService } from '../../../../services/numbering/openingNumberService';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
-const SAMPLE_OPENINGS: Opening[] = [
-  {
-    id: 'HHOP0001',
-    clientId: 'client-001',
-    clientName: 'Elastic Run',
-    title: 'Warehouse Logistics Executive',
-    description: 'Responsible for inventory tracking, inward/outward supply management, and hub dispatch operations.',
-    location: 'Warje Hub, Pune',
-    city: 'Pune',
-    state: 'Maharashtra',
-    openPositions: 15,
-    status: 'Active',
-    priority: 'High',
-    interviewDate: '2026-08-10',
-    isOutsourced: false,
-    minExperience: 1,
-    maxExperience: 3,
-    qualification: 'Higher Secondary (12th Pass) / Graduate',
-    genderPreference: 'Any',
-    ageLimit: 32,
-    skills: ['Inventory Management', 'Barcode Scanning', 'ERP Basics'],
-    minSalary: 18000,
-    maxSalary: 24000,
-    salaryType: 'Monthly',
-    benefits: ['Weekly Payment', 'Free Accommodation', 'Transport Facility', 'Attendance Bonus'],
-    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Bank Passbook', 'Driving License'],
-    assignedRecruiterIds: ['user-001'],
-    attachments: [],
-    createdAt: '2026-08-01T09:00:00.000Z',
-    updatedAt: '2026-08-03T14:20:00.000Z',
-  },
-  {
-    id: 'HHOP0002',
-    clientId: 'client-001',
-    clientName: 'Elastic Run',
-    title: 'Hub Delivery Supervisor (Outsourced)',
-    description: 'Overseeing last-mile delivery fleet and shift allocations in Peenya hub.',
-    location: 'Peenya Industrial Area, Bengaluru',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    openPositions: 8,
-    status: 'Active',
-    priority: 'Urgent',
-    interviewDate: '2026-08-12',
-    isOutsourced: true,
-    outsourcedVendor: 'QuickStaff Solutions',
-    minExperience: 2,
-    maxExperience: 5,
-    qualification: 'Graduate',
-    genderPreference: 'Male',
-    ageLimit: 35,
-    skills: ['Fleet Dispatch', 'Team Handling', 'Route Optimization'],
-    minSalary: 25000,
-    maxSalary: 32000,
-    salaryType: 'Monthly',
-    benefits: ['Incentive', 'Overtime', 'Medical Insurance'],
-    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Relieving Letter'],
-    assignedRecruiterIds: ['user-002'],
-    attachments: [],
-    createdAt: '2026-08-02T10:30:00.000Z',
-    updatedAt: '2026-08-03T16:00:00.000Z',
-  },
-  {
-    id: 'HHOP0003',
-    clientId: 'client-002',
-    clientName: 'Acme Tech',
-    title: 'Technical Support Associate',
-    description: 'Providing L1 IT support, hardware troubleshooting, and ticketing resolution.',
-    location: 'Baner Tech Park, Pune',
-    city: 'Pune',
-    state: 'Maharashtra',
-    openPositions: 5,
-    status: 'OnHold',
-    priority: 'Medium',
-    interviewDate: '2026-08-18',
-    isOutsourced: false,
-    minExperience: 0,
-    maxExperience: 2,
-    qualification: 'B.Sc IT / BCA / Diploma CS',
-    genderPreference: 'Any',
-    ageLimit: 28,
-    skills: ['Windows OS', 'Networking Basics', 'Ticket Management'],
-    minSalary: 22000,
-    maxSalary: 28000,
-    salaryType: 'Monthly',
-    benefits: ['Fixed Shift', 'Medical Insurance', 'Incentive'],
-    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Degree Certificate'],
-    assignedRecruiterIds: ['user-001'],
-    attachments: [],
-    createdAt: '2026-07-28T11:00:00.000Z',
-    updatedAt: '2026-08-02T11:00:00.000Z',
-  },
-  {
-    id: 'HHOP0004',
-    clientId: 'client-003',
-    clientName: 'Infosys Workforce',
-    title: 'Customer Service Representative',
-    description: 'Handling inbound customer queries via call and chat support in 24/7 rotational shifts.',
-    location: 'Electronic City, Bengaluru',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    openPositions: 20,
-    status: 'Closed',
-    priority: 'Low',
-    interviewDate: '2026-07-25',
-    isOutsourced: false,
-    minExperience: 0,
-    maxExperience: 3,
-    qualification: 'Any Graduate',
-    genderPreference: 'Any',
-    ageLimit: 30,
-    skills: ['English Communication', 'Customer Handling', 'Keyboard Speed'],
-    minSalary: 20000,
-    maxSalary: 26000,
-    salaryType: 'Monthly',
-    benefits: ['Growth Opportunity', 'Rotational Shift', 'Medical Insurance', 'Joining Bonus'],
-    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Educational Marksheets'],
-    assignedRecruiterIds: ['user-002'],
-    attachments: [],
-    createdAt: '2026-07-15T08:00:00.000Z',
-    updatedAt: '2026-07-26T18:00:00.000Z',
-  },
-];
+import { db } from '../../../../firebase/firebase';
+import { openingNumberService } from '../../../../services/numbering/openingNumberService';
+import type { Opening } from '../../../../types/Opening';
+
+const openingsCollection = collection(db, 'openings');
+
+/**
+ * Recursively strips undefined fields from payload to satisfy Firestore strict serialization.
+ */
+export function removeUndefinedFields<T>(obj: T): T {
+  if (obj === undefined || obj === null) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => removeUndefinedFields(item)) as unknown as T;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleanObj: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleanObj[key] = removeUndefinedFields(value);
+      }
+    }
+    return cleanObj as T;
+  }
+  return obj;
+}
+
+const fromFirestore = (id: string, data: Record<string, unknown>): Opening => ({
+  ...(data as Omit<Opening, 'id'>),
+  id,
+  assignedRecruiterIds: Array.isArray(data.assignedRecruiterIds) ? (data.assignedRecruiterIds as string[]) : [],
+  attachments: Array.isArray(data.attachments) ? (data.attachments as Opening['attachments']) : [],
+  createdAt: String(data.createdAt ?? ''),
+  updatedAt: String(data.updatedAt ?? ''),
+});
+
+export async function syncExternalVacancyProjection(opening: Opening): Promise<void> {
+  try {
+    const externalRef = doc(db, 'external_vacancies', opening.id);
+    const shouldPublish = Boolean(opening.status === 'Active' && opening.isOutsourced === true);
+
+    if (shouldPublish) {
+      const minExp = opening.minExperience ?? 0;
+      const maxExp = opening.maxExperience ?? 3;
+      const expStr = `${minExp} - ${maxExp} Yrs`;
+
+      const minSal = opening.minSalary ? `₹${opening.minSalary.toLocaleString()}` : '';
+      const maxSal = opening.maxSalary ? `₹${opening.maxSalary.toLocaleString()}` : '';
+      const salStr = minSal && maxSal ? `${minSal} - ${maxSal}` : minSal || maxSal || '';
+
+      const payload = removeUndefinedFields({
+        id: opening.id,
+        openingId: opening.id,
+        clientName: opening.clientName || 'Hire Huub Client',
+        title: opening.title || '',
+        city: opening.city || '',
+        state: opening.state || '',
+        openPositions: opening.openPositions || 1,
+        experienceRange: expStr,
+        minExperience: minExp,
+        maxExperience: maxExp,
+        qualification: opening.qualification || '',
+        salaryRange: salStr,
+        minSalary: opening.minSalary || 0,
+        maxSalary: opening.maxSalary || 0,
+        salaryPeriod: opening.salaryType || 'Monthly',
+        employmentType: 'Outsourced Staffing',
+        shift: 'Rotational / Fixed',
+        jobDescription: opening.description || '',
+        skillsRequired: opening.skills || [],
+        lastUpdated: opening.updatedAt ? new Date(opening.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        updatedAtServer: serverTimestamp(),
+      });
+      await setDoc(externalRef, payload);
+    } else {
+      await deleteDoc(externalRef);
+    }
+  } catch {
+    // Safe execution
+  }
+}
 
 export class OpeningRepository {
-  private openings: Opening[] = [...SAMPLE_OPENINGS];
-
   async getOpenings(): Promise<Opening[]> {
-    return [...this.openings];
+    const snapshot = await getDocs(openingsCollection);
+    return snapshot.docs.map((item) => fromFirestore(item.id, item.data()));
   }
 
   async getOpeningById(id: string): Promise<Opening | null> {
-    const found = this.openings.find((o) => o.id === id);
-    return found ? { ...found } : null;
+    const snapshot = await getDoc(doc(db, 'openings', id));
+    return snapshot.exists() ? fromFirestore(snapshot.id, snapshot.data()) : null;
   }
 
   async createOpening(input: Omit<Opening, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Opening> {
-    const newId = input.id || await openingNumberService.generateNextNumber(this.openings);
+    const id = input.id ?? (await openingNumberService.generateNextNumber(await this.getOpenings()));
     const now = new Date().toISOString();
-    const newOpening: Opening = {
+    const opening: Opening = {
       ...input,
-      id: newId,
+      id,
       assignedRecruiterIds: input.assignedRecruiterIds ?? [],
       attachments: input.attachments ?? [],
       createdAt: now,
       updatedAt: now,
     };
-    this.openings.unshift(newOpening);
-    return { ...newOpening };
+    const payload = removeUndefinedFields({
+      ...opening,
+      createdAt: now,
+      updatedAt: now,
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'openings', id), payload);
+    await syncExternalVacancyProjection(opening);
+    return opening;
   }
 
   async updateOpening(id: string, updates: Partial<Opening>): Promise<Opening> {
-    const index = this.openings.findIndex((o) => o.id === id);
-    if (index === -1) throw new Error(`Opening with ID ${id} not found.`);
-    const now = new Date().toISOString();
-    const updated: Opening = {
-      ...this.openings[index],
+    const existing = await this.getOpeningById(id);
+    if (!existing) throw new Error(`Opening with ID ${id} was not found.`);
+    const updated = { ...existing, ...updates, id, updatedAt: new Date().toISOString() };
+    const payload = removeUndefinedFields({
       ...updates,
-      updatedAt: now,
-    };
-    this.openings[index] = updated;
-    return { ...updated };
+      updatedAt: updated.updatedAt,
+      updatedAtServer: serverTimestamp(),
+    });
+    await updateDoc(doc(db, 'openings', id), payload);
+    await syncExternalVacancyProjection(updated);
+    return updated;
   }
 
   async deleteOpening(id: string): Promise<boolean> {
-    const index = this.openings.findIndex((o) => o.id === id);
-    if (index === -1) return false;
-    this.openings.splice(index, 1);
+    const existing = await this.getOpeningById(id);
+    if (!existing) return false;
+    await deleteDoc(doc(db, 'openings', id));
+    try {
+      await deleteDoc(doc(db, 'external_vacancies', id));
+    } catch {
+      // Safe execution
+    }
     return true;
   }
 }
 
 export const openingRepository = new OpeningRepository();
+

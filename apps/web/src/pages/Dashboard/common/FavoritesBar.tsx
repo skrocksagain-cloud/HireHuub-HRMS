@@ -9,7 +9,7 @@ export default function FavoritesBar() {
     { title: 'Employees', path: '/workbench/workforce', module: 'employees', icon: <Users size={16} /> },
     { title: 'Recruitment', path: '/staffing-hub', module: 'recruitment', icon: <Briefcase size={16} /> },
     { title: 'Finance', path: '/finance/transactions', module: 'finance', icon: <DollarSign size={16} /> },
-    { title: 'Document Center', path: '/document-center', module: 'documents', icon: <FileText size={16} /> },
+    { title: 'Document Library', path: '/documents', module: 'documents', icon: <FileText size={16} /> },
     { title: 'Attendance', path: '/attendance', module: 'employees', icon: <Clock size={16} /> },
     { title: 'Calendar', path: '/dashboard', module: 'dashboard', icon: <Calendar size={16} /> },
   ].filter((link) => canAccessModule(link.module));

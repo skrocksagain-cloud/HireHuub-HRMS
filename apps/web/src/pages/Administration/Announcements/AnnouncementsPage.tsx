@@ -47,8 +47,7 @@ export default function AnnouncementsPage() {
     getReadRecords,
   } = useAnnouncements();
 
-  const { activeRole } = usePermissions();
-  const isSuperAdmin = activeRole.name === 'Super Admin' || activeRole.name === 'admin';
+  const { isSuperAdmin } = usePermissions();
 
   // Category Filter
   const [selectedCategory, setSelectedCategory] = useState<string>('All');

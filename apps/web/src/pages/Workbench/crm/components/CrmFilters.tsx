@@ -9,12 +9,16 @@ interface CrmFiltersProps {
   onFilterChange: (filters: CrmFilterState) => void;
   clients: Client[];
   userRole: string;
+  userAssignedRole?: string;
   activeEmployees?: Employee[];
 }
+
+import { getAuthorizationScope } from '../../../../core/authorization/authorizationResolver';
 
 const QUICK_FILTERS = [
   'All',
   'Assigned',
+  'Not Contacted',
   "Today's Follow Up",
   "Today's Interview",
   'Interested',
@@ -38,16 +42,16 @@ const STATUSES: CandidateStatus[] = [
   'Interested',
 ];
 
-const SOURCES = ['Job Portal', 'Reference', 'Social Media', 'Advertisement', 'Enquiry', 'Marketing Activity'];
-
 export default function CrmFilters({ 
   filters, 
   onFilterChange, 
   clients, 
   userRole, 
+  userAssignedRole,
   activeEmployees = [] 
 }: CrmFiltersProps) {
-  const isTLOrAbove = ['Team Leader', 'Manager', 'Admin', 'Staffing', 'Super Admin'].includes(userRole);
+  const scope = getAuthorizationScope(userAssignedRole || userRole);
+  const isTLOrAbove = scope !== 'SELF';
 
   const resetFilters = () => {
     onFilterChange({
@@ -83,13 +87,14 @@ export default function CrmFilters({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-100">
         {/* Status Filter */}
         <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Candidate Status</label>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Status</label>
           <select
             value={filters.status || ''}
-            onChange={(e) => onFilterChange({ ...filters, status: (e.target.value as CandidateStatus) || undefined })}
+            onChange={(e) => onFilterChange({ ...filters, status: (e.target.value as CandidateStatus | 'Not Contacted') || undefined })}
             className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
           >
             <option value="">All Statuses</option>
+            <option value="Not Contacted">Not Contacted</option>
             {STATUSES.map((st) => (
               <option key={st} value={st}>
                 {st}
@@ -115,78 +120,28 @@ export default function CrmFilters({
           </select>
         </div>
 
-        {/* Source Filter */}
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Source</label>
-          <select
-            value={filters.sourceCategory || ''}
-            onChange={(e) => onFilterChange({ ...filters, sourceCategory: e.target.value || undefined })}
-            className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          >
-            <option value="">All Sources</option>
-            {SOURCES.map((src) => (
-              <option key={src} value={src}>
-                {src}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Recruiter Filter (TL/Admin only) */}
         {isTLOrAbove && (
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Recruiter</label>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Recruiter / Assignee</label>
             <select
               value={filters.recruiterId || ''}
               onChange={(e) => onFilterChange({ ...filters, recruiterId: e.target.value || undefined })}
               className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               <option value="">All Recruiters</option>
-              {activeEmployees.length > 0 ? (
-                activeEmployees.map((emp) => (
-                  <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
-                    {emp.fullName}
-                  </option>
-                ))
-              ) : (
-                <>
-                  <option value="user-001">Rahul Sharma</option>
-                  <option value="user-002">Anita Roy</option>
-                  <option value="tl-001">Vikram Patil (TL)</option>
-                  <option value="admin-001">Sanjay Gupta (Admin)</option>
-                </>
-              )}
+              {activeEmployees.map((emp) => (
+                <option key={emp.id || emp.employeeId} value={emp.employeeId || emp.id}>
+                  {emp.fullName}
+                </option>
+              ))}
             </select>
           </div>
         )}
 
-        {/* City Filter */}
+        {/* Follow Up Date */}
         <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">City</label>
-          <input
-            type="text"
-            value={filters.city || ''}
-            onChange={(e) => onFilterChange({ ...filters, city: e.target.value || undefined })}
-            placeholder="e.g. Pune"
-            className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-        </div>
-
-        {/* Role Filter */}
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Role</label>
-          <input
-            type="text"
-            value={filters.role || ''}
-            onChange={(e) => onFilterChange({ ...filters, role: e.target.value || undefined })}
-            placeholder="e.g. Warehouse"
-            className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-        </div>
-
-        {/* Follow Up Month */}
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Follow Up Month</label>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Follow Up Date</label>
           <input
             type="month"
             value={filters.followUpMonth || ''}
@@ -195,9 +150,9 @@ export default function CrmFilters({
           />
         </div>
 
-        {/* Interview Month */}
+        {/* Interview Date */}
         <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Interview Month</label>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Interview Date</label>
           <input
             type="month"
             value={filters.interviewMonth || ''}

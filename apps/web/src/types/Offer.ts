@@ -124,6 +124,21 @@ export interface Offer {
   esiApplicable: boolean;
 
   // ============================================================
+  // Brand
+  // ============================================================
+  brandId?: string;
+
+  // ============================================================
+  // Additional Statutory & Annual Breakdown
+  // ============================================================
+  employeePf?: number;
+  employerPf?: number;
+  employeeEsi?: number;
+  employerEsi?: number;
+  annualGross?: number;
+  annualNetTakeHome?: number;
+
+  // ============================================================
   // Offer Remarks
   // ============================================================
 

@@ -27,7 +27,7 @@ const slugify = (text: string) =>
 
 class AdminService {
   // 1. Company Settings & Storage Uploads
-  async getCompanySettings(): Promise<CompanySettings> {
+  async getCompanySettings(): Promise<CompanySettings | null> {
     return adminRepository.getCompanySettings();
   }
 
@@ -41,13 +41,28 @@ class AdminService {
       whatAction: 'UPDATE_COMPANY_SETTINGS',
       entityName: 'CompanySettings',
       entityId: settings.id,
-      oldValue: JSON.stringify({ companyName: old.companyName, logoUrl: old.logoUrl }),
+      oldValue: JSON.stringify({ companyName: old?.companyName || '', logoUrl: old?.logoUrl || '' }),
       newValue: JSON.stringify({ companyName: settings.companyName, logoUrl: settings.logoUrl }),
     });
   }
 
   async uploadCompanyLogo(file: File, actorId: string, actorName: string): Promise<string> {
-    const current = await this.getCompanySettings();
+    const current = (await this.getCompanySettings()) || {
+      id: 'hirehuub_company_settings',
+      companyName: '',
+      brandName: '',
+      gstin: '',
+      pan: '',
+      cin: '',
+      address: '',
+      bankDetails: { bankName: '', accountNumber: '', ifscCode: '', branchName: '' },
+      website: '',
+      email: '',
+      phone: '',
+      logoUrl: '',
+      stampUrl: '',
+      signatures: [],
+    };
     if (current.logoStoragePath) {
       await adminStorageService.deleteFile(current.logoStoragePath);
     }
@@ -66,7 +81,22 @@ class AdminService {
   }
 
   async uploadOfficialStamp(file: File, actorId: string, actorName: string): Promise<string> {
-    const current = await this.getCompanySettings();
+    const current = (await this.getCompanySettings()) || {
+      id: 'hirehuub_company_settings',
+      companyName: '',
+      brandName: '',
+      gstin: '',
+      pan: '',
+      cin: '',
+      address: '',
+      bankDetails: { bankName: '', accountNumber: '', ifscCode: '', branchName: '' },
+      website: '',
+      email: '',
+      phone: '',
+      logoUrl: '',
+      stampUrl: '',
+      signatures: [],
+    };
     if (current.stampStoragePath) {
       await adminStorageService.deleteFile(current.stampStoragePath);
     }
@@ -86,6 +116,7 @@ class AdminService {
 
   async deleteOfficialStamp(actorId: string, actorName: string): Promise<void> {
     const current = await this.getCompanySettings();
+    if (!current) return;
     if (current.stampStoragePath) {
       await adminStorageService.deleteFile(current.stampStoragePath);
     }
@@ -100,75 +131,7 @@ class AdminService {
     );
   }
 
-  async uploadLetterheadImage(file: File, profileId = 'default', actorId: string, actorName: string): Promise<string> {
-    const current = await this.getCompanySettings();
-    if (current.letterheadStoragePath) {
-      await adminStorageService.deleteFile(current.letterheadStoragePath);
-    }
 
-    const { url, path } = await adminStorageService.uploadLetterheadImage(file, profileId);
-    await this.updateCompanySettings(
-      {
-        ...current,
-        letterheadUrl: url,
-        letterheadStoragePath: path,
-      },
-      actorId,
-      actorName
-    );
-    return url;
-  }
-
-  async deleteLetterheadImage(actorId: string, actorName: string): Promise<void> {
-    const current = await this.getCompanySettings();
-    if (current.letterheadStoragePath) {
-      await adminStorageService.deleteFile(current.letterheadStoragePath);
-    }
-    await this.updateCompanySettings(
-      {
-        ...current,
-        letterheadUrl: '',
-        letterheadStoragePath: '',
-      },
-      actorId,
-      actorName
-    );
-  }
-
-  async uploadLetterFooterImage(file: File, profileId = 'default', actorId: string, actorName: string): Promise<string> {
-    const current = await this.getCompanySettings();
-    if (current.letterFooterStoragePath) {
-      await adminStorageService.deleteFile(current.letterFooterStoragePath);
-    }
-
-    const { url, path } = await adminStorageService.uploadLetterFooterImage(file, profileId);
-    await this.updateCompanySettings(
-      {
-        ...current,
-        letterFooterUrl: url,
-        letterFooterStoragePath: path,
-      },
-      actorId,
-      actorName
-    );
-    return url;
-  }
-
-  async deleteLetterFooterImage(actorId: string, actorName: string): Promise<void> {
-    const current = await this.getCompanySettings();
-    if (current.letterFooterStoragePath) {
-      await adminStorageService.deleteFile(current.letterFooterStoragePath);
-    }
-    await this.updateCompanySettings(
-      {
-        ...current,
-        letterFooterUrl: '',
-        letterFooterStoragePath: '',
-      },
-      actorId,
-      actorName
-    );
-  }
 
   async uploadSignatureImage(
     signatoryId: string,
@@ -178,7 +141,22 @@ class AdminService {
     actorId: string,
     actorName: string
   ): Promise<CompanySignature> {
-    const current = await this.getCompanySettings();
+    const current = (await this.getCompanySettings()) || {
+      id: 'hirehuub_company_settings',
+      companyName: '',
+      brandName: '',
+      gstin: '',
+      pan: '',
+      cin: '',
+      address: '',
+      bankDetails: { bankName: '', accountNumber: '', ifscCode: '', branchName: '' },
+      website: '',
+      email: '',
+      phone: '',
+      logoUrl: '',
+      stampUrl: '',
+      signatures: [],
+    };
     const existingIndex = current.signatures.findIndex((s) => s.id === signatoryId);
 
     if (existingIndex >= 0 && current.signatures[existingIndex].storagePath) {
@@ -217,6 +195,7 @@ class AdminService {
 
   async deleteSignature(signatoryId: string, actorId: string, actorName: string): Promise<void> {
     const current = await this.getCompanySettings();
+    if (!current) return;
     const target = current.signatures.find((s) => s.id === signatoryId);
 
     if (target?.storagePath) {
@@ -395,11 +374,63 @@ class AdminService {
 
   // 7. Document Templates (Single Collection & Versioning)
   async getDocumentTemplates(): Promise<DocumentTemplateConfig[]> {
-    let list = await adminRepository.getDocumentTemplates();
-    if (list.length === 0) {
-      list = await this.seedDefaultDocumentTemplates();
+    return adminRepository.getDocumentTemplates();
+  }
+
+  async getTemplatesByBrand(
+    brandProfileId: string,
+    docType?: string,
+    onlyPublished = false
+  ): Promise<DocumentTemplateConfig[]> {
+    const all = await this.getDocumentTemplates();
+    const filtered = all.filter((t) => {
+      const matchBrand =
+        !brandProfileId ||
+        t.brandId === brandProfileId ||
+        t.brandProfileId === brandProfileId ||
+        (t.builderSchema && t.builderSchema.brandProfileId === brandProfileId);
+      const rawType = (t.type || (t as { documentType?: string }).documentType || t.templateName || '').toLowerCase();
+      const targetType = (docType || '').toLowerCase();
+      const matchType = !docType || rawType === targetType || rawType.includes(targetType) || targetType.includes(rawType);
+      const state = t.lifecycleState || (t.builderSchema && t.builderSchema.lifecycleState) || t.status;
+      const matchPublished = !onlyPublished || state === 'Published' || state === 'Active' || t.isActive !== false;
+      return matchBrand && matchType && matchPublished;
+    });
+
+    return filtered;
+  }
+
+  async getPublishedBrandDefaultTemplate(
+    brandProfileId: string,
+    docType: string
+  ): Promise<DocumentTemplateConfig | null> {
+    const templates = await this.getTemplatesByBrand(brandProfileId, docType, true);
+    if (templates.length === 0) return null;
+    const defaultTmpl = templates.find((t) => t.isDefaultBrandTemplate);
+    return defaultTmpl || templates[0];
+  }
+
+  async setDefaultBrandTemplate(
+    templateId: string,
+    brandProfileId: string,
+    docType: string,
+    actorId = 'admin',
+    actorName = 'Super Admin'
+  ): Promise<void> {
+    const templates = await this.getTemplatesByBrand(brandProfileId, docType, false);
+    for (const tmpl of templates) {
+      const isTarget = tmpl.id === templateId;
+      if (tmpl.isDefaultBrandTemplate !== isTarget) {
+        await this.saveDocumentTemplate(
+          {
+            ...tmpl,
+            isDefaultBrandTemplate: isTarget,
+          },
+          actorId,
+          actorName
+        );
+      }
     }
-    return list;
   }
 
   async getDocumentTemplateByType(type: string): Promise<DocumentTemplateConfig | null> {
@@ -423,26 +454,6 @@ class AdminService {
       oldValue: id,
       newValue: '',
     });
-  }
-
-  async uploadTemplateFile(
-    documentType: string,
-    file: File,
-    version: string,
-    actorId: string,
-    actorName: string
-  ): Promise<{ url: string; path: string }> {
-    const res = await adminStorageService.uploadTemplateFile(documentType, version, file);
-    await this.logAudit({
-      whoId: actorId,
-      whoName: actorName,
-      whatAction: 'UPLOAD_TEMPLATE_FILE',
-      entityName: 'DocumentTemplateFile',
-      entityId: documentType,
-      oldValue: '',
-      newValue: res.url,
-    });
-    return res;
   }
 
   async saveDocumentTemplate(tmpl: DocumentTemplateConfig, actorId: string, actorName: string): Promise<void> {
@@ -543,7 +554,7 @@ class AdminService {
   }
 
   // 9. Master Data
-  async getMasterData(): Promise<MasterDataConfig> {
+  async getMasterData(): Promise<MasterDataConfig | null> {
     return adminRepository.getMasterData();
   }
 
@@ -556,13 +567,13 @@ class AdminService {
       whatAction: 'UPDATE_MASTER_DATA',
       entityName: 'MasterDataConfig',
       entityId: 'master_data',
-      oldValue: JSON.stringify({ employeePrefix: old.employeePrefix, invoicePrefix: old.invoicePrefix }),
+      oldValue: JSON.stringify({ employeePrefix: old?.employeePrefix || '', invoicePrefix: old?.invoicePrefix || '' }),
       newValue: JSON.stringify({ employeePrefix: data.employeePrefix, invoicePrefix: data.invoicePrefix }),
     });
   }
 
   // 10. Notification Settings
-  async getNotificationSettings(): Promise<NotificationSettings> {
+  async getNotificationSettings(): Promise<NotificationSettings | null> {
     return adminRepository.getNotificationSettings();
   }
 
@@ -584,7 +595,7 @@ class AdminService {
   }
 
   // 11. Security Settings & Password Reset Requests
-  async getSecuritySettings(): Promise<SecuritySettings> {
+  async getSecuritySettings(): Promise<SecuritySettings | null> {
     return adminRepository.getSecuritySettings();
   }
 
@@ -656,219 +667,6 @@ class AdminService {
       oldValue: 'Pending',
       newValue: 'Rejected',
     });
-  }
-
-  private async seedDefaultDocumentTemplates(): Promise<DocumentTemplateConfig[]> {
-    const seeds: Partial<DocumentTemplateConfig>[] = [
-      {
-        id: 'tmpl-hirehuub-standard-inv',
-        templateId: 'tmpl-hirehuub-standard-inv',
-        templateName: 'Hire Huub Standard Invoice',
-        type: 'Invoice',
-        clientName: 'Hire Huub People Solution Private Limited',
-        companyName: 'Hire Huub People Solution Private Limited',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/HireHuub_Standard_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/HireHuub_Standard_Invoice_v1.xlsx',
-        fileName: 'HireHuub_Standard_Invoice_v1.xlsx',
-        fileSize: 1048576,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'System Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-blinkit-inv',
-        templateId: 'tmpl-blinkit-inv',
-        templateName: 'Blinkit Invoice',
-        type: 'Invoice',
-        clientName: 'Blinkit Technologies Private Limited',
-        companyName: 'Blinkit Technologies Private Limited',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/Blinkit_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/Blinkit_Invoice_v1.xlsx',
-        fileName: 'Blinkit_Invoice_v1.xlsx',
-        fileSize: 524288,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'Finance Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-elasticrun-inv',
-        templateId: 'tmpl-elasticrun-inv',
-        templateName: 'ElasticRun Invoice',
-        type: 'Invoice',
-        clientName: 'Ntex Transportation Services Private Limited (ElasticRun)',
-        companyName: 'Ntex Transportation Services Private Limited',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/ElasticRun_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/ElasticRun_Invoice_v1.xlsx',
-        fileName: 'ElasticRun_Invoice_v1.xlsx',
-        fileSize: 614400,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'Finance Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-bigbasket-inv',
-        templateId: 'tmpl-bigbasket-inv',
-        templateName: 'BigBasket Invoice',
-        type: 'Invoice',
-        clientName: 'Supermarket Grocery Supplies Private Limited (BigBasket)',
-        companyName: 'Supermarket Grocery Supplies Private Limited',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/BigBasket_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/BigBasket_Invoice_v1.xlsx',
-        fileName: 'BigBasket_Invoice_v1.xlsx',
-        fileSize: 491520,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'Finance Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-zepto-inv',
-        templateId: 'tmpl-zepto-inv',
-        templateName: 'Zepto Invoice',
-        type: 'Invoice',
-        clientName: 'KIRANAKART TECHNOLOGIES PRIVATE LIMITED (Zepto)',
-        companyName: 'KIRANAKART TECHNOLOGIES PRIVATE LIMITED',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/Zepto_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/Zepto_Invoice_v1.xlsx',
-        fileName: 'Zepto_Invoice_v1.xlsx',
-        fileSize: 589824,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'Finance Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-amazon-inv',
-        templateId: 'tmpl-amazon-inv',
-        templateName: 'Amazon Invoice',
-        type: 'Invoice',
-        clientName: 'Amazon Transportation Services Private Limited',
-        companyName: 'Amazon Transportation Services Private Limited',
-        category: 'Finance',
-        format: 'XLSX',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/Amazon_Invoice_v1.xlsx',
-        templateStoragePath: 'templates/invoices/Amazon_Invoice_v1.xlsx',
-        fileName: 'Amazon_Invoice_v1.xlsx',
-        fileSize: 720896,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['invoice_number', 'invoice_date', 'client_name', 'taxable_amount', 'gst_amount', 'grand_total'],
-        uploadedBy: 'Finance Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-standard-offer-letter',
-        templateId: 'tmpl-standard-offer-letter',
-        templateName: 'Standard Offer Letter',
-        type: 'Offer Letter',
-        category: 'HR',
-        format: 'PDF',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/OfferLetter_v1.pdf',
-        templateStoragePath: 'templates/offers/OfferLetter_v1.pdf',
-        fileName: 'OfferLetter_v1.pdf',
-        fileSize: 1048576,
-        mimeType: 'application/pdf',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['candidate_name', 'designation', 'ctc', 'joining_date'],
-        uploadedBy: 'HR Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-      {
-        id: 'tmpl-standard-payslip',
-        templateId: 'tmpl-standard-payslip',
-        templateName: 'Standard Payslip',
-        type: 'Payslip',
-        category: 'Payroll',
-        format: 'PDF',
-        activeVersion: 'v1.0',
-        version: 1,
-        status: 'Active',
-        isActive: true,
-        templateFileUrl: '/templates/Payslip_v1.pdf',
-        templateStoragePath: 'templates/payslips/Payslip_v1.pdf',
-        fileName: 'Payslip_v1.pdf',
-        fileSize: 1048576,
-        mimeType: 'application/pdf',
-        defaultSignatureId: 'sig-1',
-        includeStamp: true,
-        previousVersions: [],
-        placeholders: ['employee_name', 'month', 'basic_pay', 'net_pay'],
-        uploadedBy: 'Payroll Admin',
-        uploadedAt: new Date().toISOString(),
-      },
-    ];
-
-    const resultList: DocumentTemplateConfig[] = [];
-    for (const seed of seeds) {
-      try {
-        const fullConfig = seed as DocumentTemplateConfig;
-        await adminRepository.saveDocumentTemplate(fullConfig);
-        resultList.push(fullConfig);
-      } catch {
-        // Ignore duplicate errors during seed
-      }
-    }
-    return resultList;
   }
 
   // 12. Audit Logs

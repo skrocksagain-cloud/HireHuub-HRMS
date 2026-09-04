@@ -115,11 +115,24 @@ class DashboardService {
   /**
    * Get Remaining Leave Balance (ONLY remaining days, no type breakup)
    */
-  async getRemainingLeaveBalance(_employeeId: string): Promise<{ remainingDays: number; label: string }> {
-    return {
-      remainingDays: 12,
-      label: '12 Days Remaining',
-    };
+  async getRemainingLeaveBalance(employeeId: string): Promise<{ remainingDays: number; label: string }> {
+    if (!employeeId) {
+      return { remainingDays: 0, label: '0 Days Remaining' };
+    }
+    try {
+      const { leaveRepository } = await import('../../pages/Leave/repositories/leaveRepository');
+      const balances = await leaveRepository.getBalances(employeeId);
+      const totalRemaining = balances.reduce((sum: number, b: { available?: number }) => sum + (b.available || 0), 0);
+      return {
+        remainingDays: totalRemaining,
+        label: `${totalRemaining} Days Remaining`,
+      };
+    } catch {
+      return {
+        remainingDays: 0,
+        label: '0 Days Remaining',
+      };
+    }
   }
 
   /**
@@ -130,36 +143,36 @@ class DashboardService {
 
     if (permissionService.isSuperAdmin(active)) {
       return [
-        { title: 'Total Active Candidates', value: '1,420', subtext: '940 Staffing + 480 OTS', change: '+12.4%', trend: 'up' },
-        { title: 'Org Revenue (MTD)', value: '₹1.84 Cr', subtext: '₹42.5L Pending Collections', change: '+8.2%', trend: 'up' },
-        { title: 'Monthly Expenses', value: '₹62.4L', subtext: 'Payroll & Operating Costs', change: 'Within Budget', trend: 'neutral' },
-        { title: 'Organization Health', value: 'Healthy', subtext: '0 Critical Blockers', change: 'Optimal', trend: 'up' },
+        { title: 'Total Active Candidates', value: 0, subtext: '0 Staffing + 0 OTS', change: '0%', trend: 'neutral' },
+        { title: 'Org Revenue (MTD)', value: '₹0', subtext: '₹0 Pending Collections', change: '0%', trend: 'neutral' },
+        { title: 'Monthly Expenses', value: '₹0', subtext: 'Payroll & Operating Costs', change: '0%', trend: 'neutral' },
+        { title: 'Organization Health', value: '--', subtext: '0 Critical Blockers', change: '--', trend: 'neutral' },
       ];
     }
 
     if (permissionService.canAccessModule(active, 'recruitment')) {
       return [
-        { title: 'Active Candidates', value: 86, subtext: '12 joining this week', change: '+14%', trend: 'up' },
-        { title: 'Recruiter Points', value: '450 pts', subtext: 'Target: 500 pts (90%)', change: 'On Track', trend: 'up' },
-        { title: 'Client Points', value: '128 pts', subtext: '8 Active Engagements', change: 'Stable', trend: 'neutral' },
-        { title: 'Client Highlights', value: '4 Placements', subtext: 'Acme & Apex Tech', change: '+2', trend: 'up' },
+        { title: 'Active Candidates', value: 0, subtext: '0 joining this week', change: '0%', trend: 'neutral' },
+        { title: 'Recruiter Points', value: '0 pts', subtext: 'Target: 0 pts', change: '0%', trend: 'neutral' },
+        { title: 'Client Points', value: '0 pts', subtext: '0 Active Engagements', change: '0%', trend: 'neutral' },
+        { title: 'Client Highlights', value: '0 Placements', subtext: 'None', change: '0', trend: 'neutral' },
       ];
     }
 
     if (permissionService.canAccessModule(active, 'finance')) {
       return [
-        { title: 'Revenue MTD', value: '₹48.2L', subtext: 'Billing Goal: ₹50L', change: '+5.4%', trend: 'up' },
-        { title: 'GST Liability', value: '₹8.67L', subtext: 'Filing Due Aug 20', change: 'Pending', trend: 'action' },
-        { title: 'Unpaid Amount', value: '₹18.4L', subtext: '14 Invoices Pending', change: 'Action Required', trend: 'down' },
-        { title: 'Unbilled Candidates', value: 18, subtext: '₹6.2L unbilled value', change: 'Ready for Invoice', trend: 'action' },
+        { title: 'Revenue MTD', value: '₹0', subtext: 'Billing Goal: ₹0', change: '0%', trend: 'neutral' },
+        { title: 'GST Liability', value: '₹0', subtext: 'No pending filing', change: 'Optimal', trend: 'neutral' },
+        { title: 'Unpaid Amount', value: '₹0', subtext: '0 Invoices Pending', change: 'Optimal', trend: 'neutral' },
+        { title: 'Unbilled Candidates', value: 0, subtext: '₹0 unbilled value', change: 'None', trend: 'neutral' },
       ];
     }
 
     return [
-      { title: 'Active Employees', value: 142, subtext: '+4 joined this month', change: '+2.9%', trend: 'up' },
-      { title: 'Today Attendance', value: '118 / 128', subtext: '92% present', change: '+1.2%', trend: 'up' },
-      { title: 'Pending Documents', value: 4, subtext: 'Approvals required', change: 'Action', trend: 'action' },
-      { title: 'Offers Generated', value: 8, subtext: '6 accepted', change: '+3', trend: 'up' },
+      { title: 'Active Employees', value: 0, subtext: '0 joined this month', change: '0%', trend: 'neutral' },
+      { title: 'Today Attendance', value: '0 / 0', subtext: '0% present', change: '0%', trend: 'neutral' },
+      { title: 'Pending Documents', value: 0, subtext: 'Approvals required', change: 'None', trend: 'neutral' },
+      { title: 'Offers Generated', value: 0, subtext: '0 accepted', change: '0', trend: 'neutral' },
     ];
   }
 
@@ -171,46 +184,128 @@ class DashboardService {
 
     if (permissionService.isSuperAdmin(active)) {
       return {
-        rank: 1,
-        totalParticipants: 142,
-        points: 2450,
-        target: 2000,
-        achievementPercent: 122.5,
+        rank: 0,
+        totalParticipants: 0,
+        points: 0,
+        target: 0,
+        achievementPercent: 0,
         scopeLabel: 'Organization Leaderboard',
       };
     }
 
     if (active.viewScope === 'Departments' || active.name.includes('Admin')) {
       return {
-        rank: 2,
-        totalParticipants: 24,
-        points: 450,
-        target: 500,
-        achievementPercent: 90.0,
+        rank: 0,
+        totalParticipants: 0,
+        points: 0,
+        target: 0,
+        achievementPercent: 0,
         scopeLabel: 'Department Ranking',
       };
     }
 
     if (active.viewScope === 'Teams' || active.reportingScope === 'OwnTeam') {
       return {
-        rank: 1,
-        totalParticipants: 8,
-        points: 450,
-        target: 500,
-        achievementPercent: 90.0,
+        rank: 0,
+        totalParticipants: 0,
+        points: 0,
+        target: 0,
+        achievementPercent: 0,
         scopeLabel: 'Team Ranking',
       };
     }
 
     // Default Recruiter / Employee (OWN RANK ONLY, never expose others)
     return {
-      rank: 3,
-      totalParticipants: 1, // Own rank only
-      points: 450,
-      target: 500,
-      achievementPercent: 90.0,
+      rank: 0,
+      totalParticipants: 0,
+      points: 0,
+      target: 0,
+      achievementPercent: 0,
       scopeLabel: 'Personal Achievement Score',
     };
+  }
+
+  /**
+   * Get Live Status Strip Metrics dynamically from Firestore repositories
+   */
+  async getLiveStatusMetrics(): Promise<{
+    workingToday: number;
+    present: number;
+    onLeave: number;
+    meetingsToday: number;
+    birthdays: number;
+    pendingApprovals: number;
+  }> {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const mmDd = todayStr.slice(5);
+
+      const { employeeService } = await import('../../pages/Employee/services/employeeService');
+      const { attendanceRepository } = await import('../../pages/Attendance/repositories/attendanceRepository');
+      const { leaveRepository } = await import('../../pages/Leave/repositories/leaveRepository');
+      const { calendarRepository } = await import('../calendar/repositories/calendarRepository');
+
+      const [employees, attendanceList, leaveRequests, calendarEvents, pendingLeaves] = await Promise.all([
+        employeeService.getEmployees().catch(() => []),
+        attendanceRepository.getDailyForOrganization(todayStr, todayStr).catch(() => []),
+        leaveRepository.getOrganizationRequests().catch(() => []),
+        calendarRepository.getEvents().catch(() => []),
+        leaveRepository.getPendingRequests().catch(() => []),
+      ]);
+
+      // Working Today: Active employees (not Inactive / Terminated / Resigned)
+      const workingToday = employees.filter(
+        (e: { employmentStatus?: string; status?: string }) =>
+          e.employmentStatus === 'Active' || e.employmentStatus === 'Notice Period' || e.status === 'Active'
+      ).length;
+
+      // Present: Attendance status = Present / HalfDay / SignedOut today
+      const present = attendanceList.filter(
+        (a: { status?: string }) => a.status === 'Present' || a.status === 'HalfDay' || a.status === 'SignedOut'
+      ).length;
+
+      // On Leave: Approved leave requests spanning today
+      const onLeave = leaveRequests.filter(
+        (l: { status?: string; startDate: string; endDate: string }) =>
+          l.status === 'Approved' && l.startDate <= todayStr && l.endDate >= todayStr
+      ).length;
+
+      // Meetings Today: Today's calendar events of type Meeting or Interview
+      const meetingsToday = calendarEvents.filter(
+        (c: { date: string; eventType?: string; type?: string }) =>
+          c.date === todayStr && (c.eventType === 'Meeting' || c.eventType === 'Interview' || c.type === 'Review' || c.type === 'Interview')
+      ).length;
+
+      // Birthdays: Active employees whose dateOfBirth matches MM-DD today
+      const birthdays = employees.filter((e: { dateOfBirth?: string }) => {
+        if (!e.dateOfBirth) return false;
+        const dobMmDd = e.dateOfBirth.slice(5);
+        return dobMmDd === mmDd;
+      }).length;
+
+      // Pending Approvals: Total pending leave requests + pending attendance requests
+      const pendingAttendance = await attendanceRepository.getPendingRequests().catch(() => []);
+      const pendingApprovals = pendingLeaves.length + pendingAttendance.length;
+
+      return {
+        workingToday,
+        present,
+        onLeave,
+        meetingsToday,
+        birthdays,
+        pendingApprovals,
+      };
+    } catch {
+      return {
+        workingToday: 0,
+        present: 0,
+        onLeave: 0,
+        meetingsToday: 0,
+        birthdays: 0,
+        pendingApprovals: 0,
+      };
+    }
   }
 
   /**

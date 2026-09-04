@@ -9,26 +9,26 @@ export default function OrganizationHealthWidget() {
           <span className="font-bold text-xs">Organization Health Snapshot</span>
         </div>
         <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold uppercase">
-          Healthy (98.4%)
+          Operational
         </span>
       </div>
 
       <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono pt-1">
         <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800">
           <span className="text-slate-400 block text-[10px]">Approvals</span>
-          <strong className="text-emerald-400">0 Critical</strong>
+          <strong className="text-slate-300">--</strong>
         </div>
         <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800">
           <span className="text-slate-400 block text-[10px]">Attendance</span>
-          <strong className="text-emerald-400">92% Rate</strong>
+          <strong className="text-slate-300">--</strong>
         </div>
         <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800">
           <span className="text-slate-400 block text-[10px]">Payroll</span>
-          <strong className="text-emerald-400">On Track</strong>
+          <strong className="text-slate-300">--</strong>
         </div>
         <div className="p-2 bg-slate-950/60 rounded-xl border border-slate-800">
           <span className="text-slate-400 block text-[10px]">Documents</span>
-          <strong className="text-emerald-400">100% Valid</strong>
+          <strong className="text-slate-300">--</strong>
         </div>
       </div>
     </div>

@@ -1,5 +1,8 @@
 import { Calendar } from 'lucide-react';
-import type { Candidate } from '../../types/crm';
+import { useEffect, useState } from 'react';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../../../../../firebase/firebase';
+import type { Candidate, FollowUpRecord } from '../../types/crm';
 
 interface FollowUpsTabProps {
   candidate: Candidate;
@@ -7,13 +10,32 @@ interface FollowUpsTabProps {
 }
 
 export default function FollowUpsTab({ candidate, onQuickUpdate }: FollowUpsTabProps) {
-  const followUps = candidate.followUps || [];
+  const [followUps, setFollowUps] = useState<FollowUpRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFollowUps() {
+      try {
+        const ref = collection(db, 'crm_candidates', candidate.id, 'followUps');
+        const q = query(ref, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        setFollowUps(snapshot.docs.map(doc => doc.data() as FollowUpRecord));
+      } catch (err) {
+        console.error('Failed to load follow-ups', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFollowUps();
+  }, [candidate.id]);
+
+  if (loading) return <div className="p-4 text-xs text-slate-400">Loading follow-ups...</div>;
 
   return (
     <div className="space-y-4 text-xs text-slate-700">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
         <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <Calendar size={16} className="text-emerald-600" /> Upcoming Scheduled Follow Ups ({followUps.length})
+          <Calendar size={16} className="text-emerald-600" /> Scheduled Follow Ups ({followUps.length})
         </h4>
         <button
           type="button"

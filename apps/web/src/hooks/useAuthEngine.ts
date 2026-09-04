@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AuthResponse, PasswordPolicyResult } from '../types/auth';
 import { authService, validatePasswordPolicy } from '../services/auth/authService';
 
-export type AuthTabMode = 'login' | 'activation' | 'forgot';
+export type AuthTabMode = 'login' | 'change_password' | 'forgot';
 
 export interface UseAuthEngineReturn {
   activeTab: AuthTabMode;
@@ -39,7 +39,7 @@ export interface UseAuthEngineReturn {
   showPassword: boolean;
   setShowPassword: (val: boolean) => void;
   // Actions
-  handleCompleteActivation: () => Promise<AuthResponse | null>;
+  handleCompleteActivation: (fallbackEmpId?: string) => Promise<AuthResponse | null>;
   handleCompleteResetPassword: () => Promise<AuthResponse | null>;
   resetFlows: () => void;
 }
@@ -60,7 +60,7 @@ export function useAuthEngine(): UseAuthEngineReturn {
   const [otpStep, setOtpStep] = useState<'input' | 'verify' | 'new_password'>('input');
   const [otpCode, setOtpCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<unknown>(null);
-  const [targetEmployeeId, setTargetEmployeeId] = useState('');
+  
   const [targetMobileNumber, setTargetMobileNumber] = useState('');
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [canResendOtp, setCanResendOtp] = useState(true);
@@ -114,11 +114,18 @@ export function useAuthEngine(): UseAuthEngineReturn {
     clearMessages();
   }, [clearMessages]);
 
+  
+
+  const [targetEmployeeId, setTargetEmployeeId] = useState('');
+
   const handleNormalLogin = async (): Promise<AuthResponse | null> => {
     clearMessages();
     setIsLoading(true);
     try {
       const res = await authService.login(loginId, loginPassword);
+      if (res && res.mustChangePassword && res.employee) {
+        setTargetEmployeeId(res.employee.employeeId || res.employee.id); // store for password change
+      }
       setIsLoading(false);
       return res;
     } catch (caught) {
@@ -133,19 +140,17 @@ export function useAuthEngine(): UseAuthEngineReturn {
     clearMessages();
     setIsLoading(true);
     try {
-      const flow = activeTab === 'activation' ? 'activation' : 'forgot_password';
-      const { confirmationResult: conf, mobileNumber, employee } = await authService.sendOtpForFlow(identifier, flow);
-      setConfirmationResult(conf);
+      const { message, employee } = await authService.requestPasswordResetToken(identifier);
       setTargetEmployeeId(employee.employeeId);
-      setTargetMobileNumber(mobileNumber);
+      setTargetMobileNumber(employee.employeeId); // generic tracking
       setOtpStep('verify');
       setTimerSeconds(60);
-      setSuccessMessage(`Verification OTP sent via SMS to registered mobile ${mobileNumber.slice(-4).padStart(mobileNumber.length, '*')}.`);
+      setSuccessMessage(message);
       setIsLoading(false);
       return true;
     } catch (caught) {
       setIsLoading(false);
-      const msg = caught instanceof Error ? caught.message : 'Unable to send OTP via SMS. Please try again.';
+      const msg = caught instanceof Error ? caught.message : 'Unable to request reset code. Please try again.';
       setError(msg);
       return false;
     }
@@ -156,7 +161,8 @@ export function useAuthEngine(): UseAuthEngineReturn {
     return handleSendOtp(targetEmployeeId);
   };
 
-  const handleCompleteActivation = async (): Promise<AuthResponse | null> => {
+
+  const handleCompleteActivation = async (fallbackEmpId?: string): Promise<AuthResponse | null> => {
     clearMessages();
     if (!newPassword || newPassword !== confirmPassword) {
       setError('Passwords do not match. Please ensure Password and Confirm Password match exactly.');
@@ -170,13 +176,24 @@ export function useAuthEngine(): UseAuthEngineReturn {
 
     setIsLoading(true);
     try {
-      const res = await authService.completeActivation(targetEmployeeId, confirmationResult, otpCode, newPassword);
+      const empIdToUse = targetEmployeeId || fallbackEmpId;
+      if (!empIdToUse) {
+         setError("Session expired. Please log in again.");
+         setIsLoading(false);
+         return null;
+      }
+      const res = await authService.completeActivation(
+        empIdToUse,
+        null,
+        '',
+        newPassword
+      );
       setIsLoading(false);
-      setSuccessMessage('Account activated successfully!');
+      setSuccessMessage('Password reset successfully! You are now logged in.');
       return res;
     } catch (caught) {
       setIsLoading(false);
-      const msg = caught instanceof Error ? caught.message : 'First activation failed. Please try again.';
+      const msg = caught instanceof Error ? caught.message : 'Password reset failed. Please try again.';
       setError(msg);
       return null;
     }
@@ -208,12 +225,14 @@ export function useAuthEngine(): UseAuthEngineReturn {
     }
   };
 
+  const wrappedSetActiveTab = useCallback((tab: AuthTabMode) => {
+    setActiveTab(tab);
+    resetFlows();
+  }, [resetFlows]);
+
   return {
     activeTab,
-    setActiveTab: (tab: AuthTabMode) => {
-      setActiveTab(tab);
-      resetFlows();
-    },
+    setActiveTab: wrappedSetActiveTab,
     theme,
     toggleTheme,
     isLoading,

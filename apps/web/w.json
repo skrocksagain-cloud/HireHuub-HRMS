@@ -1,0 +1,82 @@
+[
+  {
+    "id": "WF-1zA8zMFJY6jskQ9kd2L1",
+    "phone": "9903427956",
+    "updatedAt": "2026-08-24T19:59:42.061Z",
+    "candidateId": "1zA8zMFJY6jskQ9kd2L1",
+    "createdAt": "2026-08-24T19:59:42.061Z",
+    "lastWorkingDate": "2026-08-27"
+  },
+  {
+    "id": "xUUBMbrB4gxqv7ouraYE",
+    "systemAudit": [
+      {
+        "details": "Active candidate created via Associate Partner 'ss'.",
+        "action": "Created",
+        "performedBy": "SAURAV bASAK (Manager - Staffing)",
+        "id": "AUD-WF-1787080551509",
+        "timestamp": "2026-08-18T19:15:51.241Z"
+      },
+      {
+        "timestamp": "2026-08-19T19:24:14.865Z",
+        "details": "Billing Status updated to Pending.",
+        "id": "AUD-WF-1787167454865",
+        "action": "Status Changed",
+        "performedBy": "Development Admin"
+      },
+      {
+        "action": "Status Changed",
+        "details": "Billing Status updated to Billed.",
+        "performedBy": "Development Admin",
+        "id": "AUD-WF-1787167455559",
+        "timestamp": "2026-08-19T19:24:15.559Z"
+      },
+      {
+        "performedBy": "Development Admin",
+        "id": "AUD-WF-1787167457247",
+        "details": "Billing Status updated to Pending.",
+        "timestamp": "2026-08-19T19:24:17.247Z",
+        "action": "Status Changed"
+      }
+    ],
+    "totalEarnings": 0,
+    "tenureDays": 0,
+    "activatedBy": "SAURAV bASAK (Manager - Staffing)",
+    "recruiterId": "emp-001",
+    "placementHistory": [
+      {
+        "clientType": "OTS",
+        "status": "Active",
+        "clientId": "UAsxiuIbosU5XI1FdGOB",
+        "createdAt": "2026-08-18T19:15:51.241Z",
+        "clientName": "sasda",
+        "activeDate": "2026-08-18",
+        "id": "PL-1787080551509"
+      }
+    ],
+    "createdAt": "2026-08-18T19:15:51.241Z",
+    "clientName": "sasda",
+    "associatePartnerId": "4aMKN6yDAIultj87chyr",
+    "updatedAt": "2026-08-24T18:32:11.127Z",
+    "reportingTeamLead": "SAURAV bASAK (Manager - Staffing)",
+    "city": "Patna",
+    "currentAssignee": "SAURAV bASAK (Manager - Staffing)",
+    "supportsOrders": false,
+    "recruiterName": "SAURAV bASAK (Manager - Staffing)",
+    "clientId": "UAsxiuIbosU5XI1FdGOB",
+    "phone": "asdsa",
+    "associatePartnerName": "ss",
+    "area": "Patna",
+    "joiningDate": "2026-08-18",
+    "eligibility": "Pending",
+    "tenureDisplay": "0 Days",
+    "workforceType": "OTS",
+    "lastWorkingDate": "2026-08-15",
+    "workingFrom": "2026-08-18",
+    "billingStatus": "Pending",
+    "activeDate": "2026-08-18",
+    "workingStatus": "Working",
+    "candidateId": "HHCD-551509",
+    "candidateName": "sdsa"
+  }
+]

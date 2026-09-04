@@ -36,6 +36,7 @@ export interface UserSession {
   loginAt: string;
   logoutAt: string | null;
   lastActivity: string;
+  expiresAt?: string;
   device: string;
   browser: string;
   platform: string;
@@ -104,7 +105,10 @@ export interface AuthResponse {
     employeeId: string;
     name: string;
     role: string;
+    departmentId?: string;
     department?: string;
+    teamId?: string;
+    teamName?: string;
     designation: string;
     email?: string;
     mobileNumber?: string;
@@ -114,6 +118,7 @@ export interface AuthResponse {
   errorMessage?: string;
   requiresOtp?: boolean;
   confirmationResult?: unknown;
+  mustChangePassword?: boolean;
 }
 
 /**

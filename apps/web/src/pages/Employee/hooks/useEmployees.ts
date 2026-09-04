@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { employeeService } from '../services/employeeService';
 import type { Employee, EmployeeFilter, EmployeeFormData } from '../types/Employee';
+import { useAuth } from '../../../context/AuthContext';
+import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
 
 const EMPTY_FILTER: EmployeeFilter = {
   search: '',
@@ -52,6 +54,7 @@ const getErrorMessage = (error: unknown, fallbackMessage: string): string => (
 );
 
 export const useEmployees = (): UseEmployeesResult => {
+  const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filter, setFilter] = useState<EmployeeFilter>(EMPTY_FILTER);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,13 +72,21 @@ export const useEmployees = (): UseEmployeesResult => {
     try {
       setIsLoading(true);
       setError(null);
-      setEmployees(await employeeService.getEmployees());
+      
+      const scope = getSimplifiedModuleScope(user?.authorization?.role || user?.assignedRole);
+      const emps = scope === 'GLOBAL'
+        ? await employeeService.getAllEmployeesGlobal()
+        : scope === 'DEPARTMENT'
+        ? await employeeService.getEmployeesForDepartment(user?.departmentId)
+        : await employeeService.getEmployeeForSelf(user?.employeeId || user?.id);
+
+      setEmployees(emps);
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, 'Unable to load employees.'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const refreshTimer = window.setTimeout(() => {
@@ -120,21 +131,39 @@ export const useEmployees = (): UseEmployeesResult => {
     });
   }, [employees, filter]);
 
+  const [adminDepartments, setAdminDepartments] = useState<string[]>([]);
+  const [adminDesignations, setAdminDesignations] = useState<string[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      try {
+        const { adminService } = await import('../../../services/admin/adminService');
+        const [depts, desigs] = await Promise.all([
+          adminService.getDepartments().catch(() => []),
+          adminService.getDesignations().catch(() => []),
+        ]);
+        if (!isMounted) return;
+        setAdminDepartments(depts.filter((d) => d.isActive !== false).map((d) => d.name));
+        setAdminDesignations(desigs.filter((d) => d.isActive !== false).map((d) => d.name));
+      } catch {
+        // Fallback handled by employee records
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const departments = useMemo(() => {
     const list = [...new Set(employees.map(({ department }) => department).filter(Boolean))];
-    const defaults = ['Recruitment', 'Operations', 'Finance', 'Sales'];
-    return [...new Set([...defaults, ...list])];
-  }, [employees]);
+    return [...new Set([...adminDepartments, ...list])];
+  }, [employees, adminDepartments]);
+
   const designations = useMemo(() => {
     const list = [...new Set(employees.map(({ designation }) => designation).filter(Boolean))];
-    const defaults = [
-      'Recruitment Manager', 'Senior Recruitment Executive', 'Recruitment Executive',
-      'Operation Manager', 'Business Development Executive', 'MIS', 'Marketing Executive',
-      'Finance Manager', 'Payroll Executive', 'Accounts Executive',
-      'Sales Manager', 'Senior Sales Executive', 'Sales Executive'
-    ];
-    return [...new Set([...defaults, ...list])];
-  }, [employees]);
+    return [...new Set([...adminDesignations, ...list])];
+  }, [employees, adminDesignations]);
   const summary = useMemo<EmployeeSummary>(() => ({
     total: employees.length,
     active: employees.filter(({ employmentStatus }) => employmentStatus === 'Active').length,

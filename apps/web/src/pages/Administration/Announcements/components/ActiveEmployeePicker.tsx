@@ -6,9 +6,11 @@ import type { Employee } from '../../../Employee/types/Employee';
 interface Props {
   selectedEmployeeIds: string[];
   onChange: (updatedIds: string[]) => void;
+  onSelectionChange?: (selectedEmployees: Employee[]) => void;
+  singleSelect?: boolean;
 }
 
-export default function ActiveEmployeePicker({ selectedEmployeeIds, onChange }: Props) {
+export default function ActiveEmployeePicker({ selectedEmployeeIds, onChange, onSelectionChange, singleSelect }: Props) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -46,8 +48,18 @@ export default function ActiveEmployeePicker({ selectedEmployeeIds, onChange }: 
 
   const toggleEmployee = (empId: string) => {
     const exists = selectedEmployeeIds.includes(empId);
-    const updated = exists ? selectedEmployeeIds.filter((id) => id !== empId) : [...selectedEmployeeIds, empId];
+    let updated: string[];
+    
+    if (singleSelect) {
+      updated = exists ? [] : [empId];
+    } else {
+      updated = exists ? selectedEmployeeIds.filter((id) => id !== empId) : [...selectedEmployeeIds, empId];
+    }
+    
     onChange(updated);
+    if (onSelectionChange) {
+      onSelectionChange(employees.filter(e => updated.includes(e.employeeId || e.id || '')));
+    }
   };
 
   const selectedEmployees = employees.filter((e) => selectedEmployeeIds.includes(e.employeeId || e.id || ''));

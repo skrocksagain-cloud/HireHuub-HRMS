@@ -5,23 +5,33 @@ import Badge from "../../ui/Badge";
 
 import type { Document } from "../../types/Document";
 
-import { getDocuments } from "../../services/document/documentService";
+import { useAuth } from "../../context/AuthContext";
+import { getAuthorizationScope } from "../../core/authorization/authorizationResolver";
+import { getAllDocumentsGlobally, getDocumentsByReference } from "../../services/document/documentService";
 
 export default function DocumentHistory() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
 
   const [documents, setDocuments] = useState<Document[]>([]);
 
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [user]);
 
   async function loadHistory() {
     try {
       setLoading(true);
+      const canonicalRole = user?.authorization?.role || user?.assignedRole || "";
+      const scope = getAuthorizationScope(canonicalRole);
+      const userEmpId = user?.employeeId || user?.id || "";
 
-      const data = await getDocuments();
-
+      let data: Document[] = [];
+      if (scope === 'GLOBAL') {
+        data = await getAllDocumentsGlobally(canonicalRole);
+      } else {
+        data = await getDocumentsByReference(userEmpId);
+      }
       setDocuments(data);
     } catch {
       setDocuments([]);

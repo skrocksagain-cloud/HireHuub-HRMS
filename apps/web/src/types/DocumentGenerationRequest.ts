@@ -52,9 +52,9 @@ export interface DocumentGenerationRequest<TPayload = unknown> {
   payload: TPayload;
 
   /**
-   * React template to render as PDF.
+   * Optional React template (legacy reference only).
    */
-  template: ReactElement;
+  template?: ReactElement;
 
   /**
    * Optional metadata

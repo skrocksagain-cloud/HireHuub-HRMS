@@ -1,4 +1,42 @@
 import type { ApprovalScopeType, RoleItem, ViewScopeType } from '../../types/Admin';
+import matrixSource from './full_matrix.json?raw';
+
+type MatrixActions = Record<string, string>;
+type AuthorizationMatrix = Record<string, Record<string, Record<string, MatrixActions>>>;
+
+const authorizationMatrix = JSON.parse(matrixSource) as AuthorizationMatrix;
+const RESTRICTED_MATRIX_VALUES = new Set(['', 'restricted', 'none', 'no']);
+
+// Matrix matching intentionally permits formatting differences only.  In
+// particular, role names are never expanded, inferred, or matched by prefix.
+const normalize = (value: string | undefined): string => (value || '').trim().toLowerCase();
+
+const MODULE_KEYS: Record<string, string> = {
+  'associate partner': 'associatepartner',
+  'campaign hub': 'campaignhub',
+  'internal payroll': 'internalpayroll',
+  transaction: 'transaction',
+  invoice: 'invoice',
+  'credit note': 'creditnote',
+  'management control': 'managementcontrol',
+  'calendar and events': 'calendar',
+  announcement: 'announcement',
+};
+
+const modulePermissionKey = (moduleName: string): string =>
+  MODULE_KEYS[normalize(moduleName)] || normalize(moduleName).replace(/[^a-z0-9]/g, '');
+
+const canonicalModuleKey = (moduleName: string): string => {
+  const key = modulePermissionKey(moduleName);
+  return ({
+    associatepartners: 'associatepartner',
+    campaignhubs: 'campaignhub',
+    transactions: 'transaction',
+    invoices: 'invoice',
+    creditnotes: 'creditnote',
+    announcements: 'announcement',
+  } as Record<string, string>)[key] || key;
+};
 
 export interface PermissionValidationResult {
   valid: boolean;
@@ -66,40 +104,130 @@ class PermissionService {
 
   private roleCache = new Map<string, RoleItem>();
 
-  getEffectiveRole(defaultRole?: RoleItem | string): RoleItem {
-    if (this.simulatedRole) return this.simulatedRole;
-    if (typeof defaultRole === 'object' && defaultRole) return defaultRole;
+  setMasterRoles(_roles: RoleItem[]): void {
+    // Authorization is sourced solely from the embedded workbook matrix.
+    this.invalidateCache();
+  }
 
-    const roleName = typeof defaultRole === 'string' ? defaultRole : 'Super Admin';
-    const isSuper = roleName === 'Super Admin' || roleName === 'admin' || defaultRole === undefined;
+  private findMatrixDepartment(department?: string): string | undefined {
+    const normalizedDepartment = normalize(department);
+    return Object.keys(authorizationMatrix).find((name) => normalize(name) === normalizedDepartment);
+  }
 
-    if (isSuper) {
-      return PermissionService.defaultSuperRole;
+  private findMatrixRole(department: string, assignedRole: string): string | undefined {
+    const roles = authorizationMatrix[department];
+    return Object.keys(roles).find((role) => normalize(role) === normalize(assignedRole));
+  }
+
+  private createMatrixRole(department: string, roleName: string): RoleItem {
+    const row = authorizationMatrix[department][roleName];
+    const permissions: string[] = [];
+    const modules: string[] = [];
+
+    for (const [moduleName, actions] of Object.entries(row)) {
+      const key = canonicalModuleKey(moduleName);
+      if (normalize(roleName) === 'master admin' && key === 'managementcontrol') continue;
+      const view = normalize(actions.View);
+      if (!RESTRICTED_MATRIX_VALUES.has(view)) {
+        modules.push(key);
+        permissions.push(`${key}:view`);
+      }
+      for (const [action, value] of Object.entries(actions)) {
+        if (action !== 'View' && !RESTRICTED_MATRIX_VALUES.has(normalize(value))) {
+          permissions.push(`${key}:${normalize(action) === 'edit /modify' ? 'edit' : normalize(action)}`);
+        }
+      }
     }
 
-    if (this.roleCache.has(roleName)) {
-      return this.roleCache.get(roleName)!;
+    // Targeted authorization correction: Staffing Master Admin may view every
+    // existing Workbench child without receiving non-Workbench privileges.
+    if (normalize(department) === 'staffing' && normalize(roleName) === 'master admin') {
+      for (const moduleName of ['client', 'associatepartner', 'openings', 'crm', 'workforce', 'campaignhub']) {
+        modules.push(moduleName);
+        permissions.push(`${moduleName}:view`);
+      }
     }
 
-    const newRole: RoleItem = {
-      id: `role-${roleName.toLowerCase().replace(/\s+/g, '-')}`,
+    const viewValues = Object.values(row).map((actions) => normalize(actions.View));
+    const viewScope: ViewScopeType = viewValues.includes('own')
+      ? 'Own'
+      : viewValues.some((value) => value.includes('team'))
+        ? 'Teams'
+        : viewValues.includes('department')
+          ? 'Departments'
+          : 'Organization';
+
+    return {
+      id: `matrix-${normalize(department).replace(/\s+/g, '-')}-${normalize(roleName).replace(/\s+/g, '-')}`,
       name: roleName,
       description: '',
-      permissions: [roleName === 'dashboard' ? 'dashboard:view' : `${roleName.toLowerCase()}:view`],
-      modules: ['dashboard', 'employees'],
-      viewScope: 'Organization',
-      approvalScope: 'Organization',
+      permissions,
+      modules: [...new Set(modules)],
+      viewScope,
+      approvalScope: viewScope === 'Departments' ? 'Departments' : viewScope === 'Teams' ? 'Teams' : viewScope === 'Own' ? 'Own' : 'Organization',
       reportingScope: 'DirectReports',
       departmentIds: [],
       teamIds: [],
       employeeIds: [],
       branchIds: [],
       companyIds: [],
+      department,
       isActive: true,
     };
+  }
 
-    this.roleCache.set(roleName, newRole);
-    return newRole;
+  getEffectiveRole(defaultRole?: RoleItem | string, department?: string): RoleItem {
+    if (this.simulatedRole) return this.simulatedRole;
+    const roleName = typeof defaultRole === 'object'
+      ? defaultRole.roleName || defaultRole.name
+      : defaultRole;
+    const roleDepartment = department || (typeof defaultRole === 'object' ? defaultRole.department : undefined);
+
+    if (normalize(roleName) === 'super admin') {
+      return PermissionService.defaultSuperRole;
+    }
+
+    const matrixDepartment = this.findMatrixDepartment(roleDepartment);
+    const matrixRole = roleName && matrixDepartment && this.findMatrixRole(matrixDepartment, roleName);
+    if (matrixDepartment && matrixRole) {
+      const cacheKey = `${matrixDepartment}:${matrixRole}`;
+      if (!this.roleCache.has(cacheKey)) {
+        this.roleCache.set(cacheKey, this.createMatrixRole(matrixDepartment, matrixRole));
+      }
+      return this.roleCache.get(cacheKey)!;
+    }
+
+    // No exact row means no access.  This prevents a missing department, an
+    // unknown role, or Admin from silently inheriting broader permissions.
+    return {
+      id: 'matrix-no-access',
+      name: typeof roleName === 'string' ? roleName : 'No Access',
+      description: '',
+      permissions: [],
+      modules: [],
+      viewScope: 'Own',
+      approvalScope: 'Own',
+      reportingScope: 'DirectReports',
+      departmentIds: [],
+      teamIds: [],
+      employeeIds: [],
+      branchIds: [],
+      companyIds: [],
+      department: roleDepartment,
+      isActive: false,
+    };
+  }
+
+  getMatrixValue(role: RoleItem | string, moduleName: string, action: string): string {
+    const activeRole = this.getEffectiveRole(role);
+    if (this.isSuperAdmin(activeRole)) return 'All';
+    const department = this.findMatrixDepartment(activeRole.department);
+    const matrixRole = department && this.findMatrixRole(department, activeRole.name);
+    if (!department || !matrixRole) return 'Restricted';
+
+    const row = authorizationMatrix[department][matrixRole];
+    const matrixModule = Object.keys(row).find((name) => canonicalModuleKey(name) === canonicalModuleKey(moduleName));
+    return matrixModule ? row[matrixModule][action] || 'Restricted' : 'Restricted';
   }
 
   /**
@@ -129,7 +257,13 @@ class PermissionService {
     }
 
     // Module wildcard check (e.g. 'finance:*')
-    const modulePrefix = permissionKey.split(':')[0];
+    const [rawModule, action] = permissionKey.split(':');
+    const canonicalPermission = action ? `${canonicalModuleKey(rawModule)}:${action}` : canonicalModuleKey(rawModule);
+    if (perms.includes(canonicalPermission)) {
+      return true;
+    }
+
+    const modulePrefix = canonicalModuleKey(rawModule);
     if (modulePrefix && perms.includes(`${modulePrefix}:*`)) {
       return true;
     }
@@ -164,18 +298,18 @@ class PermissionService {
     const active = this.getEffectiveRole(role);
     if (this.isSuperAdmin(active)) return true;
 
-    const normKey = moduleKey.toLowerCase();
-
-    // Check feature flags first
-    if (!this.isFeatureEnabled(moduleKey.toUpperCase(), active)) {
-      return false;
-    }
+    const normKey = canonicalModuleKey(moduleKey);
 
     // Check explicit module array if configured
     if (active.modules && active.modules.length > 0) {
       if (active.modules.includes(normKey) || active.modules.includes('*')) {
         return true;
       }
+    }
+
+    // Feature flags apply only when the matrix did not explicitly grant the module.
+    if (!this.isFeatureEnabled(moduleKey.toUpperCase(), active)) {
+      return false;
     }
 
     // Fallback permission check

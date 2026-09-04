@@ -1,6 +1,8 @@
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, Timestamp, updateDoc, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '../../../../firebase/firebase';
+import type { FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
+import { canReadFinanceGlobally } from '../../../../core/authorization/financeAuthorization';
 import type { CreateInvoiceDraftInput, Invoice, InvoiceDocumentStorage, InvoiceSnapshot, InvoiceStatus, InvoiceStatusHistoryEntry, PaymentHistoryEntry } from '../../../../types/Invoice';
 
 const INVOICES_COLLECTION = 'invoices';
@@ -44,6 +46,15 @@ const invoiceFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): Invoice => 
     grandTotal,
     poNumber: data.poNumber ? String(data.poNumber) : undefined,
     remarks: data.remarks ? String(data.remarks) : undefined,
+    templateType: (data.templateType || data.snapshot?.templateType) as any,
+    billOfMonth: data.billOfMonth ? String(data.billOfMonth) : undefined,
+    stationCode: data.stationCode ? String(data.stationCode) : undefined,
+    placeOfSupply: data.placeOfSupply ? String(data.placeOfSupply) : undefined,
+    signatoryId: data.signatoryId ? String(data.signatoryId) : (data.snapshot?.company?.signatoryId ? String(data.snapshot.company.signatoryId) : undefined),
+    signatorySnapshot: data.signatorySnapshot as any || data.snapshot?.signatory,
+    bankAccountId: data.bankAccountId ? String(data.bankAccountId) : (data.snapshot?.bankAccount?.bankAccountId ? String(data.snapshot.bankAccount.bankAccountId) : undefined),
+    bankAccountSnapshot: data.bankAccountSnapshot as any || data.snapshot?.bankAccount,
+    stampUrl: data.stampUrl ? String(data.stampUrl) : (data.snapshot?.company?.stampUrl ? String(data.snapshot.company.stampUrl) : undefined),
     status: data.status as InvoiceStatus,
     statusHistory: (data.statusHistory ?? []).map((entry: InvoiceStatusHistoryEntry) => ({ ...entry, changedAt: timestamp(entry.changedAt) })),
     snapshot: data.snapshot as InvoiceSnapshot | undefined,
@@ -79,8 +90,8 @@ export interface InvoiceTotalsUpdate {
 
 export interface InvoiceRepository {
   createDraft(input: CreateInvoiceDraftInput, createdBy: string): Promise<string>;
-  getInvoice(id: string): Promise<Invoice | null>;
-  getInvoices(): Promise<Invoice[]>;
+  getInvoice(id: string, actor: FinanceAuthorizationContext): Promise<Invoice | null>;
+  getInvoices(actor: FinanceAuthorizationContext): Promise<Invoice[]>;
   updateDraft(id: string, input: CreateInvoiceDraftInput): Promise<void>;
   completeGeneration(id: string, snapshot: InvoiceSnapshot, document: InvoiceDocumentStorage, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void>;
   updateStatus(id: string, status: InvoiceStatus, statusHistory: InvoiceStatusHistoryEntry[]): Promise<void>;
@@ -98,6 +109,12 @@ class FirestoreInvoiceRepository implements InvoiceRepository {
       clientId: input.clientId,
       clientName: input.clientName || '',
       invoiceDate: input.invoiceDate,
+      templateType: input.templateType || 'All',
+      billOfMonth: input.billOfMonth || '',
+      stationCode: input.stationCode || '',
+      placeOfSupply: input.placeOfSupply || '',
+      signatoryId: input.signatoryId || '',
+      bankAccountId: input.bankAccountId || '',
       lineItems: input.lineItems,
       taxableAmount: input.taxableAmount ?? 0,
       gstAmount: input.gstAmount ?? 0,
@@ -122,12 +139,14 @@ class FirestoreInvoiceRepository implements InvoiceRepository {
     return result.id;
   }
 
-  async getInvoice(id: string): Promise<Invoice | null> {
+  async getInvoice(id: string, actor: FinanceAuthorizationContext): Promise<Invoice | null> {
+    if (!canReadFinanceGlobally(actor)) return null;
     const snapshot = await getDoc(doc(db, INVOICES_COLLECTION, id));
     return snapshot.exists() ? invoiceFrom(snapshot) : null;
   }
 
-  async getInvoices(): Promise<Invoice[]> {
+  async getInvoices(actor: FinanceAuthorizationContext): Promise<Invoice[]> {
+    if (!canReadFinanceGlobally(actor)) return [];
     const result = await getDocs(collection(db, INVOICES_COLLECTION));
     return result.docs.map(invoiceFrom);
   }
@@ -137,6 +156,9 @@ class FirestoreInvoiceRepository implements InvoiceRepository {
       clientId: input.clientId,
       clientName: input.clientName || '',
       invoiceDate: input.invoiceDate,
+      templateType: input.templateType || 'All',
+      signatoryId: input.signatoryId || '',
+      bankAccountId: input.bankAccountId || '',
       lineItems: input.lineItems,
       taxableAmount: input.taxableAmount ?? 0,
       gstAmount: input.gstAmount ?? 0,

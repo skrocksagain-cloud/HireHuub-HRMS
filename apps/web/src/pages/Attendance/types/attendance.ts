@@ -30,9 +30,17 @@ export interface DailyAttendance {
   logoutTime: Timestamp | null;
   totalWorkMinutes: number;
   isLocked: boolean;
+  deviceType?: string;
+  address?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+export type ApprovalStageStatus =
+  | 'Pending Manager Approval'
+  | 'Approved by Manager'
+  | 'Fully Approved'
+  | 'Rejected';
 
 export interface AttendanceRequest {
   id: string;
@@ -44,6 +52,13 @@ export interface AttendanceRequest {
   attendanceDate: string;
   reason: string;
   status: ApprovalStatus;
+  approvalStage?: ApprovalStageStatus;
+  managerApproved?: boolean;
+  managerApproverId?: string | null;
+  managerApprovedAt?: Timestamp | null;
+  adminApproved?: boolean;
+  adminApproverId?: string | null;
+  adminApprovedAt?: Timestamp | null;
   approverEmployeeId: string | null;
   decisionReason: string;
   createdAt: Timestamp;

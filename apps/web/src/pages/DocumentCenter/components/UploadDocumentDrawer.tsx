@@ -165,13 +165,14 @@ export default function UploadDocumentDrawer({
       setIsSubmitting(true);
 
       // Compute Shared With display string
-      let sharedWith = "Company → All Employees";
-      let refId = "COMPANY";
+      let sharedWith = '';
+      let refId = '';
 
       if (targetType === "Employee") {
-        const emp = employees.find((e) => e.id === assignedToId) || employees[0];
-        refId = emp?.id || "HH0001";
-        sharedWith = `Employee → ${emp ? `${emp.code} - ${emp.name}` : assignedToId}`;
+        const emp = employees.find((e) => e.id === assignedToId);
+        if (!emp) throw new Error('Select an employee from the Employee master.');
+        refId = emp.id;
+        sharedWith = `Employee → ${emp.code} - ${emp.name}`;
       } else if (targetType === "Department") {
         refId = assignedToId || "Recruitment";
         sharedWith = `Department → ${refId}`;
@@ -202,25 +203,13 @@ export default function UploadDocumentDrawer({
           ? "Finance"
           : "Employee";
 
-      let downloadUrl = URL.createObjectURL(selectedFile);
-      let storagePath = `documents/${refId}/${selectedFile.name}`;
-      let fileSize = selectedFile.size;
-      let mimeType = selectedFile.type || "application/pdf";
-
-      try {
-        const uploadRes = await storageService.upload(selectedFile, storagePath);
-        downloadUrl = uploadRes.downloadUrl;
-        storagePath = uploadRes.storagePath;
-        fileSize = uploadRes.fileSize;
-        mimeType = uploadRes.mimeType;
-      } catch {
-        // Fallback to local object URL if storage bucket is offline
-      }
+      if (!refId) throw new Error('A production document must have a valid owner reference.');
+      const uploadRes = await storageService.upload(selectedFile, `documents/${refId}/${selectedFile.name}`);
 
       await documentService.create({
-        documentId: `DOC${Date.now().toString().slice(-6)}`,
-        companyId: "HH01",
-        branchId: "MAIN",
+        documentId: '',
+        companyId: '',
+        branchId: '',
         category: docCategory,
         module: docModule,
         documentType,
@@ -232,16 +221,16 @@ export default function UploadDocumentDrawer({
         fileName: selectedFile.name,
         version: Number(version) || 1,
         status: "Uploaded",
-        storagePath,
-        downloadUrl,
-        fileSize,
-        mimeType,
+        storagePath: uploadRes.storagePath,
+        downloadUrl: uploadRes.downloadUrl,
+        fileSize: uploadRes.fileSize,
+        mimeType: uploadRes.mimeType,
         requiresSignature: false,
         isSigned: false,
         signedBy: "",
         qrCodeUrl: "",
         isLocked: false,
-        generatedBy: user?.name || "Admin",
+        generatedBy: user?.name || '',
         emailed: false,
         emailedTo: "",
         downloadCount: 0,

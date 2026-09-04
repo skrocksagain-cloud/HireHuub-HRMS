@@ -5,11 +5,11 @@ export interface IImportValidationService {
 }
 
 export class ImportValidationService implements IImportValidationService {
-  async validateImportData(_data: RawOpeningImportData[]): Promise<OpeningValidationResult> {
-    // Extension Point: Future import validation engine implementation
+  async validateImportData(data: RawOpeningImportData[]): Promise<OpeningValidationResult> {
+    if (!data.length) return { isValid: false, errors: ['No parsed opening rows were supplied.'], warnings: [] };
     return {
-      isValid: true,
-      errors: [],
+      isValid: data.every((row) => Boolean(row.rawFields.Title || row.rawFields.title || row.rawFields.Position || row.rawFields.position)),
+      errors: data.flatMap((row, index) => row.rawFields.Title || row.rawFields.title || row.rawFields.Position || row.rawFields.position ? [] : [`Row ${index + 2}: Title or Position is required.`]),
       warnings: [],
     };
   }

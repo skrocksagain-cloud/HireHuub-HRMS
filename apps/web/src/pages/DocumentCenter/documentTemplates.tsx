@@ -1,6 +1,3 @@
-import { createElement } from 'react';
-
-import OfferLetterPdf from '../../templates/pdf/OfferLetterPdf';
 import type { Offer } from '../../types/Offer';
 import type { DocumentGenerationRequest } from '../../types/DocumentGenerationRequest';
 
@@ -25,6 +22,5 @@ export const offerLetterDocumentTemplate: DocumentTemplateDefinition<Offer> = {
     version: INITIAL_DOCUMENT_VERSION,
     generatedBy: offer.createdBy,
     payload: offer,
-    template: createElement(OfferLetterPdf, { offer }),
   }),
 };

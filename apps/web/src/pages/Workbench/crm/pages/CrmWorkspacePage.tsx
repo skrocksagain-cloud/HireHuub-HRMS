@@ -6,14 +6,18 @@ import CrmFilters from '../components/CrmFilters';
 import TodaysWorkQueue from '../components/TodaysWorkQueue';
 import CandidateTable from '../components/CandidateTable';
 import AddCandidateDrawer from '../components/AddCandidateDrawer';
-import QuickUpdateDrawer from '../components/QuickUpdateDrawer';
+
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import BulkImportModal from '../components/BulkImportModal';
 import AssignmentCenterModal from '../components/AssignmentCenterModal';
 import ClientProfileModal from '../components/ClientProfileModal';
 import CandidateProfileDrawer from '../components/profile/CandidateProfileDrawer';
+import CreatePlacementModal from '../components/profile/CreatePlacementModal';
 import { UserCheck, ShieldAlert, CheckCircle } from 'lucide-react';
 
 export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?: boolean }) {
+  const [isPlacementModalOpen, setIsPlacementModalOpen] = useState(false);
   const {
     sessionUser,
     candidates,
@@ -31,10 +35,6 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
     setSelectedCandidate,
     isAddDrawerOpen,
     setIsAddDrawerOpen,
-    isQuickUpdateOpen,
-    setIsQuickUpdateOpen,
-    quickUpdateCandidate,
-    setQuickUpdateCandidate,
     isBulkImportOpen,
     setIsBulkImportOpen,
     isAssignmentCenterOpen,
@@ -52,9 +52,27 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
     checkDuplicatePhone,
     handleBulkAssign,
     handleBulkTransfer,
-    handleToggleBlacklist,
-    handleOpenClientPreview,
   } = useCrm();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlCandidateId = searchParams.get('candidateId');
+
+  useEffect(() => {
+    if (urlCandidateId && allCandidates.length > 0 && !selectedCandidate) {
+      const found = allCandidates.find((c) => c.id === urlCandidateId);
+      if (found) {
+        setSelectedCandidate(found);
+      }
+    }
+  }, [urlCandidateId, allCandidates, selectedCandidate, setSelectedCandidate]);
+
+  const handleCloseProfile = () => {
+    setSelectedCandidate(null);
+    if (urlCandidateId) {
+      searchParams.delete('candidateId');
+      setSearchParams(searchParams);
+    }
+  };
 
   // Handle Select All Candidates
   const handleSelectAll = (selectAll: boolean) => {
@@ -141,6 +159,7 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
             onFilterChange={setFilters}
             clients={clients}
             userRole={sessionUser.role}
+            userAssignedRole={sessionUser.assignedRole}
             activeEmployees={activeEmployees}
           />
 
@@ -148,10 +167,6 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
           <TodaysWorkQueue
             queue={todaysWorkQueue}
             onSelectCandidate={(c) => setSelectedCandidate(c)}
-            onQuickUpdate={(c) => {
-              setQuickUpdateCandidate(c);
-              setIsQuickUpdateOpen(true);
-            }}
           />
 
           {/* Bulk Selection Bar if candidates selected */}
@@ -177,19 +192,13 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
             </div>
           )}
 
-          {/* Main Candidate Table */}
+          {/* Candidate List (Simplified 1-click CTA) */}
           <CandidateTable
             candidates={candidates}
             onSelectCandidate={(c) => setSelectedCandidate(c)}
-            onQuickUpdate={(c) => {
-              setQuickUpdateCandidate(c);
-              setIsQuickUpdateOpen(true);
-            }}
-            onOpenClientPreview={handleOpenClientPreview}
             selectedCandidateIds={selectedCandidateIds}
             onToggleCandidateSelect={handleToggleCandidateSelect}
             onSelectAll={handleSelectAll}
-            userRole={sessionUser.role}
           />
         </>
       )}
@@ -215,16 +224,7 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
         assignableEmployees={assignableEmployees}
       />
 
-      <QuickUpdateDrawer
-        isOpen={isQuickUpdateOpen}
-        onClose={() => setIsQuickUpdateOpen(false)}
-        candidate={quickUpdateCandidate}
-        clients={clients}
-        openings={openings}
-        onSubmitUpdate={async (input) => {
-          await handleQuickUpdate(input);
-        }}
-      />
+
 
       <BulkImportModal
         isOpen={isBulkImportOpen}
@@ -233,8 +233,10 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
           setIsBulkImportOpen(false);
         }}
         userRole={sessionUser.role}
+        userAssignedRole={sessionUser.assignedRole}
         importHistory={importHistory}
         userSession={sessionUser}
+        assignableEmployees={assignableEmployees}
       />
 
       <AssignmentCenterModal
@@ -246,6 +248,7 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
         onBulkAssign={handleBulkAssign}
         onBulkTransfer={handleBulkTransfer}
         userRole={sessionUser.role}
+        userAssignedRole={sessionUser.assignedRole}
         assignableEmployees={assignableEmployees}
         allActiveEmployees={activeEmployees}
       />
@@ -257,15 +260,21 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
 
       <CandidateProfileDrawer
         isOpen={!!selectedCandidate}
-        onClose={() => setSelectedCandidate(null)}
+        onClose={handleCloseProfile}
         candidate={selectedCandidate}
-        onQuickUpdate={(c) => {
-          setQuickUpdateCandidate(c);
-          setIsQuickUpdateOpen(true);
-        }}
-        onToggleBlacklist={handleToggleBlacklist}
-        onOpenClientPreview={handleOpenClientPreview}
+        clients={clients}
+        openings={openings}
+        onSubmitUpdate={handleQuickUpdate}
       />
+
+      {selectedCandidate && (
+        <CreatePlacementModal
+          isOpen={isPlacementModalOpen}
+          onClose={() => setIsPlacementModalOpen(false)}
+          candidate={selectedCandidate}
+          clients={clients}
+        />
+      )}
     </div>
   );
 

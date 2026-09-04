@@ -1,0 +1,390 @@
+/**
+ * ENTERPRISE INVOICE ISOLATED CANVASES ENGINE
+ */
+
+const CONFIG_SHEET = "Config";
+const LOG_SHEET = "Invoice Log"; 
+const CLIENT_SHEET = "Client";
+const DASHBOARD_SHEET = "Dashboard";
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('Generate')
+    .addItem('Finalize Invoice', 'finalizeInvoice') 
+    .addToUi();
+}
+
+function generateInvoice() {
+  try {
+    executeIsolatedGeneration();
+    SpreadsheetApp.getUi().alert(`✅ Workspace Isolated\n\nInvoice Canvas Initialized.`);
+  } catch (err) {
+    SpreadsheetApp.getUi().alert(`❌ Generation Stopped\n\n${err.message}`);
+  }
+}
+
+function executeIsolatedGeneration() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dashboard = ss.getSheetByName(DASHBOARD_SHEET); 
+    if (!dashboard) throw new Error(`System Error: "${DASHBOARD_SHEET}" sheet tab is missing.`);
+
+    const selectedCompany = dashboard.getRange("E12").getValue().toString().trim();
+    if (!selectedCompany) throw new Error("Please select Company in E12.");
+
+    const clientSheet = ss.getSheetByName(CLIENT_SHEET);
+    const clientValidationResult = validateAndFetchClient(dashboard, clientSheet);
+    const clientNameKey = clientValidationResult.clientName;
+
+    const configMap = getConfigMappings(ss);
+    const targetTemplateName = configMap["Mapping_" + clientNameKey] || configMap["Mapping_Default"] || "All";
+    const templateSheet = ss.getSheetByName(targetTemplateName);
+    if (!templateSheet) throw new Error(`Blueprint Error: Layout template "${targetTemplateName}" missing.`);
+
+    validateRequiredConfigKeys(configMap, targetTemplateName);
+
+    const logSheet = ss.getSheetByName(LOG_SHEET);
+    const today = new Date();
+    const currentMonthStr = String(today.getMonth() + 1).padStart(2, '0');
+    const currentYearStr = String(today.getFullYear());
+    const targetMonthPrefix = currentMonthStr + currentYearStr;
+    
+    const lastRowInLog = logSheet.getLastRow();
+    let highestSequenceNumber = 0;
+
+    if (lastRowInLog >= 47) {
+      const invoiceNoValues = logSheet.getRange(47, 3, (lastRowInLog - 47) + 1, 1).getValues();
+      for (let i = 0; i < invoiceNoValues.length; i++) {
+        const currentRawCell = invoiceNoValues[i][0].toString().trim();
+        if (currentRawCell.indexOf(targetMonthPrefix + "/") === 0) {
+          const parts = currentRawCell.split("/");
+          if (parts.length === 2) {
+            const currentSequenceNum = parseInt(parts[1], 10);
+            if (!isNaN(currentSequenceNum) && currentSequenceNum > highestSequenceNumber) {
+              highestSequenceNumber = currentSequenceNum;
+            }
+          }
+        }
+      }
+    }
+
+    const nextSequenceNumber = highestSequenceNumber + 1;
+    const invoiceNoToUse = targetMonthPrefix + "/" + String(nextSequenceNumber).padStart(5, '0');
+
+    const tempCanvasName = "TMP_" + invoiceNoToUse.replace("/", "_");
+    let tempSheet = ss.getSheetByName(tempCanvasName);
+    if (tempSheet) try { ss.deleteSheet(tempSheet); } catch(e) {}
+    
+    tempSheet = templateSheet.copyTo(ss).setName(tempCanvasName);
+    tempSheet.showSheet();
+
+    // Replicate Dashboard layout
+    dashboard.getRange(1, 1, 3, dashboard.getMaxColumns()).copyTo(tempSheet.getRange(1, 1));
+    for (let hRow = 1; hRow <= 3; hRow++) tempSheet.setRowHeight(hRow, dashboard.getRowHeight(hRow));
+
+    // FETCH DATA FROM DASHBOARD E14-E18
+    const billingName = dashboard.getRange("E14").getValue();
+    const gstin = dashboard.getRange("E15").getValue();
+    const address = dashboard.getRange("E16:E18").getValues().flat().filter(String).join("\n");
+
+    let matchedMetaRecord = {
+      clientName: clientNameKey,
+      billingName: billingName,
+      address: address,
+      gstin: gstin,
+      state: clientValidationResult.state
+    };
+
+    populateTemplateMetadata(tempSheet, configMap, targetTemplateName, matchedMetaRecord, invoiceNoToUse, today);
+    evaluateTaxAndCurrencyMatrix(tempSheet, configMap, targetTemplateName, clientValidationResult.state);
+
+    const userProperties = PropertiesService.getDocumentProperties();
+    userProperties.setProperty("ACTIVE_WORKING_INVOICE_NO", invoiceNoToUse);
+    userProperties.setProperty("ACTIVE_WORKING_TEMPLATE_NAME", targetTemplateName);
+    userProperties.setProperty("ACTIVE_WORKING_CANVAS_NAME", tempCanvasName);
+    userProperties.setProperty("ACTIVE_WORKING_CLIENT_NAME", clientNameKey);
+
+    createGenerateButtonInline(tempSheet);
+    ss.setActiveSheet(tempSheet);
+    return invoiceNoToUse;
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function createGenerateButtonInline(sheet) {
+  try {
+    sheet.getImages().forEach(img => { if (img.getOnAction() === 'finalizeInvoice') img.remove(); });
+    const response = UrlFetchApp.fetch("https://img.shields.io/badge/Finalize__Invoice-Solid%20Blue-1A73E8?style=for-the-badge");
+    sheet.insertImage(response.getBlob(), 7, 1).assignScript("finalizeInvoice");
+  } catch (err) { Logger.log(err); }
+}
+function finalizeInvoice() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const userProperties = PropertiesService.getDocumentProperties();
+  const activeInvoiceNo = userProperties.getProperty("ACTIVE_WORKING_INVOICE_NO");
+  const activeTemplateName = userProperties.getProperty("ACTIVE_WORKING_TEMPLATE_NAME");
+  const activeCanvasName = userProperties.getProperty("ACTIVE_WORKING_CANVAS_NAME");
+  const clientLogName = userProperties.getProperty("ACTIVE_WORKING_CLIENT_NAME");
+
+  const tempSheet = ss.getSheetByName(activeCanvasName);
+  if (!tempSheet) return SpreadsheetApp.getUi().alert("Session Error: Canvas missing.");
+
+  try {
+    const configMap = getConfigMappings(ss);
+    const logSheet = ss.getSheetByName(LOG_SHEET);
+    
+    // Final Tax Calc
+    evaluateTaxAndCurrencyMatrix(tempSheet, configMap, activeTemplateName, "N/A"); 
+    SpreadsheetApp.flush();
+
+    const explicitTotalCell = configMap[`${activeTemplateName}_Cell_Total_Field`] || "F33";
+    const finalVal = tempSheet.getRange(explicitTotalCell).getValue();
+    if (isNaN(finalVal) || finalVal <= 0) {
+      throw new Error(`Math Error: Calculated final grand total cell "${explicitTotalCell}" must evaluate to a value greater than zero.`);
+    }
+
+    // Export PDF to Drive before deleting the tab
+    exportCanvasSheetToPdf(ss, tempSheet, activeInvoiceNo, activeTemplateName);
+
+    const finalizeDate = new Date();
+    const logData = logSheet.getDataRange().getValues();
+    let targetRowIndex = -1;
+
+    // Scan for duplicate matching footprints starting cleanly from Row 47 baseline
+    for (let i = logData.length - 1; i >= 46; i--) {
+      if (logData[i][2] && logData[i][2].toString().trim() === activeInvoiceNo) {
+        targetRowIndex = i + 1;
+        break;
+      }
+    }
+
+    // Log entry alignment
+    if (targetRowIndex === -1) {
+      const secureNextRow = getLastTrueRowWithData(logSheet);
+      logSheet.getRange(secureNextRow, 1, 1, 4).setValues([[clientLogName, finalizeDate, activeInvoiceNo, finalVal]]);
+      logSheet.getRange(secureNextRow, 2).setNumberFormat('dd-MM-yyyy');
+    } else {
+      logSheet.getRange(targetRowIndex, 2).setValue(finalizeDate).setNumberFormat('dd-MM-yyyy');
+      logSheet.getRange(targetRowIndex, 4).setValue(finalVal);
+    }
+
+    const dashboard = ss.getSheetByName(DASHBOARD_SHEET);
+    if (dashboard) {
+      ss.setActiveSheet(dashboard);
+      dashboard.getRange("E12:E13").clearContent();
+    }
+
+    try { ss.deleteSheet(tempSheet); } catch(err) {}
+
+    userProperties.deleteProperty("ACTIVE_WORKING_INVOICE_NO");
+    userProperties.deleteProperty("ACTIVE_WORKING_TEMPLATE_NAME");
+    userProperties.deleteProperty("ACTIVE_WORKING_CANVAS_NAME");
+    userProperties.deleteProperty("ACTIVE_WORKING_CLIENT_NAME");
+
+    SpreadsheetApp.flush();
+    onOpen();
+
+    SpreadsheetApp.getUi().alert("Generated Successfully and Saved.");
+  } catch (err) { SpreadsheetApp.getUi().alert(err.message); }
+}
+
+function exportCanvasSheetToPdf(ss, canvasSheet, invoiceNo, templateName) {
+  const configMap = getConfigMappings(ss);
+  const parentFolderId = configMap["Parent_Folder_ID"];
+  const dateParts = invoiceNo.split("/");
+  const monthString = dateParts[0].substring(0, 2);
+  const yearString = dateParts[0].substring(2, 6);
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const currentMonthName = months[parseInt(monthString, 10) - 1];
+
+  const targetFolder = getOrCreateTargetDirectory(parentFolderId, yearString, currentMonthName);
+  const sanitizedFileName = invoiceNo.replace("/", "-") + ".pdf";
+
+  let r1, r2, c1, c2;
+  const cleanTemplateName = templateName.toString().trim().toLowerCase();
+
+  if (cleanTemplateName === "bilikit") {
+    r1 = 3; r2 = 47; c1 = 0; c2 = 5; 
+  } else if (cleanTemplateName === "elastic run") {
+    r1 = 3; r2 = 42; c1 = 0; c2 = 6; 
+  } else {
+    r1 = 3; r2 = 50; c1 = 0; c2 = 6; 
+  }
+
+  const baseUrl = ss.getUrl().replace(/edit$/, '') + 'export?exportFormat=pdf&format=pdf';
+  const settings = [
+    'size=A4',
+    'portrait=true',
+    'fitw=true',
+    'fith=true',
+    'scale=4', 
+    'gridlines=false',
+    'printtitle=false',
+    'sheetnames=false',
+    'fzr=false',
+    'attachment=false',
+    'gid=' + canvasSheet.getSheetId(),
+    'r1=' + r1,
+    'r2=' + r2,
+    'c1=' + c1,
+    'c2=' + c2
+  ];
+  
+  const exportUrl = baseUrl + '&' + settings.join('&');
+  
+  const response = UrlFetchApp.fetch(exportUrl, {
+    headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions: true
+  });
+
+  if (response.getResponseCode() !== 200) {
+    throw new Error("PDF Export Failed. Status Code: " + response.getResponseCode());
+  }
+  
+  const file = targetFolder.createFile(response.getBlob().setName(sanitizedFileName));
+  return { id: file.getId(), url: file.getUrl(), name: sanitizedFileName };
+}
+
+function getOrCreateTargetDirectory(parentId, yearStr, monthStr) {
+  const rootFolder = DriveApp.getFolderById(parentId);
+  
+  let yearFolder;
+  const yearScan = rootFolder.getFoldersByName(yearStr);
+  yearFolder = yearScan.hasNext() ? yearScan.next() : rootFolder.createFolder(yearStr);
+  
+  let monthFolder;
+  const monthScan = yearFolder.getFoldersByName(monthStr);
+  monthFolder = monthScan.hasNext() ? monthScan.next() : yearFolder.createFolder(monthStr);
+  
+  return monthFolder;
+}
+function getLastTrueRowWithData(sheet) {
+  const values = sheet.getRange("A:A").getValues();
+  for (let i = values.length - 1; i >= 46; i--) if (values[i][0]) return i + 2;
+  return 48;
+}
+
+function evaluateTaxAndCurrencyMatrix(sheet, configMap, templateName, stateName) {
+  try {
+    const explicitSubTotal = configMap[`${templateName}_Cell_Sub_Total`] || "F29";
+    const subTotalVal = parseFloat(sheet.getRange(explicitSubTotal).getDisplayValue().replace(/[₹\$,\s]/g, '')) || 0;
+    if (subTotalVal <= 0) return;
+
+    const taxRate = 0.18; // Default IGST
+    const computedIgst = Math.round(subTotalVal * taxRate * 100) / 100;
+    
+    sheet.getRange(configMap[`${templateName}_Cell_IGST`] || "F32").setValue(computedIgst);
+    sheet.getRange(configMap[`${templateName}_Cell_Total_Field`] || "F33").setValue(subTotalVal + computedIgst);
+    sheet.getRange(configMap[`${templateName}_Cell_Amount_Words`] || "C35").setValue(AMOUNTINWORDS(subTotalVal + computedIgst));
+  } catch (err) { Logger.log(err); }
+}
+
+function AMOUNTINWORDS(num) {
+  let val = Math.floor(num);
+  return "Rupees " + convertRawValueToIndianText(val) + " Only";
+}
+
+function convertRawValueToIndianText(n) {
+  const single = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const double = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  if (n < 20) return single[n];
+  if (n < 100) return double[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + single[n % 10] : "");
+  if (n < 1000) return single[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " " + convertRawValueToIndianText(n % 100) : "");
+  if (n < 100000) return convertRawValueToIndianText(Math.floor(n / 1000)) + " Thousand" + (n % 1000 !== 0 ? " " + convertRawValueToIndianText(n % 1000) : "");
+  if (n < 10000000) return convertRawValueToIndianText(Math.floor(n / 100000)) + " Lakh" + (n % 100000 !== 0 ? " " + convertRawValueToIndianText(n % 100000) : "");
+  return convertRawValueToIndianText(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 !== 0 ? " " + convertRawValueToIndianText(n % 10000000) : "");
+}
+
+function validateRequiredConfigKeys(configMap, templateName) {
+  const keys = [`${templateName}_Cell_Sub_Total`, `${templateName}_Cell_IGST`, `${templateName}_Cell_Total_Field`, `${templateName}_Cell_Amount_Words`, `Parent_Folder_ID`];
+  for (let key of keys) if (!configMap[key]) throw new Error(`Missing Config: ${key}`);
+}
+
+function getConfigMappings(ss) {
+  const data = ss.getSheetByName(CONFIG_SHEET).getDataRange().getValues();
+  let m = {};
+  for (let i = 0; i < data.length; i++) if (data[i][0]) m[data[i][0].toString().trim()] = data[i][1].toString().trim();
+  return m;
+}
+
+function populateTemplateMetadata(sheet, config, templateName, meta, invoiceNo, dateObj) {
+  sheet.getRange(config[`${templateName}_Cell_Billing_Name`] || "A17").setValue(meta.billingName).setFontWeight("bold");
+  sheet.getRange(config[`${templateName}_Cell_Address`] || "A18").setValue(meta.address);
+  sheet.getRange(config[`${templateName}_Cell_GSTIN`] || "A21").setValue(meta.gstin);
+  sheet.getRange(config[`${templateName}_Cell_Invoice_No`] || "E23").setValue(invoiceNo);
+  sheet.getRange(config[`${templateName}_Cell_Invoice_Date`] || "E22").setValue(dateObj).setNumberFormat('dd-MM-yyyy');
+}
+
+function validateAndFetchClient(dashboard, clientSheet) {
+  const name = dashboard.getRange("E12").getValue().toString().trim();
+  const state = dashboard.getRange("E13").getValue().toString().trim();
+  if (!name) throw new Error("Client Name (E12) is blank.");
+  return { clientName: name, state: state };
+}
+
+/**
+ * Opens the Client Manager Sidebar.
+ */
+function openSidebar() {
+  var html = HtmlService.createHtmlOutputFromFile('ClientSidebarForm')
+      .setTitle('Add New Client')
+      .setWidth(300);
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/**
+ * Receives data from the sidebar form and strictly scans from Row 25 down 
+ * to find the first truly blank cell in Column C.
+ */
+function saveClientToSheet(clientData) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Client");
+    
+    if (!sheet) {
+      return "Error: Could not find a tab named 'Client'.";
+    }
+    
+    var startRow = 25;
+    var targetRow = startRow;
+    
+    // Fetch all values in Column C starting from row 25 to the very bottom
+    var lastRowInSheet = sheet.getLastRow();
+    
+    if (lastRowInSheet >= startRow) {
+      var numRowsToRead = (lastRowInSheet - startRow) + 1;
+      var columnCValues = sheet.getRange(startRow, 3, numRowsToRead, 1).getValues();
+      
+      // Scan row by row to find the first cell that is completely empty
+      for (var i = 0; i < columnCValues.length; i++) {
+        if (columnCValues[i][0].toString().trim() === "") {
+          targetRow = startRow + i;
+          break;
+        }
+        if (i === columnCValues.length - 1) {
+          targetRow = startRow + i + 1;
+        }
+      }
+    }
+    
+    if (targetRow < 25) {
+      targetRow = 25;
+    }
+    
+    // Write data strictly to Columns C, D, E, F, and H
+    sheet.getRange(targetRow, 3).setValue(clientData.nickName);     // Col C
+    sheet.getRange(targetRow, 4).setValue(clientData.billingName);  // Col D
+    sheet.getRange(targetRow, 5).setValue(clientData.address);      // Col E
+    sheet.getRange(targetRow, 6).setValue(clientData.gstin);        // Col F
+    sheet.getRange(targetRow, 8).setValue(clientData.city);         // Col H (Column 8)
+    
+    return "Success";
+  } catch (err) {
+    return "Error: " + err.message;
+  }
+}

@@ -34,16 +34,23 @@ export class SessionService {
     const terminatedCount = await userSessionRepository.terminateActiveSessions(employeeId);
 
     const deviceInfo = getDeviceInfo();
-    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const now = new Date().toISOString();
+    const secureRandomId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+    const sessionId = `sess_${secureRandomId}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
     const sessionData: Omit<UserSession, 'id'> = {
       sessionId,
       employeeId,
       userId: employeeId,
-      loginAt: now,
+      loginAt: now.toISOString(),
       logoutAt: null,
-      lastActivity: now,
+      lastActivity: now.toISOString(),
+      expiresAt,
       device: deviceInfo.device,
       browser: deviceInfo.browser,
       platform: deviceInfo.platform,

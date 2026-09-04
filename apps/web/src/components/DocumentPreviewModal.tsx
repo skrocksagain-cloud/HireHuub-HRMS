@@ -1,6 +1,23 @@
 import { useState } from 'react';
-import { X, Download, Printer, ZoomIn, ZoomOut, Maximize2, Minimize2, ShieldCheck, FileText, CheckCircle2 } from 'lucide-react';
-import type { DocumentResult } from '../core/engine/documentEngine';
+import { X, Download, Printer, ZoomIn, ZoomOut, Maximize2, Minimize2, ShieldCheck, FileText } from 'lucide-react';
+export interface DocumentResult {
+  success: boolean;
+  documentId?: string;
+  fileName?: string;
+  downloadUrl?: string;
+  previewUrl?: string;
+  storagePath?: string;
+  renderedHtml?: string;
+  blob?: Blob;
+  templateFileUrl?: string;
+  format?: string;
+  templateVersion?: string;
+  templateUsed?: string;
+  digitalSignatureInfo?: any;
+  status?: string;
+  error?: string;
+}
+
 import { documentCenterService } from '../services/document/documentCenterService';
 
 interface DocumentPreviewModalProps {
@@ -30,14 +47,14 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
       if (result.downloadUrl) {
         const link = document.createElement('a');
         link.href = result.downloadUrl;
-        link.download = result.fileName;
+        link.download = result.fileName || 'document.pdf';
         link.target = '_blank';
         link.click();
       } else if (result.blob) {
         const url = URL.createObjectURL(result.blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = result.fileName;
+        link.download = result.fileName || 'document.pdf';
         link.click();
         URL.revokeObjectURL(url);
       }
@@ -48,7 +65,24 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
     }
   };
 
-  const placeholders = result.resolvedPlaceholders || {};
+  const uploadedUrl = result.templateFileUrl || '';
+  const generatedUrl = result.downloadUrl || result.previewUrl || '';
+  const blobUrl = result.blob ? URL.createObjectURL(result.blob) : '';
+
+  const previewSrc = uploadedUrl || blobUrl || generatedUrl;
+  const activeUrl = uploadedUrl || generatedUrl;
+
+  const cleanUrl = activeUrl.split('?')[0].toLowerCase();
+  const isPdf = cleanUrl.endsWith('.pdf') || (!uploadedUrl && (Boolean(result.blob) || result.format === 'PDF'));
+  const isImage = cleanUrl.endsWith('.png') || cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg') || cleanUrl.endsWith('.webp');
+  const isDocxOrXlsx =
+    cleanUrl.endsWith('.docx') ||
+    cleanUrl.endsWith('.xlsx') ||
+    cleanUrl.endsWith('.xls') ||
+    cleanUrl.includes('.doc') ||
+    cleanUrl.includes('.xls') ||
+    result.format === 'DOCX' ||
+    result.format === 'XLSX';
 
   return (
     <div className={`fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 ${isFullScreen ? 'p-0' : 'p-4'}`}>
@@ -117,7 +151,7 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
               className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-xs"
             >
               <Download size={15} />
-              {downloading ? 'Downloading…' : 'Download PDF'}
+              {downloading ? 'Downloading…' : 'Download File'}
             </button>
 
             {/* Fullscreen Toggle */}
@@ -144,153 +178,65 @@ export default function DocumentPreviewModal({ result, onClose }: DocumentPrevie
 
         {/* Main Document Preview Body */}
         <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200/80">
-          <div
-            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-            className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-10 shadow-xl border border-slate-300 rounded-lg flex flex-col justify-between transition-all"
-          >
-            {/* HR Letterhead Top Image (If HR Category or letterheadUrl present) */}
-            {result.category === 'HR' || result.format === 'DOCX' || result.letterheadUrl ? (
-              <div className="border-b border-slate-200 pb-3">
-                {result.letterheadUrl ? (
-                  <img src={result.letterheadUrl} alt="Company Letterhead Top" className="w-full max-h-28 object-contain" />
-                ) : (
-                  <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3">
-                    <div className="flex items-center gap-3">
-                      {result.logoUrl ? (
-                        <img src={result.logoUrl} alt="Company Logo" className="h-12 object-contain" />
-                      ) : (
-                        <div className="font-black text-xl text-slate-900 tracking-wider">HIRE HUUB ONE</div>
-                      )}
-                    </div>
-                    <div className="text-right font-mono text-[10px] text-slate-500">
-                      Date: {placeholders.date || new Date().toLocaleDateString()}
-                    </div>
-                  </div>
-                )}
+          {result.renderedHtml ? (
+            <div
+              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+              className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-10 shadow-xl border border-slate-300 rounded-lg transition-all"
+              dangerouslySetInnerHTML={{ __html: result.renderedHtml }}
+            />
+          ) : !uploadedUrl && !generatedUrl && !blobUrl ? (
+            <div className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-10 shadow-xl border border-slate-300 rounded-lg flex flex-col items-center justify-center text-center space-y-4">
+              <div className="p-4 bg-slate-100 text-slate-400 rounded-full border border-slate-200">
+                <FileText size={48} />
               </div>
-            ) : (
-              /* Finance / Payroll Direct Excel Header Banner */
-              <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {result.logoUrl && <img src={result.logoUrl} alt="Logo" className="h-10 object-contain bg-white p-1 rounded-lg" />}
-                  <div>
-                    <div className="font-bold text-sm text-white">{placeholders.company_name || 'Hire Huub One'}</div>
-                    <div className="text-[10px] text-emerald-400 font-mono">FINANCIAL STATEMENT / EXCEL TEMPLATE</div>
-                  </div>
-                </div>
-                <div className="text-right text-[11px] font-mono">
-                  <div>Ref: {result.fileName.replace('.pdf', '')}</div>
-                  <div className="text-slate-400">Date: {placeholders.date || new Date().toLocaleDateString()}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Document Content / Body */}
-            <div className="py-6 space-y-6 flex-1 text-xs text-slate-800 leading-relaxed">
-              <div className="flex justify-between font-mono text-[11px] text-slate-500 border-b border-slate-100 pb-2">
-                <span>Ref No: {result.fileName.replace('.pdf', '')}</span>
-                <span>Template Version: {result.templateVersion || 'v1.0'}</span>
-              </div>
-
-              {result.category === 'HR' || result.format === 'DOCX' ? (
-                /* HR Letter Document Layout */
-                <div className="space-y-4 font-medium">
-                  <p className="font-bold text-slate-900 text-sm">To Whom It May Concern,</p>
-                  <p>
-                    This official document is issued by <strong>{placeholders.company_name}</strong> for <strong>{placeholders.employee_name || placeholders.candidate_name || placeholders.client_name}</strong>.
-                  </p>
-
-                  <div className="my-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                    <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 text-xs">Resolved Document Parameters</div>
-                    <div className="grid grid-cols-2 gap-3 text-[11px]">
-                      <div><span className="text-slate-500">Party / Entity:</span> <strong className="text-slate-900">{placeholders.employee_name || placeholders.client_name}</strong></div>
-                      <div><span className="text-slate-500">Designation / Role:</span> <strong className="text-slate-900">{placeholders.designation || 'Staff'}</strong></div>
-                      <div><span className="text-slate-500">Department:</span> <strong className="text-slate-900">{placeholders.department || 'General'}</strong></div>
-                      <div><span className="text-slate-500">Joining / Issue Date:</span> <strong className="text-slate-900">{placeholders.joining_date || placeholders.date}</strong></div>
-                      <div><span className="text-slate-500">Company GSTIN:</span> <strong className="text-slate-900 font-mono">{placeholders.gstin}</strong></div>
-                      <div><span className="text-slate-500">Company PAN:</span> <strong className="text-slate-900 font-mono">{placeholders.pan}</strong></div>
-                    </div>
-                  </div>
-
-                  <p>
-                    All terms, policies, and proprietary stipulations of <strong>{placeholders.company_name}</strong> remain applicable in full effect as configured under official ERP records.
-                  </p>
-                </div>
-              ) : (
-                /* Finance & Payroll Excel Template View Layout */
-                <div className="space-y-4">
-                  <div className="font-bold text-slate-900 text-sm border-b pb-1 flex items-center justify-between">
-                    <span>{result.templateUsed || 'Financial Document'}</span>
-                    <span className="text-emerald-700 font-mono text-xs">Direct Excel Spreadsheet Render</span>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 font-mono text-[11px]">
-                    <div className="font-bold text-slate-900 border-b pb-1 font-sans text-xs">Spreadsheet Data Grid Summary</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>Entity Name: <strong className="text-slate-900">{placeholders.client_name || placeholders.employee_name}</strong></div>
-                      <div>Amount / Total: <strong className="text-emerald-700 font-bold">{placeholders.amount || placeholders.ctc || placeholders.net_pay || '₹0.00'}</strong></div>
-                      <div>GSTIN: <strong className="text-slate-900">{placeholders.gstin}</strong></div>
-                      <div>Invoice / Ref ID: <strong className="text-slate-900">{placeholders.invoice_number || result.fileName.replace('.pdf', '')}</strong></div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-600 text-[11px]">
-                    Excel template formatting, table structures, cell borders, and formulas are preserved directly from the uploaded spreadsheet template.
-                  </div>
-                </div>
-              )}
-
-              {/* Signatures & Stamp Section */}
-              <div className="pt-8 grid grid-cols-2 gap-8 items-end border-t border-slate-200 mt-6">
-                <div>
-                  {result.stampUrl && result.stampUsed ? (
-                    <div className="space-y-1">
-                      <img src={result.stampUrl} alt="Stamp" className="h-20 object-contain" />
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">Official Company Stamp</div>
-                    </div>
-                  ) : (
-                    <div className="text-[10px] text-slate-400 italic">No stamp required</div>
-                  )}
-                </div>
-
-                <div className="text-right space-y-1.5">
-                  {result.signatureUrl ? (
-                    <img src={result.signatureUrl} alt="Signature" className="h-14 object-contain ml-auto" />
-                  ) : (
-                    <div className="h-10 border-b border-slate-400 w-48 ml-auto"></div>
-                  )}
-                  <div className="font-bold text-slate-900 text-xs">{result.signatureUsed || 'Authorized Signatory'}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    Type: <span className="text-emerald-700 font-bold">{result.signatureType || 'Image'}</span>
-                  </div>
-                </div>
-              </div>
+              <h2 className="text-xl font-bold text-slate-900">No Template Available</h2>
+              <p className="text-sm text-slate-500 max-w-md">
+                No template has been uploaded for this document type.
+              </p>
             </div>
-
-            {/* Bottom Letter Footer Image (If HR Category or letterFooterUrl present) */}
-            {result.category === 'HR' || result.format === 'DOCX' || result.letterFooterUrl ? (
-              <div className="border-t border-slate-200 pt-3">
-                {result.letterFooterUrl ? (
-                  <img src={result.letterFooterUrl} alt="Company Letter Footer Bottom" className="w-full max-h-24 object-contain" />
-                ) : (
-                  <div className="border-t border-slate-300 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                    <div>{placeholders.company_name} | Enterprise HR & Document Management System</div>
-                    <div className="flex items-center gap-1 text-emerald-700 font-bold">
-                      <CheckCircle2 size={12} /> Registered in Document Center
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Finance Legal Footer */
-              <div className="border-t border-slate-300 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                <div>This financial document is computer-generated from approved ERP templates.</div>
-                <div className="flex items-center gap-1 text-emerald-700 font-bold">
-                  <CheckCircle2 size={12} /> Registered in Document Center
-                </div>
-              </div>
-            )}
-          </div>
+          ) : isPdf ? (
+            <div
+              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+              className="bg-white w-full h-full min-h-[297mm] shadow-xl border border-slate-300 rounded-lg overflow-hidden flex flex-col transition-all"
+            >
+              <iframe
+                src={previewSrc}
+                title={result.fileName}
+                className="w-full flex-1 border-0 rounded-lg"
+              />
+            </div>
+          ) : isImage ? (
+            <div
+              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+              className="bg-white p-6 shadow-xl border border-slate-300 rounded-lg flex items-center justify-center transition-all max-w-full overflow-auto"
+            >
+              <img src={previewSrc} alt={result.fileName} className="max-w-full max-h-[280mm] object-contain rounded-md" />
+            </div>
+          ) : isDocxOrXlsx ? (
+            <div
+              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+              className="bg-white w-full h-full min-h-[297mm] shadow-xl border border-slate-300 rounded-lg overflow-hidden flex flex-col transition-all"
+            >
+              <iframe
+                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewSrc)}`}
+                title={result.fileName}
+                className="w-full flex-1 border-0 rounded-lg"
+              />
+            </div>
+          ) : (
+            <div className="bg-white text-slate-900 p-10 shadow-xl border border-slate-300 rounded-lg flex flex-col items-center justify-center text-center space-y-4">
+              <FileText size={48} className="text-slate-400" />
+              <h3 className="font-bold text-base text-slate-900">Preview unavailable for this file type</h3>
+              <p className="text-xs text-slate-500 font-mono">{result.fileName}</p>
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs"
+              >
+                Download File to View
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Digital Signature & Metadata Drawer */}

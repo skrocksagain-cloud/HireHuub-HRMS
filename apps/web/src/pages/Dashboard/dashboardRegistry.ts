@@ -36,23 +36,31 @@ class DashboardRegistry {
       return SuperAdminDashboard;
     }
 
-    if (active.name.toLowerCase().includes('finance')) {
+    const deptRaw = active.description || '';
+    const d = deptRaw.toLowerCase();
+    if (d.includes('staffing')) return StaffingDashboard;
+    if (d.includes('hr') || d.includes('human')) return HRDashboard;
+    if (d.includes('finance')) return FinanceDashboard;
+    if (d.includes('marketing')) return MarketingDashboard;
+
+    // Fallback if department is unknown
+    if (permissionService.canView(active, 'invoice') || permissionService.canView(active, 'credit_notes') || permissionService.canView(active, 'finance')) {
       return FinanceDashboard;
     }
 
-    if (active.name.toLowerCase().includes('marketing')) {
+    if (permissionService.canView(active, 'campaign_hub')) {
       return MarketingDashboard;
     }
 
-    if (active.name.toLowerCase().includes('hr') || active.name.toLowerCase().includes('people')) {
+    if (permissionService.canView(active, 'employees')) {
       return HRDashboard;
     }
 
-    if (active.name.toLowerCase().includes('admin') || active.viewScope === 'Departments') {
+    if (permissionService.canView(active, 'management')) {
       return AdminDashboard;
     }
 
-    if (permissionService.canAccessModule(active, 'recruitment') || active.name.toLowerCase().includes('staffing')) {
+    if (permissionService.canView(active, 'crm') || permissionService.canView(active, 'openings')) {
       return StaffingDashboard;
     }
 

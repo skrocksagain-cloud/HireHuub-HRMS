@@ -11,15 +11,17 @@ import MiniCalendarWidget from '../widgets/MiniCalendarWidget';
 import RecentActivityTimeline from '../widgets/RecentActivityTimeline';
 import QuickActionsWidget from '../widgets/QuickActionsWidget';
 import type { useDashboard } from '../../../hooks/useDashboard';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 interface WorkspaceDashboardProps {
   dashboard: ReturnType<typeof useDashboard>;
 }
 
 export default function HRDashboard({ dashboard }: WorkspaceDashboardProps) {
+  const { canView } = usePermissions();
   return (
     <div className="space-y-6">
-      <LiveStatusStrip />
+      <LiveStatusStrip metrics={dashboard.statusMetrics} />
       <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Human Resources & Employee Relations" designation="HR Manager" />
       <FavoritesBar />
 
@@ -29,24 +31,26 @@ export default function HRDashboard({ dashboard }: WorkspaceDashboardProps) {
         <div className="lg:col-span-2 space-y-6">
           <QuickActionsWidget />
           <UpcomingTasksWidget />
-          <RecentActivityTimeline activities={dashboard.recentActivities} />
-          <AnnouncementsWidget announcements={dashboard.announcements} />
+          {canView('management') && <RecentActivityTimeline activities={dashboard.recentActivities} />}
+          {canView('announcement') && <AnnouncementsWidget announcements={dashboard.announcements} />}
         </div>
 
         <div className="space-y-6">
-          <AttendanceWidget
-            attendance={dashboard.attendance}
-            isSignedIn={dashboard.isSignedIn}
-            isSignedOut={dashboard.isSignedOut}
-            isSuperAdmin={dashboard.isSuperAdmin}
-            workingDurationFormatted={dashboard.workingDurationFormatted}
-            expectedLogoutTime={dashboard.expectedLogoutTime}
-            onSignIn={dashboard.signIn}
-            onSignOut={dashboard.signOut}
-          />
-          <LeaveBalanceWidget leaveBalance={dashboard.leaveBalance} />
-          <EventsWidget />
-          <MiniCalendarWidget events={dashboard.calendarEvents} />
+          {canView('attendance') && (
+            <AttendanceWidget
+              attendance={dashboard.attendance}
+              isSignedIn={dashboard.isSignedIn}
+              isSignedOut={dashboard.isSignedOut}
+              isSuperAdmin={dashboard.isSuperAdmin}
+              workingDurationFormatted={dashboard.workingDurationFormatted}
+              expectedLogoutTime={dashboard.expectedLogoutTime}
+              onSignIn={dashboard.signIn}
+              onSignOut={dashboard.signOut}
+            />
+          )}
+          {canView('leave') && <LeaveBalanceWidget leaveBalance={dashboard.leaveBalance} />}
+          {canView('calendar and Events') && <EventsWidget />}
+          {canView('calendar and Events') && <MiniCalendarWidget events={dashboard.calendarEvents} />}
         </div>
       </div>
     </div>

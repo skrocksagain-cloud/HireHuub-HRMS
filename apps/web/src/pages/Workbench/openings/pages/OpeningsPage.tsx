@@ -7,8 +7,6 @@ import {
   Eye,
   Edit2,
   Trash2,
-  FileSpreadsheet,
-  FileImage,
   Building2,
   Calendar,
   Lock,
@@ -25,11 +23,10 @@ import { useAuth } from '../../../../context/AuthContext';
 import type { UserRole } from '../../../../types/Client';
 import type { Opening } from '../../../../types/Opening';
 import NewOpeningDrawer from '../components/NewOpeningDrawer';
-import ImportPreviewModal from '../components/ImportPreviewModal';
 
 export default function OpeningsPage() {
   const navigate = useNavigate();
-  const { openings, createOpening, updateOpening, deleteOpening, refresh } = useOpenings();
+  const { openings, createOpening, updateOpening, deleteOpening } = useOpenings();
   const { user } = useAuth();
 
   const currentRole: UserRole = (user?.role as UserRole) || 'Super Admin';
@@ -42,7 +39,6 @@ export default function OpeningsPage() {
   const canCreate = isSuperAdmin || isStaffingAdmin;
   const canEdit = isSuperAdmin || isStaffingAdmin;
   const canDelete = isSuperAdmin || isStaffingAdmin;
-  const canImport = isSuperAdmin || isStaffingAdmin;
   const isAccessRestricted = isMarketing;
 
   // Filter States
@@ -57,8 +53,6 @@ export default function OpeningsPage() {
   // Modals & Drawers
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [editingOpening, setEditingOpening] = useState<Opening | null>(null);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importType, setImportType] = useState<'Excel' | 'Image'>('Excel');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Role Filtering: Hide outsourced openings from Staffing Team & Finance
@@ -108,10 +102,7 @@ export default function OpeningsPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Newest First
   }, [visibleOpenings, searchQuery, clientFilter, stateFilter, cityFilter, statusFilter, interviewDateFilter, outsourcedFilter]);
 
-  const handleOpenImport = (type: 'Excel' | 'Image') => {
-    setImportType(type);
-    setShowImportModal(true);
-  };
+
 
   const handleCreateSubmit = async (data: Partial<Opening>) => {
     await createOpening(data as Omit<Opening, 'id' | 'createdAt' | 'updatedAt'>);
@@ -159,29 +150,8 @@ export default function OpeningsPage() {
             />
           </div>
 
-          {/* Top Actions: + New Opening, Import Excel, Import Image */}
+          {/* Top Actions: + New Opening */}
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-            {canImport && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleOpenImport('Excel')}
-                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 shadow-2xs transition"
-                >
-                  <FileSpreadsheet size={15} className="text-emerald-700" />
-                  <span>Import Excel</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenImport('Image')}
-                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 shadow-2xs transition"
-                >
-                  <FileImage size={15} className="text-blue-700" />
-                  <span>Import Image</span>
-                </button>
-              </>
-            )}
-
             {canCreate && (
               <button
                 type="button"
@@ -530,16 +500,6 @@ export default function OpeningsPage() {
           onSubmit={handleEditSubmit}
           initialData={editingOpening}
           mode="edit"
-        />
-      )}
-
-      {/* Import Preview Modal */}
-      {showImportModal && (
-        <ImportPreviewModal
-          isOpen={showImportModal}
-          onClose={() => setShowImportModal(false)}
-          importType={importType}
-          onImportSuccess={refresh}
         />
       )}
     </DashboardLayout>

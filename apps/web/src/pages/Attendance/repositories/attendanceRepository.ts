@@ -14,21 +14,45 @@ const dailyFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): DailyAttendan
 
 const requestFrom = (snapshot: QueryDocumentSnapshot<DocumentData>): AttendanceRequest => {
   const data = snapshot.data();
-  return { id: snapshot.id, documentType: 'request', employeeId: String(data.employeeId ?? ''), employeeName: String(data.employeeName ?? ''), department: String(data.department ?? ''), requestType: data.requestType === 'WFH' ? 'WFH' : 'Regularization', attendanceDate: String(data.attendanceDate ?? ''), reason: String(data.reason ?? ''), status: data.status as AttendanceRequest['status'], approverEmployeeId: typeof data.approverEmployeeId === 'string' ? data.approverEmployeeId : null, decisionReason: String(data.decisionReason ?? ''), createdAt: asTimestamp(data.createdAt), updatedAt: asTimestamp(data.updatedAt) };
+  return {
+    id: snapshot.id,
+    documentType: 'request',
+    employeeId: String(data.employeeId ?? ''),
+    employeeName: String(data.employeeName ?? ''),
+    department: String(data.department ?? ''),
+    requestType: data.requestType === 'WFH' ? 'WFH' : 'Regularization',
+    attendanceDate: String(data.attendanceDate ?? ''),
+    reason: String(data.reason ?? ''),
+    status: (data.status as AttendanceRequest['status']) || 'Pending',
+    approvalStage: (data.approvalStage as any) || 'Pending Manager Approval',
+    managerApproved: Boolean(data.managerApproved),
+    managerApproverId: typeof data.managerApproverId === 'string' ? data.managerApproverId : null,
+    managerApprovedAt: nullableTimestamp(data.managerApprovedAt),
+    adminApproved: Boolean(data.adminApproved),
+    adminApproverId: typeof data.adminApproverId === 'string' ? data.adminApproverId : null,
+    adminApprovedAt: nullableTimestamp(data.adminApprovedAt),
+    approverEmployeeId: typeof data.approverEmployeeId === 'string' ? data.approverEmployeeId : null,
+    decisionReason: String(data.decisionReason ?? ''),
+    createdAt: asTimestamp(data.createdAt),
+    updatedAt: asTimestamp(data.updatedAt),
+  };
 };
 
 export interface AttendanceRepository {
   getDaily(employeeId: string, attendanceDate: string): Promise<DailyAttendance | null>;
   getDailyForEmployee(employeeId: string, from: string, to: string): Promise<DailyAttendance[]>;
   getDailyForOrganization(from: string, to: string): Promise<DailyAttendance[]>;
+  getDailyForDepartment(from: string, to: string, department: string): Promise<DailyAttendance[]>;
   getRequestsForEmployee(employeeId: string): Promise<AttendanceRequest[]>;
   getPendingRequests(): Promise<AttendanceRequest[]>;
+  getPendingRequestsForDepartment(department: string): Promise<AttendanceRequest[]>;
   createDaily(record: Omit<DailyAttendance, 'id' | 'createdAt' | 'updatedAt'> & DeviceDetails): Promise<DailyAttendance>;
   createStatusDaily(record: Omit<DailyAttendance, 'id' | 'createdAt' | 'updatedAt' | 'loginTime' | 'logoutTime' | 'totalWorkMinutes'>): Promise<void>;
   updateDaily(recordId: string, changes: Partial<DailyAttendance>): Promise<void>;
   closeDaily(recordId: string, status: AttendanceStatus, totalWorkMinutes: number): Promise<void>;
   createRequest(request: Omit<AttendanceRequest, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'approverEmployeeId' | 'decisionReason' | 'documentType'>): Promise<void>;
   decideRequest(requestId: string, approverEmployeeId: string, status: 'Approved' | 'Rejected', decisionReason: string): Promise<void>;
+  updateRequestStage(requestId: string, changes: Partial<AttendanceRequest>): Promise<void>;
   isHoliday(attendanceDate: string): Promise<boolean>;
   hasApprovedLeave(employeeId: string, attendanceDate: string): Promise<boolean>;
 }
@@ -51,6 +75,13 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
     return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
   }
 
+  async getDailyForDepartment(from: string, to: string, department: string): Promise<DailyAttendance[]> {
+    if (!department?.trim()) return [];
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily'), where('department', '==', department)));
+    const list = result.docs.map(dailyFrom).filter((item) => item.attendanceDate >= from && item.attendanceDate <= to);
+    return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
+  }
+
   async getRequestsForEmployee(employeeId: string): Promise<AttendanceRequest[]> {
     const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('employeeId', '==', employeeId)));
     const list = result.docs.map(requestFrom);
@@ -58,8 +89,15 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   async getPendingRequests(): Promise<AttendanceRequest[]> {
-    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('status', '==', 'Pending')));
-    const list = result.docs.map(requestFrom);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request')));
+    const list = result.docs.map(requestFrom).filter((item) => item.status === 'Pending' || item.approvalStage !== 'Fully Approved');
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+  }
+
+  async getPendingRequestsForDepartment(department: string): Promise<AttendanceRequest[]> {
+    if (!department?.trim()) return [];
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('department', '==', department)));
+    const list = result.docs.map(requestFrom).filter((item) => item.status === 'Pending' || item.approvalStage !== 'Fully Approved');
     return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }
 
@@ -83,11 +121,28 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   async createRequest(request: Omit<AttendanceRequest, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'approverEmployeeId' | 'decisionReason' | 'documentType'>): Promise<void> {
-    await addDoc(collection(db, ATTENDANCE_COLLECTION), { ...request, documentType: 'request', status: 'Pending', approverEmployeeId: null, decisionReason: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await addDoc(collection(db, ATTENDANCE_COLLECTION), {
+      ...request,
+      documentType: 'request',
+      status: 'Pending',
+      approvalStage: 'Pending Manager Approval',
+      managerApproved: false,
+      managerApproverId: null,
+      adminApproved: false,
+      adminApproverId: null,
+      approverEmployeeId: null,
+      decisionReason: '',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   }
 
   async decideRequest(requestId: string, approverEmployeeId: string, status: 'Approved' | 'Rejected', decisionReason: string): Promise<void> {
     await updateDoc(doc(db, ATTENDANCE_COLLECTION, requestId), { status, approverEmployeeId, decisionReason, updatedAt: serverTimestamp() });
+  }
+
+  async updateRequestStage(requestId: string, changes: Partial<AttendanceRequest>): Promise<void> {
+    await updateDoc(doc(db, ATTENDANCE_COLLECTION, requestId), { ...changes, updatedAt: serverTimestamp() });
   }
 
   async isHoliday(attendanceDate: string): Promise<boolean> {

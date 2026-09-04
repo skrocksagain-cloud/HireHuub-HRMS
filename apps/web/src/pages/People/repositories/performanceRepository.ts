@@ -1,16 +1,21 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase/firebase';
-import type { Client } from '../../../types/Client';
 import type { Employee } from '../../Employee/types/Employee';
-import type { WorkforceItem } from '../../Workbench/workforce/types/workforce';
 
 export interface PerformanceSummary {
   employeeId: string;
+  employeeCode: string;
   employeeName: string;
   department: string;
   designation: string;
+  brandId?: string;
+  brandName?: string;
+  employmentStatus: string;
   monthlyPoints: number;
   totalPoints: number;
+  targetPoints: number;
+  achievementPercent: number;
+  incentiveAmount?: number;
   activeCandidateCount: number;
   clientPointsBreakdown: Array<{
     clientId: string;
@@ -21,80 +26,107 @@ export interface PerformanceSummary {
   }>;
   departmentRank: number;
   companyRank: number;
-  rewardEligibility: string;
-  promotionRecommendation: string;
-  incrementRecommendation: string;
 }
 
 export interface PerformanceRepository {
-  getPerformanceForEmployee(employeeId: string): Promise<PerformanceSummary | null>;
-  getAllPerformanceSummaries(): Promise<PerformanceSummary[]>;
+  getPerformanceForEmployee(employeeId: string, month?: string): Promise<PerformanceSummary | null>;
+  getAllPerformanceSummaries(month?: string): Promise<PerformanceSummary[]>;
+  getPerformanceSummaries(input: PerformanceScopeQuery): Promise<PerformanceSummary[]>;
+}
+
+export interface PerformanceScopeQuery {
+  scope: 'SELF' | 'DEPARTMENT' | 'GLOBAL';
+  employeeId?: string;
+  departmentId?: string;
+  month?: string;
 }
 
 export class FirestorePerformanceRepository implements PerformanceRepository {
-  private async fetchClientsMap(): Promise<Map<string, Client>> {
-    const map = new Map<string, Client>();
-    try {
-      const snap = await getDocs(collection(db, 'clients'));
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data();
-        map.set(docSnap.id, { id: docSnap.id, ...data } as Client);
-        if (data.name) map.set(data.name.toLowerCase(), { id: docSnap.id, ...data } as Client);
-      });
-    } catch {
-      // Fallback
+
+  private async fetchPlacements(input: PerformanceScopeQuery): Promise<any[]> {
+    if (input.scope === 'SELF') {
+      if (!input.employeeId?.trim()) return [];
+      const snap = await getDocs(query(collection(db, 'placements'), where('recruiterId', '==', input.employeeId)));
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
     }
-    return map;
+    if (input.scope === 'DEPARTMENT') {
+      if (!input.departmentId?.trim()) return [];
+      const snap = await getDocs(query(collection(db, 'placements'), where('departmentId', '==', input.departmentId)));
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
+    }
+    const snap = await getDocs(collection(db, 'placements'));
+    return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
   }
 
-  private async fetchWorkforceItems(): Promise<WorkforceItem[]> {
-    try {
-      const snap = await getDocs(collection(db, 'workforce'));
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as WorkforceItem));
-    } catch {
-      return [];
+  private async fetchEmployees(input: PerformanceScopeQuery): Promise<Employee[]> {
+    if (input.scope === 'SELF') {
+      if (!input.employeeId?.trim()) return [];
+      const snap = await getDocs(query(collection(db, 'employees'), where('employeeId', '==', input.employeeId)));
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
     }
+    if (input.scope === 'DEPARTMENT') {
+      if (!input.departmentId?.trim()) return [];
+      const snap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', input.departmentId)));
+      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+    }
+    const snap = await getDocs(collection(db, 'employees'));
+    return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
   }
 
-  private async fetchEmployees(): Promise<Employee[]> {
-    try {
-      const snap = await getDocs(collection(db, 'employees'));
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Employee));
-    } catch {
-      return [];
-    }
+  async getAllPerformanceSummaries(month?: string): Promise<PerformanceSummary[]> {
+    return this.getPerformanceSummaries({ scope: 'GLOBAL', month });
   }
 
-  async getAllPerformanceSummaries(): Promise<PerformanceSummary[]> {
-    const [clientsMap, workforceItems, employees] = await Promise.all([
-      this.fetchClientsMap(),
-      this.fetchWorkforceItems(),
-      this.fetchEmployees(),
+  async getPerformanceSummaries(input: PerformanceScopeQuery): Promise<PerformanceSummary[]> {
+    const [allPlacements, employees] = await Promise.all([
+      this.fetchPlacements(input),
+      this.fetchEmployees(input)
     ]);
 
-    // Group active workforce candidates by recruiterId / recruiterName
-    const recruiterMap = new Map<string, WorkforceItem[]>();
-    workforceItems.forEach((item) => {
-      const key = item.recruiterId || item.recruiterName || item.activatedBy || 'Unassigned';
+    // Filter by activeDate matching the requested month
+    let targetPlacements = allPlacements;
+    if (input.month) {
+      targetPlacements = allPlacements.filter((p) => {
+        if (!p.activeDate) return false;
+        try {
+          const d = new Date(p.activeDate);
+          if (isNaN(d.getTime())) return false;
+          const placementMonthStr = `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+          return placementMonthStr.toLowerCase() === input.month!.toLowerCase();
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    // Group target placements by recruiterId / recruiterName
+    const recruiterMap = new Map<string, any[]>();
+    targetPlacements.forEach((placement) => {
+      const key = placement.recruiterId || placement.recruiterName;
+      if (!key) return;
       const existing = recruiterMap.get(key) || [];
-      existing.push(item);
+      existing.push(placement);
       recruiterMap.set(key, existing);
     });
 
     const summaries: PerformanceSummary[] = employees.map((emp) => {
       const key = emp.employeeId || emp.employeeCode || emp.id || emp.fullName;
-      const candidateList = recruiterMap.get(key) || recruiterMap.get(emp.fullName) || [];
-      
-      // Calculate Client-wise points using Client Master recruiter points (client.points)
-      const clientGroup = new Map<string, { clientName: string; count: number; pointsPerCand: number }>();
+      const placementList = recruiterMap.get(key) || recruiterMap.get(emp.fullName) || [];
 
-      candidateList.forEach((cand) => {
-        const clientObj = clientsMap.get(cand.clientId) || clientsMap.get(cand.clientName.toLowerCase());
-        const pts = clientObj?.points ?? 10; // Consumes Client Master Recruiter Points
-        const clientName = cand.clientName || clientObj?.name || 'Standard Client';
+      // Calculate Client-wise points using snapshot points from Placement
+      const clientGroup = new Map<
+        string,
+        { clientName: string; count: number; pointsPerCand: number; totalEarned: number }
+      >();
 
-        const existing = clientGroup.get(clientName) || { clientName, count: 0, pointsPerCand: pts };
+      placementList.forEach((placement) => {
+        const pts = Number(placement.totalPointAtActivation) || 0;
+        const basePts = Number(placement.pointAtActivation) || 0;
+        
+        const clientName = placement.clientName || 'Unknown Client';
+        const existing = clientGroup.get(clientName) || { clientName, count: 0, pointsPerCand: basePts, totalEarned: 0 };
         existing.count += 1;
+        existing.totalEarned += pts;
         clientGroup.set(clientName, existing);
       });
 
@@ -103,26 +135,32 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
         clientName: cg.clientName,
         activeCount: cg.count,
         pointsPerCandidate: cg.pointsPerCand,
-        totalEarned: cg.count * cg.pointsPerCand,
+        totalEarned: cg.totalEarned,
       }));
 
       const totalPoints = clientPointsBreakdown.reduce((sum, item) => sum + item.totalEarned, 0);
-      const activeCandidateCount = candidateList.length;
+      const activeCandidateCount = placementList.length;
+
+      const brandIdVal = (emp as any).brandId || (emp as any).brand || undefined;
+      const brandNameVal = (emp as any).brandName || undefined;
 
       return {
-        employeeId: emp.employeeId || emp.employeeCode || emp.id || 'EMP-UNKNOWN',
+        employeeId: emp.employeeId ?? emp.employeeCode ?? emp.id ?? '',
+        employeeCode: emp.employeeCode || emp.employeeId || '',
         employeeName: emp.fullName,
         department: emp.department,
         designation: emp.designation,
-        monthlyPoints: Math.round(totalPoints * 0.4), // Current month component
+        brandId: brandIdVal,
+        brandName: brandNameVal,
+        employmentStatus: emp.employmentStatus || 'Active',
+        monthlyPoints: totalPoints,
         totalPoints,
+        targetPoints: 0,
+        achievementPercent: 0,
         activeCandidateCount,
         clientPointsBreakdown,
-        departmentRank: 1, // Will be computed after sorting
+        departmentRank: 1,
         companyRank: 1,
-        rewardEligibility: totalPoints >= 200 ? 'Eligible for Quarterly Performance Bonus' : 'In Progress (Requires 200+ Points)',
-        promotionRecommendation: totalPoints >= 500 ? 'Recommended for Senior Role Promotion' : 'Needs Further Client Activations',
-        incrementRecommendation: totalPoints >= 300 ? 'Recommended for 15% Salary Increment' : 'Standard Annual Review',
       };
     });
 
@@ -150,9 +188,9 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
     return summaries;
   }
 
-  async getPerformanceForEmployee(employeeId: string): Promise<PerformanceSummary | null> {
-    const all = await this.getAllPerformanceSummaries();
-    return all.find((s) => s.employeeId === employeeId || s.employeeName.toLowerCase().includes(employeeId.toLowerCase())) || all[0] || null;
+  async getPerformanceForEmployee(employeeId: string, month?: string): Promise<PerformanceSummary | null> {
+    const all = await this.getPerformanceSummaries({ scope: 'SELF', employeeId, month });
+    return all.find((s) => s.employeeId === employeeId) ?? null;
   }
 }
 

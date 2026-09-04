@@ -66,6 +66,17 @@ export interface ExpenseTransaction {
   attachmentName?: string;
   attachmentUrl?: string;
 
+  brandId?: string;
+  brandName?: string;
+  manualExpenseType?: string;
+
+  payrollRunId?: string;
+  payslipId?: string;
+  employeeId?: string;
+  salaryMonth?: string;
+  documentId?: string;
+  payslipStoragePath?: string;
+
   status: ExpenseTransactionStatus;
   statusHistory: ExpenseTransactionStatusHistoryEntry[];
   createdBy: string;
@@ -92,6 +103,15 @@ export interface RecordExpenseInput {
   notes?: string;
   attachmentName?: string;
   attachmentUrl?: string;
+  brandId?: string;
+  brandName?: string;
+  manualExpenseType?: string;
+  payrollRunId?: string;
+  payslipId?: string;
+  employeeId?: string;
+  salaryMonth?: string;
+  documentId?: string;
+  payslipStoragePath?: string;
 }
 
 export interface ExpenseLedgerEntry {

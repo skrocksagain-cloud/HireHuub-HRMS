@@ -15,6 +15,8 @@ import {
   UserCheck,
   History,
   Paperclip,
+  Download,
+  FileText,
 } from 'lucide-react';
 
 import DashboardLayout from '../../../../layouts/DashboardLayout';
@@ -424,13 +426,75 @@ export default function OpeningDetailsPage() {
           </div>
         )}
 
-        {/* Tab 6: Attachments (Mandatory Correction 4) */}
+        {/* Tab 6: Attachments */}
         {activeTab === 'attachments' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4 text-xs">
-            <h3 className="font-bold text-slate-900">Opening Document Attachments</h3>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-600">
-              <p>File attachments extension point ready for {opening.id}.</p>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Paperclip size={16} className="text-emerald-600" />
+                Opening Reference Attachments ({opening.attachments?.length || 0})
+              </h3>
             </div>
+
+            {opening.attachments && opening.attachments.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                {opening.attachments.map((att) => {
+                  const isImg =
+                    att.fileName.match(/\.(jpg|jpeg|png|webp|gif)$/i);
+
+                  return (
+                    <div
+                      key={att.id || att.fileName}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3 flex flex-col justify-between hover:border-emerald-300 transition shadow-2xs"
+                    >
+                      {isImg ? (
+                        <div className="relative w-full h-36 bg-slate-200 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img
+                            src={att.fileUrl}
+                            alt={att.fileName}
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-36 bg-emerald-50/70 border border-emerald-200/60 rounded-lg flex flex-col items-center justify-center p-3 text-center space-y-2">
+                          <FileText size={36} className="text-emerald-600" />
+                          <span className="font-bold text-slate-800 text-xs truncate max-w-full">{att.fileName}</span>
+                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Document</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <span className="font-bold text-slate-900 text-xs block truncate" title={att.fileName}>
+                          {att.fileName}
+                        </span>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <span>{att.uploadedAt ? new Date(att.uploadedAt).toLocaleDateString() : 'Uploaded'}</span>
+                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Document</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <a
+                          href={att.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                          title="Download Document"
+                        >
+                          <Download size={16} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-2">
+                <Paperclip size={24} className="mx-auto text-slate-400" />
+                <p className="text-slate-600 font-semibold text-xs">No reference attachments uploaded for this opening.</p>
+                <p className="text-slate-400 text-[11px]">Attach job description images or PDF documents when creating or editing this opening.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

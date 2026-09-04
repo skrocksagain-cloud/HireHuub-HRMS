@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -21,8 +21,9 @@ import KpiCard from '../../../../../ui/KpiCard';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../../../../../context/AuthContext';
 import type { CreateClientInput, UserRole } from '../../../../../types/Client';
-import type { CommercialType, PayoutType, PercentageBasis, OtsTenureCondition } from '../../../../../types/ClientCommercial';
+import { formatTenureCondition, type CommercialType, type PayoutType, type PercentageBasis } from '../../../../../types/ClientCommercial';
 import type { SpocRole } from '../../../../../types/ClientSPOC';
+import { getIndianStates, getCitiesForState, getStateCode } from '../../../../../core/location/indiaLocationMaster';
 
 export default function ClientsPage() {
   const navigate = useNavigate();
@@ -45,55 +46,23 @@ export default function ClientsPage() {
   const [name, setName] = useState('');
   const [billingName, setBillingName] = useState('');
   const [gstin, setGstin] = useState('');
-  const [state, setState] = useState('Maharashtra');
+  const [state, setState] = useState('');
   const [line1, setLine1] = useState('');
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [scopeChoice, setScopeChoice] = useState<'India' | 'IndividualStates'>('India');
-  const [points, setPoints] = useState<number>(2);
+  const [points, setPoints] = useState<number>(0);
 
   // Commercial fields (Payroll / OTS)
   const [commercialType, setCommercialType] = useState<CommercialType>('OTS');
   const [payoutType, setPayoutType] = useState<PayoutType>('Amount');
   const [percentageBasis, setPercentageBasis] = useState<PercentageBasis>('Annual CTC');
-  const [percentageRate, setPercentageRate] = useState<number>(8.33);
-  const [payoutAmount, setPayoutAmount] = useState<number>(65000);
-  const [tenureCondition, setTenureCondition] = useState<OtsTenureCondition>('90 Days');
+  const [percentageRate, setPercentageRate] = useState<number>(0);
+  const [payoutAmount, setPayoutAmount] = useState<number>(0);
+  const [tenureCondition, setTenureCondition] = useState<number | ''>(90);
   const [poRequired, setPoRequired] = useState<boolean>(true);
-  const [templateReference, setTemplateReference] = useState('Hire Huub Standard Invoice');
+  const [templateReference, setTemplateReference] = useState('All');
   const [templateVersion, setTemplateVersion] = useState<number>(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<{
-    id: string;
-    templateId: string;
-    templateName: string;
-    version: number;
-    companyName: string;
-    storagePath: string;
-  } | null>(null);
-  const [activeTemplates, setActiveTemplates] = useState<Array<{ id: string; templateId: string; templateName: string; version: number; companyName: string; storagePath: string }>>([]);
-
-  useEffect(() => {
-    import('../../../../../services/admin/adminService')
-      .then(({ adminService }) => adminService.getDocumentTemplatesByType('Invoice'))
-      .then((tmplList) => {
-        const active = tmplList.filter((t) => (t.status || (t.isActive ? 'Active' : 'Inactive')) === 'Active');
-        if (active.length > 0) {
-          const mapped = active.map((t) => ({
-            id: t.id,
-            templateId: t.templateId || t.id,
-            templateName: t.templateName,
-            version: t.version || 1,
-            companyName: t.clientName || t.companyName || 'Hire Huub',
-            storagePath: t.templateStoragePath || '',
-          }));
-          setActiveTemplates(mapped);
-          setSelectedTemplate(mapped[0]);
-          setTemplateReference(mapped[0].templateName);
-          setTemplateVersion(mapped[0].version);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // SPOC inputs
   const [hrName, setHrName] = useState('');
@@ -112,6 +81,18 @@ export default function ClientsPage() {
       setFormError(`Your current role '${currentRole}' is not permitted to create clients.`);
       return;
     }
+    if (commercialType === 'OTS') {
+      if (tenureCondition === '' || tenureCondition === undefined || tenureCondition === null) {
+        setFormError('Tenure Condition is required for OTS clients.');
+        return;
+      }
+      const numTenure = Number(tenureCondition);
+      if (isNaN(numTenure) || !Number.isInteger(numTenure) || numTenure < 1) {
+        setFormError('Tenure Condition must be a valid whole number of at least 1 day.');
+        return;
+      }
+    }
+
     setCreating(true);
     setFormError('');
 
@@ -121,7 +102,7 @@ export default function ClientsPage() {
         {
           id: `spoc-hr-${nowId}`,
           role: 'HR' as SpocRole,
-          name: hrName.trim() || 'HR Contact',
+          name: hrName.trim(),
           designation: 'HR Manager',
           email: hrEmail.trim(),
           phone: hrPhone.trim(),
@@ -131,7 +112,7 @@ export default function ClientsPage() {
         {
           id: `spoc-acc-${nowId}`,
           role: 'Accounts' as SpocRole,
-          name: accountsName.trim() || 'Accounts Contact',
+          name: accountsName.trim(),
           designation: 'Accounts Executive',
           email: accountsEmail.trim(),
           phone: accountsPhone.trim(),
@@ -158,13 +139,13 @@ export default function ClientsPage() {
         highlights: ['New Client'],
         commercial: {
           type: commercialType,
-          points,
+          points: Number(points) || 0,
           payoutType,
-          percentageBasis: payoutType === 'Percentage' ? percentageBasis : undefined,
-          percentageRate: payoutType === 'Percentage' ? percentageRate : undefined,
-          payoutAmount: payoutType === 'Amount' ? payoutAmount : undefined,
-          tenureCondition: commercialType === 'OTS' ? tenureCondition : undefined,
-          poRequired,
+          percentageBasis: payoutType === 'Percentage' ? percentageBasis || 'Annual CTC' : 'Annual CTC',
+          percentageRate: payoutType === 'Percentage' ? Number(percentageRate) || 0 : 0,
+          payoutAmount: payoutType === 'Amount' ? Number(payoutAmount) || 0 : 0,
+          tenureCondition: commercialType === 'OTS' ? Number(tenureCondition) : undefined,
+          poRequired: Boolean(poRequired),
         },
         gstConfig: {
           gstMode: scopeChoice,
@@ -174,7 +155,7 @@ export default function ClientsPage() {
           stateGstRecords: [
             {
               id: `gst-rec-1`,
-              stateCode: state === 'Maharashtra' ? '27' : '29',
+              stateCode: getStateCode(state),
               stateName: state,
               gstin,
               billingName: billingName || name,
@@ -189,13 +170,13 @@ export default function ClientsPage() {
         },
         spocs,
         invoiceConfig: {
-          templateId: selectedTemplate?.templateId || 'tmpl-hirehuub-standard',
-          templateName: selectedTemplate?.templateName || templateReference,
-          templateVersion: selectedTemplate?.version || templateVersion,
-          templateReference: selectedTemplate?.templateName || templateReference,
-          storagePath: selectedTemplate?.storagePath || '',
-          referenceName: selectedTemplate?.templateName || templateReference,
-          documentId: selectedTemplate?.id || '',
+          templateId: '',
+          templateName: templateReference || 'All',
+          templateVersion: 1,
+          templateReference: templateReference || 'All',
+          storagePath: '',
+          referenceName: templateReference || 'All',
+          documentId: '',
         },
       };
 
@@ -213,20 +194,20 @@ export default function ClientsPage() {
     setName('');
     setBillingName('');
     setGstin('');
-    setState('Maharashtra');
+    setState('');
     setLine1('');
     setCity('');
     setPostalCode('');
     setScopeChoice('India');
-    setPoints(2);
+    setPoints(0);
     setCommercialType('OTS');
     setPayoutType('Amount');
     setPercentageBasis('Annual CTC');
-    setPercentageRate(8.33);
-    setPayoutAmount(65000);
-    setTenureCondition('90 Days');
+    setPercentageRate(0);
+    setPayoutAmount(0);
+    setTenureCondition(90);
     setPoRequired(true);
-    setTemplateReference('sheet-template-default-v1');
+    setTemplateReference('');
     setTemplateVersion(1);
     setHrName('');
     setHrEmail('');
@@ -418,7 +399,12 @@ export default function ClientsPage() {
                 {filteredClients.map((client) => (
                   <tr key={client.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3.5 px-4 font-bold text-slate-900">
-                      <div className="text-emerald-700 font-bold text-sm">{client.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-700 font-bold text-sm">{client.name}</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {client.clientId || client.id}
+                        </span>
+                      </div>
                       <div className="text-[11px] text-slate-500 font-medium">{client.billingName}</div>
                     </td>
                     <td className="py-3.5 px-4">
@@ -455,7 +441,7 @@ export default function ClientsPage() {
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
                       {client.commercial.type === 'OTS' ? (
-                        <span className="font-semibold text-slate-800">{client.commercial.tenureCondition || '90 Days'}</span>
+                        <span className="font-semibold text-slate-800">{formatTenureCondition(client.commercial.tenureCondition)}</span>
                       ) : (
                         <span className="text-slate-400 text-[10px]">— (Payroll)</span>
                       )}
@@ -575,19 +561,68 @@ export default function ClientsPage() {
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Primary State *</label>
+                <label className="block font-semibold text-slate-700 mb-1">State / Union Territory *</label>
                 <select
                   value={state}
-                  onChange={(e) => setState(e.target.value)}
+                  onChange={(e) => {
+                    setState(e.target.value);
+                    setCity('');
+                  }}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                  required
                 >
-                  <option value="Maharashtra">Maharashtra (27)</option>
-                  <option value="Karnataka">Karnataka (29)</option>
-                  <option value="Telangana">Telangana (36)</option>
-                  <option value="West Bengal">West Bengal (19)</option>
-                  <option value="Tamil Nadu">Tamil Nadu (33)</option>
-                  <option value="Delhi">Delhi (07)</option>
+                  <option value="">Select State / UT</option>
+                  {getIndianStates().map((s) => (
+                    <option key={s.stateCode} value={s.stateName}>
+                      {s.stateName} ({s.stateCode})
+                    </option>
+                  ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Country</label>
+                <input
+                  type="text"
+                  readOnly
+                  value="India"
+                  className="w-full p-2 bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">City *</label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={!state}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                  required
+                >
+                  <option value="">{state ? 'Select City' : 'Select State First'}</option>
+                  {state &&
+                    getCitiesForState(state).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  {city && state && !getCitiesForState(state).includes(city) && (
+                    <option value={city}>{city} (Historical)</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Postal Code</label>
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="e.g. 700091"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                />
               </div>
             </div>
 
@@ -600,29 +635,6 @@ export default function ClientsPage() {
                 placeholder="Street address line 1"
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">City (Optional for India)</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Pune"
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Postal Code</label>
-                <input
-                  type="text"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="411058"
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
             </div>
           </div>
 
@@ -729,15 +741,27 @@ export default function ClientsPage() {
             {commercialType === 'OTS' && (
               <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-1">
                 <label className="block font-semibold text-amber-900 text-xs">Tenure Condition (OTS Only) *</label>
-                <select
-                  value={tenureCondition}
-                  onChange={(e) => setTenureCondition(e.target.value as OtsTenureCondition)}
-                  className="w-full p-2 bg-white border border-amber-300 rounded-xl font-semibold text-amber-950 focus:outline-none"
-                >
-                  <option value="30 Days">30 Days</option>
-                  <option value="90 Days">90 Days</option>
-                  <option value="180 Days">180 Days</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={tenureCondition}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setTenureCondition('');
+                      } else {
+                        const parsed = Number(val);
+                        setTenureCondition(isNaN(parsed) ? '' : parsed);
+                      }
+                    }}
+                    placeholder="90"
+                    required={commercialType === 'OTS'}
+                    className="w-28 p-2 bg-white border border-amber-300 rounded-xl font-semibold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                  />
+                  <span className="font-bold text-amber-900 text-sm">Days</span>
+                </div>
                 <span className="text-[10px] text-slate-500 block">Required service retention period before OTS payout</span>
               </div>
             )}
@@ -755,49 +779,26 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          {/* Invoice Template Reference */}
+          {/* Hire Huub Billing Configuration */}
           <div className="space-y-3">
             <h4 className="font-bold text-slate-900 border-b border-slate-200 pb-1 text-xs uppercase tracking-wider text-emerald-700">
-              Invoice Template Reference
+              Hire Huub Billing Configuration
             </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Invoice Template *</label>
-                <select
-                  value={templateReference}
-                  onChange={(e) => {
-                    const sel = activeTemplates.find((t) => t.templateName === e.target.value || t.templateId === e.target.value);
-                    if (sel) {
-                      setTemplateReference(sel.templateName);
-                      setTemplateVersion(sel.version);
-                    } else {
-                      setTemplateReference(e.target.value);
-                    }
-                  }}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
-                  required
-                >
-                  {activeTemplates.length === 0 && (
-                    <option value={templateReference}>{templateReference} (v{templateVersion})</option>
-                  )}
-                  {activeTemplates.map((t) => (
-                    <option key={t.id} value={t.templateName}>
-                      {t.templateName} (v{t.version})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Template Version *</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={templateVersion}
-                  onChange={(e) => setTemplateVersion(Number(e.target.value))}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Invoice Template *</label>
+              <select
+                value={templateReference || 'All'}
+                onChange={(e) => {
+                  setTemplateReference(e.target.value);
+                  setTemplateVersion(1);
+                }}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+                required
+              >
+                <option value="Blinkit">Blinkit</option>
+                <option value="Elastic Run">Elastic Run</option>
+                <option value="All">All</option>
+              </select>
             </div>
           </div>
 

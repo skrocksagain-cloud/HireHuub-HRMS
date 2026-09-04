@@ -1,38 +1,30 @@
-import { useState } from "react";
-import { Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, CheckCircle2, AlertCircle, ShieldCheck, Sparkles, FileText, ChevronRight } from "lucide-react";
 import DashboardLayout from "../../layouts/DashboardLayout";
-import SectionHeader from "../../ui/SectionHeader";
 import DashboardStats from "./components/cards/DashboardStats";
 import RecentDocuments from "./components/cards/RecentDocuments";
 import DocumentDistribution from "./components/cards/DocumentDistribution";
 import DocumentActivity from "./components/cards/DocumentActivity";
-import QuickActions from "./components/cards/QuickActions";
-import OfferLetterGenerator from './components/OfferLetterGenerator';
 import UploadDocumentDrawer from "./components/UploadDocumentDrawer";
-import DocumentPreviewModal from "../../components/DocumentPreviewModal";
-import {
-  PayslipDrawer,
-  IncrementLetterDrawer,
-  RelievingLetterDrawer,
-  ExperienceLetterDrawer,
-} from "./components/DocumentGenerationDrawers";
+import DocumentPreviewModal, { type DocumentResult } from "../../components/DocumentPreviewModal";
+import { DocumentContentHubPage } from "./components/DocumentContentHub/DocumentContentHubPage";
 
 import type { Document } from "../../types/Document";
-import type { DocumentResult } from "../../core/engine/documentEngine";
+import type { CompanySettings } from "../../types/Admin";
 import { documentCenterService } from "../../services/document/documentCenterService";
+import { adminService } from "../../services/admin/adminService";
 
 import useDocumentDashboard from "./useDocumentDashboard";
-import { useOfferLetterGeneration } from './hooks/useOfferLetterGeneration';
 import { useAuth } from "../../context/AuthContext";
 import { permissionService } from "../../core/permissions/permissionService";
 
 export default function DocumentDashboard() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'content_hub' | 'history'>('history');
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isPayslipOpen, setIsPayslipOpen] = useState(false);
-  const [isIncrementOpen, setIsIncrementOpen] = useState(false);
-  const [isRelievingOpen, setIsRelievingOpen] = useState(false);
-  const [isExperienceOpen, setIsExperienceOpen] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
@@ -50,60 +42,59 @@ export default function DocumentDashboard() {
     refresh,
   } = useDocumentDashboard();
 
-  const {
-    offers,
-    isLoadingOffers,
-    isGenerating,
-    error,
-    generatedFileName,
-    generateOfferLetter,
-  } = useOfferLetterGeneration();
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await adminService.getCompanySettings();
+        if (settings) {
+          setCompanySettings(settings);
+          if (settings.brandProfilesList && settings.brandProfilesList.length > 0) {
+            setSelectedBrandId(settings.brandProfilesList[0].id);
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    };
+    loadSettings();
+  }, []);
 
-  const canUpload = permissionService.canUploadDocument(user?.role || "Employee");
+  const brandList = companySettings?.brandProfilesList || [];
+  const activeBrand = brandList.find((b) => b.id === selectedBrandId) || brandList[0];
+
+  const currentRole = (user?.role as string) || 'Super Admin';
+  const canUpload = permissionService.canUploadDocument(currentRole);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
     setToastType(type);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
-  const handleDocumentGeneratedSuccess = (res: DocumentResult) => {
-    showToast(`Document '${res.fileName}' generated and downloaded successfully!`);
-    refresh();
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleDownloadDocument = async (docItem: Document) => {
+    const targetUrl = docItem.downloadUrl || docItem.fileUrl;
+    if (!targetUrl) {
+      showToast(`Document '${docItem.title}' has no downloadable file URL.`, 'error');
+      return;
+    }
     try {
-      const docId = docItem.id || docItem.documentId;
-      const registered = docId ? await documentCenterService.getDocumentById(docId) : null;
-      const targetUrl = registered?.storageUrl || docItem.downloadUrl || docItem.fileUrl;
-      if (!targetUrl) {
-        showToast(`Document '${docItem.title}' file was not found in storage.`, 'error');
-        return;
+      if (docItem.id) {
+        await documentCenterService.recordDownload(docItem.id);
       }
-
-      if (docId) {
-        await documentCenterService.recordDownload(docId);
-      }
-
-      const link = window.document.createElement('a');
-      link.href = targetUrl;
-      link.target = '_blank';
-      link.download = docItem.title.endsWith('.pdf') ? docItem.title : `${docItem.title}.pdf`;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
-
-      showToast(`Document '${docItem.title}' downloaded successfully.`);
-      await refresh();
+      const a = document.createElement('a');
+      a.href = targetUrl;
+      a.download = docItem.title || 'document';
+      a.target = '_blank';
+      a.click();
+      showToast(`Downloaded '${docItem.title || 'Document'}'`);
     } catch {
-      showToast(`Failed to download document '${docItem.title}'.`, 'error');
+      showToast(`Failed to download '${docItem.title || 'Document'}'`, 'error');
     }
   };
 
   const handlePreviewDocument = async (docItem: Document) => {
-    const docId = docItem.id || docItem.documentId;
-    const registered = docId ? await documentCenterService.getDocumentById(docId) : null;
+    const docId = docItem.id || '';
+    const registered = docId ? await documentCenterService.getDocumentById(docId).catch(() => null) : null;
     const targetUrl = registered?.storageUrl || docItem.downloadUrl || docItem.fileUrl;
     if (!targetUrl) {
       showToast(`Document '${docItem.title}' preview file is unavailable.`, 'error');
@@ -114,141 +105,151 @@ export default function DocumentDashboard() {
       success: true,
       documentId: docId,
       fileName: docItem.title,
-      status: 'Generated',
       downloadUrl: targetUrl,
       previewUrl: targetUrl,
       storagePath: registered?.storagePath || docItem.storagePath || '',
       templateVersion: `v${docItem.version || 1}`,
-      resolvedPlaceholders: {},
     });
   };
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <SectionHeader
-            title="Document Center Workspace"
-            subtitle="Single Source of Truth for all Hire Huub One ERP documents."
-          />
+      <div className="space-y-6 font-sans">
+        {/* Top-Level Brand Selector & Breadcrumb Banner */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-sky-950 border border-sky-800/60 text-sky-400">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-semibold mb-0.5">
+                <span>Legal Entity: {companySettings?.companyName || 'Hire Huub ERP'}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+                <span className="text-sky-400 font-bold">Document Library</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+                <span className="text-slate-200">{activeBrand?.brandName || 'Hire Huub'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Active Brand Scope:</span>
+                <div className="relative">
+                  <select
+                    value={selectedBrandId}
+                    onChange={(e) => setSelectedBrandId(e.target.value)}
+                    className="bg-slate-950 border border-sky-600/80 rounded-xl px-3.5 py-1.5 text-xs text-sky-300 font-extrabold focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-md cursor-pointer"
+                  >
+                    {brandList.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.brandName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          {canUpload && (
-            <button
-              type="button"
-              onClick={() => setIsUploadOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-xs transition"
-            >
-              <Upload size={16} />
-              <span>Upload Document</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {canUpload && (
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/20 transition"
+              >
+                <Upload size={16} />
+                <span>Upload Document</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Document Library Subtabs */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              activeTab === 'history'
+                ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Document Storage & History
+          </button>
+          <button
+            onClick={() => setActiveTab('content_hub')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              activeTab === 'content_hub'
+                ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" /> Document Content Hub
+          </button>
         </div>
 
         {toastMessage && (
           <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
             toastType === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
+              ? 'bg-emerald-950 border-emerald-800 text-emerald-300'
+              : 'bg-rose-950 border-rose-800 text-rose-300'
           }`}>
             {toastType === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
             <span>{toastMessage}</span>
           </div>
         )}
 
-        <OfferLetterGenerator
-          offers={offers}
-          isLoadingOffers={isLoadingOffers}
-          isGenerating={isGenerating}
-          error={error}
-          generatedFileName={generatedFileName}
-          onGenerate={generateOfferLetter}
-        />
-
-        {/* Statistics */}
-        <DashboardStats
-          loading={loading}
-          totalDocuments={totalDocuments}
-          generatedToday={generatedToday}
-          storageUsed={storageUsed}
-          totalTemplates={totalTemplates}
-        />
-
-        {/* Main Dashboard */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left Section */}
-          <div className="xl:col-span-2 space-y-6">
-            <RecentDocuments
-              loading={loading}
-              documents={recentDocuments}
-              onRefresh={refresh}
-              onDownload={handleDownloadDocument}
-              onPreview={handlePreviewDocument}
-            />
-
-            <DocumentDistribution
-              loading={loading}
-              data={distribution}
-            />
-          </div>
-
-          {/* Right Section */}
+        {/* Tab 1: Document Storage & History */}
+        {activeTab === 'history' && (
           <div className="space-y-6">
-            <QuickActions
-              onGenerateOfferLetter={() => {
-                const el = window.document.getElementById('offer-letter-generator');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-                else showToast('Select an offer from the list above to generate PDF.');
-              }}
-              onGeneratePayslip={() => setIsPayslipOpen(true)}
-              onGenerateIncrementLetter={() => setIsIncrementOpen(true)}
-              onGenerateRelievingLetter={() => setIsRelievingOpen(true)}
-              onUploadDocument={() => setIsUploadOpen(true)}
-            />
-
-            <DocumentActivity
+            <DashboardStats
               loading={loading}
-              activities={activities}
+              totalDocuments={totalDocuments}
+              generatedToday={generatedToday}
+              storageUsed={storageUsed}
+              totalTemplates={totalTemplates}
             />
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 space-y-6">
+                <RecentDocuments
+                  loading={loading}
+                  documents={recentDocuments}
+                  onRefresh={refresh}
+                  onDownload={handleDownloadDocument}
+                  onPreview={handlePreviewDocument}
+                />
+                <DocumentDistribution
+                  loading={loading}
+                  data={distribution}
+                />
+              </div>
+
+              <div className="space-y-6">
+                <DocumentActivity
+                  loading={loading}
+                  activities={activities}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Drawers for Document Generation */}
-        <PayslipDrawer
-          isOpen={isPayslipOpen}
-          onClose={() => setIsPayslipOpen(false)}
-          onSuccess={handleDocumentGeneratedSuccess}
-        />
-
-        <IncrementLetterDrawer
-          isOpen={isIncrementOpen}
-          onClose={() => setIsIncrementOpen(false)}
-          onSuccess={handleDocumentGeneratedSuccess}
-        />
-
-        <RelievingLetterDrawer
-          isOpen={isRelievingOpen}
-          onClose={() => setIsRelievingOpen(false)}
-          onSuccess={handleDocumentGeneratedSuccess}
-        />
-
-        <ExperienceLetterDrawer
-          isOpen={isExperienceOpen}
-          onClose={() => setIsExperienceOpen(false)}
-          onSuccess={handleDocumentGeneratedSuccess}
-        />
+        {/* Tab 2: Document Content Hub */}
+        {activeTab === 'content_hub' && (
+          <DocumentContentHubPage />
+        )}
 
         {/* Upload Document Drawer */}
         <UploadDocumentDrawer
           isOpen={isUploadOpen}
           onClose={() => setIsUploadOpen(false)}
           onSuccess={() => {
-            refresh();
             setIsUploadOpen(false);
+            showToast('Document uploaded successfully!');
+            refresh();
           }}
         />
 
-        {/* Preview Modal */}
+        {/* Document Preview Modal */}
         {previewResult && (
           <DocumentPreviewModal
             result={previewResult}

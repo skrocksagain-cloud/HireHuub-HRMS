@@ -89,28 +89,29 @@ export const HIERARCHY_LEVELS: Record<string, number> = {
 };
 
 export class DesignationMasterService {
-  async getDepartmentsFromAdmin(): Promise<string[]> {
+  async getDepartmentsFromAdmin(): Promise<Array<{ id: string, name: string }>> {
     try {
       const depts = await adminService.getDepartments();
-      const activeNames = depts.filter((d) => d.isActive).map((d) => d.name);
-      return activeNames.length > 0 ? activeNames : APPROVED_DEPARTMENTS;
+      return depts.filter((d) => d.isActive !== false).map((d) => ({ id: d.id, name: d.name }));
     } catch {
-      return APPROVED_DEPARTMENTS;
+      return [];
     }
   }
 
   async getDesignationsForDepartment(departmentName: string): Promise<string[]> {
-    const defaults = DEFAULT_DEPARTMENT_DESIGNATIONS[departmentName] || [];
     try {
       const adminDesigs = await adminService.getDesignations();
-      const dbMatching = adminDesigs
-        .filter((r) => r.isActive && (r.departmentName === departmentName || !r.departmentId))
+      const activeDesigs = adminDesigs.filter((r) => r.isActive !== false);
+      if (!departmentName) {
+        return activeDesigs.map((r) => r.name);
+      }
+      const dbMatching = activeDesigs
+        .filter((r) => r.departmentName === departmentName || !r.departmentId || !r.departmentName)
         .map((r) => r.name);
 
-      const combined = [...new Set([...defaults, ...dbMatching])];
-      return combined.length > 0 ? combined : defaults;
+      return [...new Set(dbMatching)];
     } catch {
-      return defaults;
+      return [];
     }
   }
 

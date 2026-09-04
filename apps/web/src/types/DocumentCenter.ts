@@ -23,7 +23,10 @@ export interface RegisteredDocument {
   employeeId?: string;
   candidateId?: string;
   clientId?: string;
+  vendorId?: string;
+  templateId?: string;
   templateVersion: string;
+  outputFormat?: string;
   generatedBy: string;
   generatedByName: string;
   generatedOn: string;
@@ -48,4 +51,6 @@ export interface DocumentFilterOptions {
   clientId?: string;
   status?: RegisteredDocument['status'];
   searchTerm?: string;
+  referenceId?: string;
+  documentId?: string;
 }

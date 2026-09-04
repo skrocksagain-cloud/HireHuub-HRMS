@@ -100,6 +100,7 @@ export class FirestoreUserSessionRepository implements UserSessionRepository {
       loginAt: typeof data.loginAt === 'string' ? data.loginAt : '',
       logoutAt: typeof data.logoutAt === 'string' ? data.logoutAt : null,
       lastActivity: typeof data.lastActivity === 'string' ? data.lastActivity : '',
+      expiresAt: typeof data.expiresAt === 'string' ? data.expiresAt : undefined,
       device: typeof data.device === 'string' ? data.device : 'Desktop',
       browser: typeof data.browser === 'string' ? data.browser : 'Chrome',
       platform: typeof data.platform === 'string' ? data.platform : 'Windows',

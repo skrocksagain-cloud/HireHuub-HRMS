@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  User,
   UserCheck,
   CalendarCheck,
   CalendarOff,
@@ -23,6 +24,7 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
+  Send,
 } from "lucide-react";
 import hLogo from "../../assets/logo/h-logo.png";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -87,7 +89,7 @@ const navigationItems: SidebarItem[] = [
       { kind: "leaf", name: "Attendance", path: "/attendance", icon: <CalendarCheck size={16} /> },
       { kind: "leaf", name: "Leave", path: "/leave", icon: <CalendarOff size={16} /> },
       { kind: "leaf", name: "Performance", path: "/performance", icon: <TrendingUp size={16} /> },
-      { kind: "leaf", name: "Documents", path: "/documents", icon: <FileText size={16} /> },
+      { kind: "leaf", name: "Profile", path: "/profile", icon: <User size={16} /> },
     ],
   },
   {
@@ -111,10 +113,10 @@ const navigationItems: SidebarItem[] = [
         icon: <UserPlus size={16} />,
         children: [
           { name: "Openings", path: "/workbench/staffing-hub/openings", icon: <Briefcase size={14} /> },
-          { name: "CRM", path: "/workbench/staffing-hub/crm", icon: <Users size={14} /> },
+          { name: "CRM", path: "/workbench/crm", icon: <Users size={14} /> },
+          { name: "Workforce", path: "/workbench/workforce", icon: <UsersRound size={14} /> },
         ],
       },
-      { kind: "leaf", name: "Workforce", path: "/workbench/workforce", icon: <UsersRound size={16} /> },
       { kind: "leaf", name: "Campaign Hub", path: "/workbench/campaign-hub", icon: <Megaphone size={16} /> },
     ],
   },
@@ -124,16 +126,18 @@ const navigationItems: SidebarItem[] = [
     icon: <Banknote size={18} />,
     basePath: "/finance",
     children: [
+      { kind: "leaf", name: "Internal Payroll", path: "/finance/payroll", icon: <Banknote size={16} /> },
+      { kind: "leaf", name: "Transactions", path: "/finance/transactions", icon: <ArrowLeftRight size={16} /> },
       {
         kind: "sub-group",
-        name: "Billing",
+        name: "Hire Huub",
         icon: <FileText size={16} />,
         children: [
           { name: "Invoices", path: "/finance/billing/invoices", icon: <FileText size={14} /> },
           { name: "Credit Notes", path: "/finance/billing/credit-notes", icon: <FileX2 size={14} /> },
+          { name: "Payout", path: "/finance/payout", icon: <Send size={14} /> },
         ],
       },
-      { kind: "leaf", name: "Transactions", path: "/finance/transactions", icon: <ArrowLeftRight size={16} /> },
     ],
   },
   {
@@ -333,20 +337,54 @@ function GroupSection({
 export default function Sidebar() {
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { canAccessModule, simulatedRole } = usePermissions();
+  const {  canView, simulatedRole } = usePermissions();
 
-  const filteredNavigation = navigationItems.filter((item) => {
-    if (item.kind === "flat") {
-      if (item.path === "/dashboard") return canAccessModule("dashboard");
-      if (item.path === "/management") return canAccessModule("management");
-      return true;
-    }
-    if (item.basePath === "/people") return canAccessModule("employees");
-    if (item.basePath === "/workbench") return canAccessModule("recruitment") || canAccessModule("employees");
-    if (item.basePath === "/finance") return canAccessModule("finance");
-    if (item.name === "Administration") return canAccessModule("management");
+    const isItemVisible = (path: string): boolean => {
+    const p = path.toLowerCase();
+    if (p === "/dashboard") return true;
+    if (p.includes("/profile")) return canView("profile");
+    if (p.includes("/attendance")) return canView("attendance");
+    if (p.includes("/leave")) return canView("leave");
+    if (p.includes("/performance")) return canView("performance");
+    if (p.includes("/employees") || p.includes("/people")) return canView("employees");
+    if (p.includes("/workbench/network/clients")) return canView("client");
+    if (p.includes("/workbench/network/associate-partners")) return canView("associatePartner");
+    if (p.includes("/workbench/staffing-hub/openings")) return canView("openings");
+    if (p.includes("/workbench/crm")) return canView("crm");
+    if (p.includes("/workbench/workforce")) return canView("workforce");
+    if (p.includes("/workbench/campaign-hub")) return canView("campaignHub");
+    if (p.includes("/finance/billing/invoices")) return canView("invoices");
+    if (p.includes("/finance/billing/credit-notes")) return canView("creditNotes");
+    if (p.includes("/finance/payroll")) return canView("internalPayroll");
+    if (p.includes("/finance/transactions")) return canView("transactions");
+    if (p.includes("/finance/payout")) return canView("payout");
+    if (p.includes("/management") || p.includes("/settings")) return canView("managementControl");
+    if (p.includes("/administration/calendar")) return canView("calendar");
+    if (p.includes("/administration/announcements")) return canView("announcements");
     return true;
-  });
+  };
+
+  const filteredNavigation = navigationItems
+    .map((item) => {
+      if (item.kind === "flat") {
+        return isItemVisible(item.path) ? item : null;
+      }
+
+      const validChildren = item.children
+        .map((child) => {
+          if (child.kind === "leaf") {
+            return isItemVisible(child.path) ? child : null;
+          }
+          const validSubChildren = child.children.filter((sub) => isItemVisible(sub.path));
+          if (validSubChildren.length === 0) return null;
+          return { ...child, children: validSubChildren };
+        })
+        .filter(Boolean) as GroupChild[];
+
+      if (validChildren.length === 0) return null;
+      return { ...item, children: validChildren };
+    })
+    .filter(Boolean) as SidebarItem[];
 
   return (
     <aside

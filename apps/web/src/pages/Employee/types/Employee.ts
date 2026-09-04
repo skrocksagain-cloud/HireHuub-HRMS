@@ -2,7 +2,39 @@ export type EmployeeGender = 'Male' | 'Female' | 'Other';
 
 export type EmploymentType = 'Permanent' | 'Contract' | 'Intern' | 'Consultant';
 
-export type EmployeeStatus = 'Active' | 'Inactive' | 'Notice Period' | 'Terminated';
+export type EmployeeStatus = 'Active' | 'Inactive' | 'Notice Period' | 'Terminated' | 'Resigned';
+
+export type ExitType = 'Resignation' | 'Termination' | 'Mutual Separation' | 'Manager Initiated';
+
+export type ExitStatus =
+  | 'Pending Manager Approval'
+  | 'Approved'
+  | 'Notice Period'
+  | 'Exit Completed'
+  | 'Rejected';
+
+export interface ExitRecord {
+  id?: string;
+  exitType: ExitType;
+  initiatedBy: string;
+  initiatedByRole?: string;
+  initiatedAt: string;
+  resignationDate?: string;
+  noticePeriodDays?: number;
+  lastWorkingDate: string;
+  exitReason: string;
+  exitRemarks?: string;
+  exitStatus: ExitStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  relievingLetterGenerated?: boolean;
+  relievingLetterUrl?: string;
+  relievingLetterRef?: string;
+  relievingLetterGeneratedAt?: string;
+}
 
 export interface Employee {
   id?: string;
@@ -15,6 +47,7 @@ export interface Employee {
   gender: EmployeeGender;
   dateOfBirth: string;
   mobileNumber: string;
+  mobileVerified?: boolean;
   email: string;
   /** Legacy aliases are mapped by employeeService for existing Firestore records. */
   officialEmail?: string;
@@ -22,6 +55,8 @@ export interface Employee {
   mobile?: string;
   departmentId?: string;
   department: string;
+  teamId?: string;
+  teamName?: string;
   designationId?: string;
   designation: string;
   reportingManagerId?: string;
@@ -35,6 +70,29 @@ export interface Employee {
   address: string;
   emergencyContact: string;
   notes: string;
+  fatherName?: string;
+  motherName?: string;
+  aadhaarNumber?: string;
+  panNumber?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  branchName?: string;
+  bankName?: string;
+  monthlyGross?: number;
+  salary?: number;
+  grossSalary?: number;
+  pfApplicable?: boolean;
+  esicApplicable?: boolean;
+  ptApplicable?: boolean;
+  calculatedPf?: number;
+  calculatedEsic?: number;
+  calculatedPt?: number;
+  totalDeductions?: number;
+  netTakeHome?: number;
+  lastWorkingDate?: string;
+  rehireDate?: string;
+  assignedRole?: 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
+  exitRecord?: ExitRecord;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -48,10 +106,12 @@ export interface EmployeeFormData {
   dateOfBirth: string;
   mobileNumber: string;
   email: string;
+  departmentId?: string;
   department: string;
   designation: string;
   employmentType: EmploymentType;
   joiningDate: string;
+  reportingManagerId?: string;
   reportingManager: string;
   workLocation: string;
   employmentStatus: EmployeeStatus;
@@ -59,6 +119,15 @@ export interface EmployeeFormData {
   address: string;
   emergencyContact: string;
   notes: string;
+  grossSalary?: number;
+  pfApplicable?: boolean;
+  esicApplicable?: boolean;
+  ptApplicable?: boolean;
+  calculatedPf?: number;
+  calculatedEsic?: number;
+  calculatedPt?: number;
+  totalDeductions?: number;
+  netTakeHome?: number;
 }
 
 export interface EmployeeFilter {

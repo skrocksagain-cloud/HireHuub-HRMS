@@ -3,7 +3,7 @@ import { adminService } from '../admin/adminService';
 export class CampaignNumberService {
   private async getPrefix(): Promise<string> {
     const company = await adminService.getCompanySettings();
-    if (!company.campaignPrefix?.trim()) throw new Error('Administration → Company Settings is missing the campaign prefix.');
+    if (!company || !company.campaignPrefix?.trim()) throw new Error('Administration → Company Settings is missing the campaign prefix.');
     return company.campaignPrefix;
   }
 

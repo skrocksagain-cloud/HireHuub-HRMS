@@ -9,8 +9,7 @@ interface HolidayModalProps {
 }
 
 export default function HolidayModal({ onClose, onSave }: HolidayModalProps) {
-  const { activeRole } = usePermissions();
-  const isSuperAdmin = activeRole.name === 'Super Admin' || activeRole.name === 'admin';
+  const { isSuperAdmin } = usePermissions();
 
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));

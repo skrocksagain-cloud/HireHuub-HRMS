@@ -45,7 +45,7 @@ export default function GlobalSearchBar() {
             title: `${name} (${e.employeeId || 'Active Employee'})`,
             category: 'Employees',
             module: 'employees',
-            path: `/people/employees/${e.employeeId || e.id}`,
+            path: `/people/employees/${e.employeeId || e.id}?fromSearch=true`,
           });
         }
       });

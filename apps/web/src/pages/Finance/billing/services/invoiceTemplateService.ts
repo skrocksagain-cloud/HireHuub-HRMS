@@ -46,13 +46,10 @@ class InvoiceTemplateService {
   }
 
   /**
-   * Resolves the best matching InvoiceTemplate for a specific client.
+   * Resolves the assigned InvoiceTemplate for a specific client.
    *
-   * Resolution order:
-   * 1. Exact match on templateId or id (client.invoiceConfig.templateReference)
-   * 2. Fuzzy match on clientName / companyName / templateName
-   * 3. First active template available (global fallback)
-   * 4. null — caller should fall back to React-PDF default layout
+   * Requirement:
+   * Strict exact match on templateId or id from Administration → Document Templates.
    */
   async resolveTemplateForClient(
     templateReference: string

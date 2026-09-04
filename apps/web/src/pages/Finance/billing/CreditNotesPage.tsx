@@ -12,14 +12,14 @@ import StatusBadge from "../../../ui/StatusBadge";
 import Drawer from "../../../ui/Drawer";
 import { creditNoteService } from "./services/creditNoteService";
 import { billingService } from "./services/billingService";
-import { permissionService } from "../../../core/permissions/permissionService";
+import { canReadFinanceGlobally } from '../../../core/authorization/financeAuthorization';
 import { useAuth } from "../../../context/AuthContext";
 import type { CreditNote, CreateCreditNoteDraftInput } from "../../../types/CreditNote";
 
 export default function CreditNotesPage() {
   const { user } = useAuth();
-  const currentRole = (user?.role as string) || "Super Admin";
-  const hasFinanceAccess = permissionService.canAccessFinance(currentRole);
+  const actor = { role: user?.authorization?.role || user?.assignedRole, employeeId: user?.employeeId, departmentId: user?.departmentId };
+  const hasFinanceAccess = canReadFinanceGlobally(actor);
 
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -38,9 +38,7 @@ export default function CreditNotesPage() {
   const [actionError, setActionError] = useState<string>("");
   const [actionSuccess, setActionSuccess] = useState<string>("");
 
-  useEffect(() => {
-    loadCreditNotes();
-  }, []);
+  useEffect(() => { if (hasFinanceAccess) void loadCreditNotes(); }, [hasFinanceAccess]);
 
   useEffect(() => {
     if (showCreateDrawer) {
@@ -53,7 +51,7 @@ export default function CreditNotesPage() {
   const loadCreditNotes = async () => {
     setLoading(true);
     try {
-      const data = await creditNoteService.getCreditNoteHistory();
+      const data = await creditNoteService.getCreditNoteHistory(actor);
       setCreditNotes(data);
     } catch (error: unknown) {
       setCreditNotes([]);
@@ -77,7 +75,7 @@ export default function CreditNotesPage() {
         reason,
         selections: [],
       };
-      await creditNoteService.createDraft(input, user?.name || "Finance Admin");
+      await creditNoteService.createDraft(input, user?.name || 'Unknown user', actor);
       setActionSuccess("Credit Note draft created successfully.");
       setShowCreateDrawer(false);
       await loadCreditNotes();
@@ -105,7 +103,7 @@ export default function CreditNotesPage() {
           <ShieldAlert size={48} className="mx-auto text-rose-600" />
           <h3 className="text-base font-bold text-rose-900">Access Restricted — Finance Module</h3>
           <p className="text-xs text-rose-700 max-w-md mx-auto">
-            Your current role ('{currentRole}') does not have permission to view or manage Credit Notes.
+            Your canonical authorization role does not have permission to view Credit Notes.
           </p>
         </div>
       </DashboardLayout>

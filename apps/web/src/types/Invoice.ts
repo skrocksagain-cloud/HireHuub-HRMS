@@ -6,11 +6,17 @@ export type InvoiceStatus = 'Draft' | 'Generated' | 'Approved' | 'Sent' | 'Parti
 
 export type PaymentModeType = 'Cash' | 'Cheque' | 'UPI' | 'NEFT' | 'RTGS' | 'Bank Transfer' | 'Other';
 
+export type HireHuubTemplateType = 'Blinkit' | 'Elastic Run' | 'All';
+
 export interface InvoiceLineItemInput {
   description: string;
   quantity: number;
   unitPrice: number;
   gstRate: number;
+  hsn?: string;
+  workDuration?: string;
+  unit?: string;
+  amount?: number;
 }
 
 export interface InvoiceLineItem extends InvoiceLineItemInput {
@@ -35,6 +41,10 @@ export interface InvoiceCompanySnapshot {
   registeredAddress: BillingAddress;
   bankDetails: BankDetails;
   authorizedSignatory: string;
+  signatoryId?: string;
+  signatoryDesignation?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
 }
 
 export interface InvoiceClientSnapshot {
@@ -58,6 +68,23 @@ export interface InvoiceTemplateSnapshot {
   templateVersion: number;
 }
 
+export interface InvoiceSignatorySnapshot {
+  signatoryId: string;
+  fullName: string;
+  designation: string;
+  signatureUrl?: string;
+  department?: string;
+}
+
+export interface InvoiceBankAccountSnapshot {
+  bankAccountId?: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
+  accountHolderName?: string;
+}
+
 export interface InvoiceSnapshot {
   invoiceNumber: string;
   invoiceDate: string;
@@ -68,9 +95,16 @@ export interface InvoiceSnapshot {
   gst: InvoiceGstBreakdown;
   grandTotal: number;
   template: InvoiceTemplateSnapshot;
+  templateType?: HireHuubTemplateType;
+  billOfMonth?: string;
+  stationCode?: string;
+  placeOfSupply?: string;
   poNumber?: string;
   remarks?: string;
   amountInWords?: string;
+  signatory?: InvoiceSignatorySnapshot;
+  bankAccount?: InvoiceBankAccountSnapshot;
+  stampUrl?: string;
 }
 
 export interface InvoiceStatusHistoryEntry {
@@ -123,6 +157,15 @@ export interface Invoice {
   clientName?: string;
   invoiceDate: string;
   lineItems: InvoiceLineItemInput[];
+  templateType?: HireHuubTemplateType;
+  billOfMonth?: string;
+  stationCode?: string;
+  placeOfSupply?: string;
+  signatoryId?: string;
+  signatorySnapshot?: InvoiceSignatorySnapshot;
+  bankAccountId?: string;
+  bankAccountSnapshot?: InvoiceBankAccountSnapshot;
+  stampUrl?: string;
   taxableAmount?: number;
   gstAmount?: number;
   grandTotal?: number;
@@ -156,6 +199,12 @@ export interface CreateInvoiceDraftInput {
   clientName?: string;
   invoiceDate: string;
   lineItems: InvoiceLineItemInput[];
+  templateType?: HireHuubTemplateType;
+  billOfMonth?: string;
+  stationCode?: string;
+  placeOfSupply?: string;
+  signatoryId?: string;
+  bankAccountId?: string;
   invoiceNumber?: string;
   taxableAmount?: number;
   gstAmount?: number;

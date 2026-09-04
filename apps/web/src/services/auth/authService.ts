@@ -7,8 +7,10 @@ import { attendanceComplianceService } from './attendanceComplianceService';
 import { authLogService } from './authLogService';
 import { firebasePhoneAuthProvider } from './providers/firebasePhoneAuthProvider';
 import { authRepository } from './repositories/authRepository';
-import { userSessionRepository } from './repositories/userSessionRepository';
+
 import { sessionService } from './sessionService';
+
+
 
 /**
  * Secure SHA-256 Web Crypto Hashing with Salt
@@ -58,16 +60,30 @@ export class AuthService {
   async login(identifier: string, passwordInput: string): Promise<AuthResponse> {
     const cleanId = identifier.trim();
     if (!cleanId || !passwordInput) {
-      throw new Error('Please provide both Employee ID/Mobile and Password.');
+      throw new Error('Please provide both Employee ID and Password.');
+    }
+
+    const normalizedEmployeeId = cleanId.toLowerCase();
+    const email = `${normalizedEmployeeId}@hirehuub.local`;
+
+    const { signInWithEmailAndPassword, signOut } = await import('firebase/auth');
+    const { auth } = await import('../../firebase/firebase');
+
+    try {
+      await signInWithEmailAndPassword(auth, email, passwordInput);
+    } catch (error: any) {
+      throw new Error('Invalid Employee ID or password. Please try again.');
     }
 
     const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
     if (!employee) {
-      throw new Error('Account not found. Please verify your Employee ID or Mobile Number.');
+      await signOut(auth);
+      throw new Error('Account not found. Please verify your Employee ID.');
     }
 
     // Account Status Validation
     if (employee.accountStatus === 'Pending Activation') {
+      await signOut(auth);
       throw new Error('Account is pending activation. Please use the First Time Activation tab to set up your password.');
     }
 
@@ -84,47 +100,22 @@ export class AuthService {
           employee.accountStatus = 'Active';
           employee.lockedUntil = null;
         } else {
+          await signOut(auth);
           const remainingMinutes = Math.ceil((lockExpiration - Date.now()) / (60 * 1000));
           throw new Error(`Account is locked due to multiple failed login attempts. Try again in ${remainingMinutes} minute(s) or contact Super Admin.`);
         }
       } else if (employee.lockReason === 'Attendance Violation') {
+        await signOut(auth);
         throw new Error('Account locked due to Attendance Compliance Violation (forgot to sign out for 3 consecutive days). Please request Department Admin / Super Admin unlock.');
       } else {
+        await signOut(auth);
         throw new Error(`Account is locked (${employee.lockReason || 'Administrative Lock'}). Please contact HR or Super Admin.`);
       }
     }
 
     if (['Inactive', 'Suspended', 'Resigned', 'Terminated'].includes(employee.accountStatus)) {
+      await signOut(auth);
       throw new Error(`Account status is '${employee.accountStatus}'. Login access is restricted.`);
-    }
-
-    // Password Verification
-    const inputHash = await hashPassword(passwordInput);
-
-    // If password hash is not yet set in database, allow default initial password matching
-    const isPasswordValid = employee.passwordHash
-      ? employee.passwordHash === inputHash
-      : passwordInput === 'Password@123' || passwordInput === `${employee.employeeId}@123`;
-
-    if (!isPasswordValid) {
-      const { isLocked, remainingAttempts } = await authRepository.recordFailedLoginAttempt(
-        employee.id,
-        employee.failedLoginAttempts
-      );
-
-      await authLogService.logEvent(employee.employeeId, 'Failed Login', 'failure', {
-        attemptedId: cleanId,
-        remainingAttempts,
-      });
-
-      if (isLocked) {
-        await authLogService.logEvent(employee.employeeId, 'Account Locked', 'failure', {
-          reason: 'Failed Login Protection — 5 consecutive failures',
-        });
-        throw new Error('Maximum failed login attempts reached (5). Account is locked for 30 minutes.');
-      }
-
-      throw new Error(`Invalid password. You have ${remainingAttempts} attempt(s) remaining before account lockout.`);
     }
 
     // Reset failed attempts upon successful login
@@ -132,6 +123,9 @@ export class AuthService {
 
     // Enforce Single Active Session
     const { sessionId } = await sessionService.createSingleUserSession(employee.employeeId);
+
+    // Inject Custom Claims & Refresh Token
+    await this.injectCustomClaims(sessionId);
 
     // Log Login Event
     await authLogService.logEvent(employee.employeeId, 'Login', 'success', {
@@ -159,9 +153,9 @@ export class AuthService {
   }
 
   /**
-   * Send Phone OTP for First-Time Activation or Forgot Password
+   * Request Password Reset OTP via Email
    */
-  async sendOtpForFlow(identifier: string, flow: 'activation' | 'forgot_password'): Promise<{ confirmationResult: unknown; mobileNumber: string; employee: { id: string; employeeId: string; name: string } }> {
+  async requestPasswordResetToken(identifier: string): Promise<{ success: boolean; message: string; employee: { id: string; employeeId: string; name: string } }> {
     const cleanId = identifier.trim();
     if (!cleanId) {
       throw new Error('Please enter your Employee ID or Mobile Number.');
@@ -169,23 +163,23 @@ export class AuthService {
 
     const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
     if (!employee) {
-      throw new Error('Employee record not found. Please verify your Employee ID.');
+      // Security: Do not expose existence. Return generic success.
+      return { 
+        success: true, 
+        message: 'If the Employee ID exists, a recovery code has been sent to the registered profile email.',
+        employee: { id: 'generic', employeeId: cleanId, name: 'Employee' }
+      };
     }
 
-    const mobileNumber = employee.mobileNumber || employee.mobile;
-    if (!mobileNumber) {
-      throw new Error('No registered mobile number found for this employee. Please contact HR.');
-    }
-
-    if (flow === 'activation' && employee.accountStatus === 'Active' && employee.firstLoginCompleted) {
-      throw new Error('Account is already activated. Please perform Normal Login.');
-    }
-
-    const { confirmationResult } = await firebasePhoneAuthProvider.sendOtp(mobileNumber);
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../firebase/firebase');
+    const requestResetFn = httpsCallable(functions, 'requestPasswordReset');
+    
+    await requestResetFn({ employeeId: employee.employeeId });
 
     return {
-      confirmationResult,
-      mobileNumber,
+      success: true,
+      message: 'If the Employee ID exists, a recovery code has been sent to the registered profile email.',
       employee: {
         id: employee.id,
         employeeId: employee.employeeId,
@@ -208,13 +202,15 @@ export class AuthService {
       throw new Error('Employee record not found.');
     }
 
-    // Verify Phone OTP
-    const isOtpValid = await firebasePhoneAuthProvider.verifyOtp(confirmationResult, otpCode);
-    if (!isOtpValid) {
-      throw new Error('Invalid OTP code. Activation cannot be completed.');
+    // Skip OTP verification in first login (OTP removed per earlier steps)
+    // If confirmationResult is passed, it means we are in a flow that still requires it
+    if (confirmationResult) {
+      const isOtpValid = await firebasePhoneAuthProvider.verifyOtp(confirmationResult, otpCode);
+      if (!isOtpValid) {
+        throw new Error('Invalid OTP code. Activation cannot be completed.');
+      }
+      await authLogService.logEvent(employee.employeeId, 'OTP Verification', 'success', { flow: 'activation' });
     }
-
-    await authLogService.logEvent(employee.employeeId, 'OTP Verification', 'success', { flow: 'activation' });
 
     // Validate Password Policy
     const policyResult = validatePasswordPolicy(newPasswordInput);
@@ -222,13 +218,34 @@ export class AuthService {
       throw new Error(policyResult.errors.join(' '));
     }
 
-    const passwordHash = await hashPassword(newPasswordInput);
+    const canonicalEmail = `${employee.employeeId.toLowerCase()}@hirehuub.local`;
+
+    const { updatePassword } = await import('firebase/auth');
+    const { auth } = await import('../../firebase/firebase');
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Please sign in again before changing your password.');
+    }
+
+    if (employee.firebaseUid && currentUser.uid !== employee.firebaseUid) {
+      throw new Error('Authenticated user does not match the requested employee record.');
+    } else if (!employee.firebaseUid && currentUser.email !== canonicalEmail) {
+      throw new Error('Authenticated email does not match the canonical identity.');
+    }
+
+    try {
+      await updatePassword(currentUser, newPasswordInput);
+    } catch (e: any) {
+      if (e.code === 'auth/requires-recent-login') {
+        throw new Error('Please sign in again before changing your password.');
+      }
+      throw new Error('Failed to securely update Firebase credentials: ' + (e.message || ''));
+    }
+
     const now = new Date().toISOString();
 
-    // Update Employee Firestore Document
-    await authRepository.updateEmployeeAuthData(employee.id, {
-      passwordHash,
-      tempPasswordHash: null, // Temporary password permanently invalidated
+    const authDataUpdates: Record<string, any> = {
       mobileVerified: true,
       firstLoginCompleted: true,
       activatedAt: now,
@@ -237,12 +254,22 @@ export class AuthService {
       failedLoginAttempts: 0,
       lockedUntil: null,
       lockReason: null,
-    });
+    };
+    if (!employee.firebaseUid) {
+      authDataUpdates.firebaseUid = currentUser.uid;
+    }
+
+    // Update Employee Firestore Document
+    await authRepository.updateEmployeeAuthData(employee.id, authDataUpdates);
 
     await authLogService.logEvent(employee.employeeId, 'Password Created', 'success');
 
     // Create Single Session & Log Login
     const { sessionId } = await sessionService.createSingleUserSession(employee.employeeId);
+    
+    // Inject Custom Claims & Refresh Token
+    await this.injectCustomClaims(sessionId);
+    
     await authLogService.logEvent(employee.employeeId, 'Login', 'success', { flow: 'first_time_activation', sessionId });
 
     return {
@@ -267,6 +294,7 @@ export class AuthService {
    */
   async resetPassword(
     employeeId: string,
+    // @ts-ignore
     confirmationResult: unknown,
     otpCode: string,
     newPasswordInput: string
@@ -276,40 +304,30 @@ export class AuthService {
       throw new Error('Employee record not found.');
     }
 
-    // Verify OTP
-    const isOtpValid = await firebasePhoneAuthProvider.verifyOtp(confirmationResult, otpCode);
-    if (!isOtpValid) {
-      throw new Error('Invalid OTP verification code.');
-    }
-
-    await authLogService.logEvent(employee.employeeId, 'OTP Verification', 'success', { flow: 'forgot_password' });
-
     // Validate Password Policy
     const policyResult = validatePasswordPolicy(newPasswordInput);
     if (!policyResult.isValid) {
       throw new Error(policyResult.errors.join(' '));
     }
 
-    const passwordHash = await hashPassword(newPasswordInput);
-    const now = new Date().toISOString();
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../firebase/firebase');
+    const completeResetFn = httpsCallable(functions, 'completePasswordReset');
 
-    // Terminate all existing sessions on password reset
-    await userSessionRepository.terminateActiveSessions(employee.employeeId);
-
-    // Update Employee Firestore Document
-    await authRepository.updateEmployeeAuthData(employee.id, {
-      passwordHash,
-      lastPasswordChangedAt: now,
-      failedLoginAttempts: 0,
-      lockedUntil: null,
-      lockReason: null,
-      accountStatus: 'Active',
-    });
+    try {
+      await completeResetFn({ employeeId: employee.employeeId, otp: otpCode, newPassword: newPasswordInput });
+    } catch (e: any) {
+      throw new Error('Password reset failed: ' + (e.message || 'Invalid code or expired.'));
+    }
 
     await authLogService.logEvent(employee.employeeId, 'Password Reset', 'success');
 
     // Create new single session
     const { sessionId } = await sessionService.createSingleUserSession(employee.employeeId);
+    
+    // Inject Custom Claims & Refresh Token
+    await this.injectCustomClaims(sessionId);
+    
     await authLogService.logEvent(employee.employeeId, 'Login', 'success', { flow: 'forgot_password_reset', sessionId });
 
     return {
@@ -338,6 +356,20 @@ export class AuthService {
     }
     if (employeeId) {
       await authLogService.logEvent(employeeId, 'Logout', 'success');
+    }
+  }
+  
+  private async injectCustomClaims(sessionId: string): Promise<void> {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions, auth } = await import('../../firebase/firebase');
+    const createErpFirebaseTokenFn = httpsCallable(functions, 'createErpFirebaseToken');
+    
+    // Cloud function assigns claims to the native Firebase UID securely
+    await createErpFirebaseTokenFn({ sessionId });
+    
+    // Force refresh token to apply the new claims to the current session immediately
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true);
     }
   }
 }

@@ -1,0 +1,1174 @@
+{
+  "Staffing": {
+    "User": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "own",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Workforce": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      }
+    },
+    "Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "Team",
+        "Edit": "Team",
+        "Upload": "Own"
+      },
+      "Leave": {
+        "View": "Team",
+        "Edit": "Team",
+        "Upload": "Own"
+      },
+      "Performance": {
+        "View": "Own and Team",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "Own",
+        "Edit": "Own",
+        "Upload": "Own"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "CRM": {
+        "View": "Own and Team",
+        "Edit": "Own and Team",
+        "Upload": "Own and Team"
+      },
+      "Workforce": {
+        "View": "Own and Team",
+        "Edit": "Own and Team",
+        "Upload": "Own and Team"
+      },
+      "Campaign Hub": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      }
+    },
+    "Master Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "Department",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Leave": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Performance": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "Yes",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Only Big Day",
+        "Edit": "Only Big Day",
+        "Upload": "Only Big Day"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "Department",
+        "Edit": "Department",
+        "Upload": "Department"
+      }
+    }
+  },
+  "HR": {
+    "User": {
+      "Employees": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Attendance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Leave": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Profile": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Admin": {
+      "Employees": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Attendance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Leave": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Profile": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Master Admin": {
+      "Employees": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Attendance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Leave": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Profile": {
+        "View": "View",
+        "Edit": "View",
+        "Upload": "View"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    }
+  },
+  "Finance": {
+    "User": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Transaction": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Invoice": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Credit Note": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Payout": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Transaction": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Invoice": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Credit Note": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Payout": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Master Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Associate partner": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "View",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Internal Payroll": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Transaction": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Invoice": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Credit Note": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Payout": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    }
+  },
+  "Marketing": {
+    "User": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "own",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Associate partner": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "own",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Associate partner": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    },
+    "Master Admin": {
+      "Employees": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Attendance": {
+        "View": "own",
+        "Edit": "Apply / Mark",
+        "Upload": "Yes"
+      },
+      "Leave": {
+        "View": "own",
+        "Edit": "Apply",
+        "Upload": "Yes"
+      },
+      "Performance": {
+        "View": "own",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Profile": {
+        "View": "own",
+        "Edit": "Yes",
+        "Upload": "Yes"
+      },
+      "Client": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Associate partner": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Openings": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "CRM": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Workforce": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Campaign Hub": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      },
+      "Internal Payroll": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Transaction": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Invoice": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Credit Note": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Payout": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Management Control": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "calendar and Events": {
+        "View": "Restricted",
+        "Edit": "Restricted",
+        "Upload": "Restricted"
+      },
+      "Announcement": {
+        "View": "All",
+        "Edit": "All",
+        "Upload": "All"
+      }
+    }
+  }
+}

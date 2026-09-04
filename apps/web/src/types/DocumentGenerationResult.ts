@@ -3,5 +3,7 @@ export interface DocumentGenerationResult {
   fileName?: string;
   generatedAt?: Date;
   document?: Blob;
+  downloadUrl?: string;
+  storagePath?: string;
   error?: string;
 }

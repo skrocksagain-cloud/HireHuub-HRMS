@@ -3,7 +3,7 @@ import QuickActionCard from '../../../ui/QuickActionCard';
 import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function QuickActionsWidget() {
-  const { canAccessModule, canCreate } = usePermissions();
+  const { canCreate } = usePermissions();
 
   return (
     <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
@@ -17,16 +17,16 @@ export default function QuickActionsWidget() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {canCreate('employees') && (
-          <QuickActionCard title="Add Employee" to="/workbench/workforce" icon={<UserPlus size={18} />} colorScheme="emerald" />
+          <QuickActionCard title="Add Employee" to="/employees" icon={<UserPlus size={18} />} colorScheme="emerald" />
         )}
-        {canCreate('recruitment') && (
-          <QuickActionCard title="Create Opening" to="/staffing-hub" icon={<Briefcase size={18} />} colorScheme="amber" />
+        {canCreate('openings') && (
+          <QuickActionCard title="Create Opening" to="/workbench/staffing-hub/openings" icon={<Briefcase size={18} />} colorScheme="amber" />
         )}
-        {canCreate('finance') && (
-          <QuickActionCard title="New Invoice" to="/finance/billing/new-invoice" icon={<FileText size={18} />} colorScheme="blue" />
+        {canCreate('invoice') && (
+          <QuickActionCard title="New Invoice" to="/finance/billing/invoices" icon={<FileText size={18} />} colorScheme="blue" />
         )}
-        {canAccessModule('documents') && (
-          <QuickActionCard title="Document Center" to="/document-center" icon={<Plus size={18} />} colorScheme="purple" />
+        {canCreate('documents') && (
+          <QuickActionCard title="Upload Document" to="/documents" icon={<Plus size={18} />} colorScheme="purple" />
         )}
       </div>
     </div>

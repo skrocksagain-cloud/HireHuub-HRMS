@@ -17,7 +17,8 @@ export type AnnouncementVisibilityScope =
   | 'Company'
   | 'Department'
   | 'Team'
-  | 'Selected Employees';
+  | 'Selected Employees'
+  | 'Private';
 
 export type AnnouncementPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 

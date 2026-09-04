@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ExcelJS from 'exceljs';
 import {
   FileSpreadsheet,
   Upload,
@@ -30,7 +31,7 @@ interface ClientPayoutImportModalProps {
   onToggleLockImport: (importId: string, lockState: boolean) => Promise<void>;
 }
 
-type Step = 'upload' | 'preview' | 'mapping' | 'validation' | 'history';
+type Step = 'upload' | 'validation' | 'history';
 
 export default function ClientPayoutImportModal({
   isOpen,
@@ -50,11 +51,7 @@ export default function ClientPayoutImportModal({
   const [importMonth, setImportMonth] = useState<string>('2026-07');
   const [fileUploaded, setFileUploaded] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
-  const [parsedRawRows] = useState<unknown[]>([]);
-
-  // Column Mapping state saved by Client ID
-  const [salaryColHeader, setSalaryColHeader] = useState<string>('Net Salary');
-  const [ordersColHeader, setOrdersColHeader] = useState<string>('Trips');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Processed Validation Result
   const [processedRows, setProcessedRows] = useState<ClientPayoutImportRow[]>([]);
@@ -65,6 +62,7 @@ export default function ClientPayoutImportModal({
     duplicateCount: 0,
     missingIdCount: 0,
     invalidEarningsCount: 0,
+    invalidDateCount: 0,
     canProceed: false,
   });
 
@@ -92,33 +90,74 @@ export default function ClientPayoutImportModal({
     setModalError('');
     setFileName(file.name);
     setFileUploaded(true);
+    setSelectedFile(file);
   };
 
-  const handleProceedToMapping = () => {
-    if (!fileUploaded) {
+  const handleProceedToValidation = async () => {
+    if (!fileUploaded || !selectedFile) {
       setModalError('Please select a valid Excel file first.');
       return;
     }
     setModalError('');
-    setStep('mapping');
-  };
+    setSubmitting(true);
 
-  const handleValidateImport = () => {
-    const rawPayload = (parsedRawRows.length > 0 ? parsedRawRows : workforce.map((w) => ({
-      rawEmployeeId: w.id,
-      rawName: w.candidateName,
-      rawEarnings: w.totalEarnings || 0,
-      rawOrders: w.totalOrders || 0,
-    }))) as Array<{ rawEmployeeId: string; rawName: string; rawEarnings: number; rawOrders: number }>;
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const buffer = await selectedFile.arrayBuffer();
+      await workbook.xlsx.load(buffer);
 
-    const { validationSummary, processedRows: rows } = PayoutAggregationService.validateImportRows(
-      rawPayload,
-      workforce
-    );
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new Error('No worksheet found in the Excel file.');
+      }
 
-    setProcessedRows(rows);
-    setValidationResult(validationSummary);
-    setStep('validation');
+      const rows: any[] = [];
+      let headers: string[] = [];
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+          headers = (row.values as string[]).map(h => h ? h.toString().trim() : '');
+        } else {
+          if (row.hasValues) {
+             const rowValues = row.values as any[];
+             const rowData: any = {};
+             headers.forEach((header, index) => {
+                if (header) {
+                   rowData[header] = rowValues[index];
+                }
+             });
+             rows.push(rowData);
+          }
+        }
+      });
+
+      const requiredHeaders = ['Date', 'Employee ID', 'Name', 'Earning', 'Order'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+         throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
+      }
+
+      const rawPayload = rows.map(r => ({
+         rawDate: r['Date'],
+         rawEmployeeId: r['Employee ID']?.toString() || '',
+         rawName: r['Name']?.toString() || '',
+         rawEarnings: Number(r['Earning']) || 0,
+         rawOrders: Number(r['Order']) || 0,
+      })).filter(r => r.rawEmployeeId || r.rawName); // Keep rows with missing date to show Invalid Date validation error
+
+      const { validationSummary, processedRows: validatedRows } = PayoutAggregationService.validateImportRows(
+        rawPayload,
+        workforce
+      );
+
+      setProcessedRows(validatedRows);
+      setValidationResult(validationSummary);
+      setStep('validation');
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : 'Failed to parse Excel file.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleExecuteImport = async () => {
@@ -151,11 +190,12 @@ export default function ClientPayoutImportModal({
         duplicateCount: validationResult.duplicateCount,
         missingIdCount: validationResult.missingIdCount,
         invalidEarningsCount: validationResult.invalidEarningsCount,
+        invalidDateCount: validationResult.invalidDateCount,
         totalEarnings,
         totalOrders,
         columnMapping: {
-          [salaryColHeader]: 'earnings',
-          [ordersColHeader]: 'orders',
+          'Earning': 'earnings',
+          'Order': 'orders',
         },
         rows: processedRows,
       };
@@ -207,22 +247,12 @@ export default function ClientPayoutImportModal({
             <ArrowRight size={12} className="text-slate-400" />
             <button
               type="button"
-              onClick={() => setStep('mapping')}
-              className={`px-2.5 py-1 rounded-lg transition ${
-                step === 'mapping' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-200'
-              }`}
-            >
-              2. Column Mapping
-            </button>
-            <ArrowRight size={12} className="text-slate-400" />
-            <button
-              type="button"
               onClick={() => setStep('validation')}
               className={`px-2.5 py-1 rounded-lg transition ${
                 step === 'validation' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-200'
               }`}
             >
-              3. Validation
+              2. Validation
             </button>
           </div>
 
@@ -331,73 +361,11 @@ export default function ClientPayoutImportModal({
               <div className="flex justify-end pt-2">
                 <button
                   type="button"
-                  onClick={handleProceedToMapping}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition"
+                  disabled={submitting}
+                  onClick={handleProceedToValidation}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition disabled:opacity-50"
                 >
-                  Proceed to Column Mapping →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: COLUMN MAPPING */}
-          {step === 'mapping' && isFinanceOrAdmin && (
-            <div className="space-y-4">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-[11px]">
-                Column mappings are automatically saved by <strong>Client ID ({selectedClientId})</strong> and will be reused automatically for all future imports.
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 border-b pb-1 text-xs uppercase tracking-wider text-emerald-700">
-                  Client Excel Column Mapping Rules
-                </h4>
-
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">
-                      Excel Column for Earnings (e.g. Net Salary / Payout Amount)
-                    </label>
-                    <input
-                      type="text"
-                      value={salaryColHeader}
-                      onChange={(e) => setSalaryColHeader(e.target.value)}
-                      placeholder="Net Salary"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900"
-                    />
-                    <span className="text-[10px] text-slate-500 mt-1 block">Maps to Total Earnings</span>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">
-                      Excel Column for Orders / Trips (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={ordersColHeader}
-                      onChange={(e) => setOrdersColHeader(e.target.value)}
-                      placeholder="Trips"
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900"
-                    />
-                    <span className="text-[10px] text-slate-500 mt-1 block">Maps to Total Orders</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep('upload')}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
-                >
-                  ← Back to Upload
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleValidateImport}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition"
-                >
-                  Validate Sheet Data →
+                  {submitting ? 'Validating...' : 'Proceed to Validation →'}
                 </button>
               </div>
             </div>
@@ -411,7 +379,7 @@ export default function ClientPayoutImportModal({
               </h4>
 
               {/* Validation KPI Badges */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+              <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 text-center overflow-x-auto">
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
                   <span className="text-[10px] text-slate-400 block font-semibold">Total Records</span>
                   <span className="font-bold text-slate-900 text-sm">{validationResult.totalRecords}</span>
@@ -436,6 +404,10 @@ export default function ClientPayoutImportModal({
                   <span className="text-[10px] text-rose-700 block font-semibold">Invalid Earnings</span>
                   <span className="font-bold text-rose-800 text-sm">{validationResult.invalidEarningsCount}</span>
                 </div>
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
+                  <span className="text-[10px] text-rose-700 block font-semibold">Invalid Dates</span>
+                  <span className="font-bold text-rose-800 text-sm">{validationResult.invalidDateCount}</span>
+                </div>
               </div>
 
               {/* Processed Rows Preview */}
@@ -443,19 +415,37 @@ export default function ClientPayoutImportModal({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
                     <tr>
+                      <th className="p-2.5">Date</th>
                       <th className="p-2.5">Employee ID</th>
                       <th className="p-2.5">Candidate Name</th>
                       <th className="p-2.5 text-right">Net Earnings</th>
+                      <th className="p-2.5 text-right">Orders</th>
                       <th className="p-2.5 text-center">Matched Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {processedRows.map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-bold text-slate-800">
+                          {(() => {
+                            try {
+                              const d = new Date(row.date);
+                              if (!isNaN(d.getTime())) {
+                                return `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`;
+                              }
+                            } catch (e) {
+                              // Ignore invalid dates
+                            }
+                            return row.date;
+                          })()}
+                        </td>
                         <td className="p-2.5 font-mono font-bold text-slate-900">{row.employeeId}</td>
                         <td className="p-2.5 font-bold text-slate-800">{row.candidateName}</td>
                         <td className="p-2.5 text-right font-bold text-emerald-700">
                           ₹{row.earnings.toLocaleString('en-IN')}
+                        </td>
+                        <td className="p-2.5 text-right font-bold text-slate-700">
+                          {row.orders}
                         </td>
                         <td className="p-2.5 text-center">
                           {row.matched ? (
@@ -477,10 +467,10 @@ export default function ClientPayoutImportModal({
               <div className="flex justify-between pt-2">
                 <button
                   type="button"
-                  onClick={() => setStep('mapping')}
+                  onClick={() => setStep('upload')}
                   className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
                 >
-                  ← Back to Mapping
+                  ← Back to Upload
                 </button>
 
                 <button

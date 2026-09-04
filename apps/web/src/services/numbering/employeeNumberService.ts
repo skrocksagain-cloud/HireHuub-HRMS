@@ -4,9 +4,15 @@ import type { Employee } from '../../pages/Employee/types/Employee';
 
 export class EmployeeNumberService {
   private async getPrefix(): Promise<string> {
-    const company = await adminService.getCompanySettings();
-    if (!company.employeeCodePrefix?.trim()) throw new Error('Administration → Company Settings is missing the employee code prefix.');
-    return company.employeeCodePrefix;
+    try {
+      const company = await adminService.getCompanySettings();
+      if (company && company.employeeCodePrefix?.trim()) {
+        return company.employeeCodePrefix.trim();
+      }
+    } catch {
+      // Fallback to approved default prefix
+    }
+    return 'HHEMP';
   }
 
   /**
@@ -32,17 +38,25 @@ export class EmployeeNumberService {
    */
   calculateNextNumber(employees: Partial<Employee>[], prefix: string): string {
     let maxSequence = 0;
+    const existingCodes = new Set<string>();
 
     for (const employee of employees) {
       const codeOrId = employee.employeeId || employee.employeeCode || '';
+      if (codeOrId) existingCodes.add(codeOrId.toUpperCase());
       const sequence = this.extractSequenceNumber(codeOrId);
       if (sequence > maxSequence) {
         maxSequence = sequence;
       }
     }
 
-    const nextSequence = maxSequence + 1;
-    return `${prefix}${String(nextSequence).padStart(4, '0')}`;
+    let nextSequence = maxSequence + 1;
+    let candidate = `${prefix}${String(nextSequence).padStart(4, '0')}`;
+    while (existingCodes.has(candidate.toUpperCase())) {
+      nextSequence++;
+      candidate = `${prefix}${String(nextSequence).padStart(4, '0')}`;
+    }
+
+    return candidate;
   }
 
   private extractSequenceNumber(identifier: string): number {

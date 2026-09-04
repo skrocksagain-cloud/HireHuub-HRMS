@@ -13,7 +13,7 @@ interface ImportPreviewModalProps {
   onImportSuccess: () => void;
 }
 
-interface SampleImportRow {
+interface ImportRow {
   tempId: string;
   title: string;
   city: string;
@@ -37,10 +37,11 @@ export default function ImportPreviewModal({
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedClientName, setSelectedClientName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importedRows, setImportedRows] = useState<SampleImportRow[]>([]);
+  const [importedRows, setImportedRows] = useState<ImportRow[]>([]);
+  const [validationError, setValidationError] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
-  const [editingRow, setEditingRow] = useState<SampleImportRow | null>(null);
+  const [editingRow, setEditingRow] = useState<ImportRow | null>(null);
 
   useEffect(() => {
     async function loadClients() {
@@ -58,6 +59,7 @@ export default function ImportPreviewModal({
       setSelectedClientName('');
       setSelectedFile(null);
       setImportedRows([]);
+      setValidationError('');
     }
   }, [isOpen]);
 
@@ -78,73 +80,20 @@ export default function ImportPreviewModal({
   const handleProcessFile = async () => {
     if (!selectedClientId || !selectedFile) return;
 
+    setValidationError('');
     try {
-      if (importType === 'Excel') {
-        await openingService.excelImport.parseExcelFile(selectedFile).catch(() => {});
-      } else {
-        await openingService.ocrImport.extractFromImage(selectedFile).catch(() => {});
-      }
-    } catch {
-      // Contract placeholder
+      if (importType !== 'Excel') throw new Error('Image import is unavailable until an OCR parser is configured.');
+      const parsedRows = await openingService.excelImport.parseExcelFile(selectedFile);
+      const rows = parsedRows.map((raw, index) => {
+        const fullData = openingService.importMapping.mapToOpeningModel(raw);
+        const error = fullData.title ? undefined : 'Title or Position is required.';
+        return { tempId: `row-${index + 1}`, title: fullData.title ?? '', city: fullData.city ?? '', state: fullData.state ?? '', openPositions: fullData.openPositions ?? 0, minSalary: fullData.minSalary ?? 0, maxSalary: fullData.maxSalary ?? 0, isValid: !error, validationError: error, fullData };
+      });
+      setImportedRows(rows);
+      setStep(2);
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : 'Unable to parse the selected file.');
     }
-
-    const parsedSample: SampleImportRow[] = [
-      {
-        tempId: 'row-1',
-        title: `${importType === 'Excel' ? 'Operations Manager' : 'Field Technician'}`,
-        city: 'Pune',
-        state: 'Maharashtra',
-        openPositions: 10,
-        minSalary: 20000,
-        maxSalary: 30000,
-        isValid: true,
-        fullData: {
-          clientId: selectedClientId,
-          clientName: selectedClientName,
-          title: `${importType === 'Excel' ? 'Operations Manager' : 'Field Technician'}`,
-          description: 'Extracted opening from batch document',
-          location: 'Pune Regional Office',
-          city: 'Pune',
-          state: 'Maharashtra',
-          openPositions: 10,
-          status: 'Active',
-          priority: 'High',
-          isOutsourced: false,
-          minSalary: 20000,
-          maxSalary: 30000,
-          salaryType: 'Monthly',
-        },
-      },
-      {
-        tempId: 'row-2',
-        title: 'Dispatch Supervisor',
-        city: 'Bengaluru',
-        state: 'Karnataka',
-        openPositions: 5,
-        minSalary: 22000,
-        maxSalary: 28000,
-        isValid: true,
-        fullData: {
-          clientId: selectedClientId,
-          clientName: selectedClientName,
-          title: 'Dispatch Supervisor',
-          description: 'Extracted opening from batch document',
-          location: 'Bengaluru Logistics Park',
-          city: 'Bengaluru',
-          state: 'Karnataka',
-          openPositions: 5,
-          status: 'Active',
-          priority: 'Medium',
-          isOutsourced: false,
-          minSalary: 22000,
-          maxSalary: 28000,
-          salaryType: 'Monthly',
-        },
-      },
-    ];
-
-    setImportedRows(parsedSample);
-    setStep(2);
   };
 
   const handleSaveEditedRow = async (updatedData: Partial<Opening>) => {
@@ -169,8 +118,9 @@ export default function ImportPreviewModal({
   };
 
   const handleValidateAll = async () => {
-    await openingService.importValidation.validateImportData([]).catch(() => {});
-    setStep(3);
+    const result = await openingService.importValidation.validateImportData(importedRows.map((row) => ({ source: 'Excel', rawFields: { Title: row.fullData.title ?? '' } })));
+    if (!result.isValid || importedRows.some((row) => !row.isValid)) { setValidationError(result.errors.join(' ') || 'Resolve invalid rows before importing.'); return; }
+    setValidationError(''); setStep(3);
   };
 
   const handleConfirmImport = async () => {
@@ -181,14 +131,7 @@ export default function ImportPreviewModal({
         await openingService.createOpening({
           clientId: mapped.clientId || selectedClientId,
           clientName: mapped.clientName || selectedClientName,
-          title: mapped.title || 'Imported Position',
-          description: mapped.description || 'Imported from document',
-          location: mapped.location || 'Hub',
-          city: mapped.city || 'Pune',
-          state: mapped.state || 'Maharashtra',
-          openPositions: mapped.openPositions || 1,
-          status: mapped.status || 'Active',
-          priority: mapped.priority || 'Medium',
+          title: mapped.title!, description: mapped.description!, location: mapped.location!, city: mapped.city!, state: mapped.state!, openPositions: mapped.openPositions!, status: mapped.status!, priority: mapped.priority!,
           isOutsourced: Boolean(mapped.isOutsourced),
           outsourcedVendor: mapped.outsourcedVendor,
           minSalary: mapped.minSalary,
@@ -200,8 +143,8 @@ export default function ImportPreviewModal({
       }
       onImportSuccess();
       onClose();
-    } catch {
-      // Fallback
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : 'Import failed.');
     } finally {
       setIsImporting(false);
     }
@@ -234,6 +177,7 @@ export default function ImportPreviewModal({
           {/* Body Step 1: Select Client & Upload File */}
           {step === 1 && (
             <div className="p-6 space-y-5">
+              {validationError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-700">{validationError}</div>}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Select Client (Client Master) *</label>
                 <select

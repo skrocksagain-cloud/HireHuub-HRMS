@@ -72,6 +72,9 @@ export class StatusRuleEngine {
       case 'OB':
       case 'Call Back Later':
       case 'Ringing / Busy / Forward / Call Disconnected':
+      case 'Inactive':
+      case 'Number not in Service':
+      case 'Not Eligible':
         return {
           requiresClient: false,
           requiresInterviewDate: false,
@@ -82,9 +85,6 @@ export class StatusRuleEngine {
         };
 
       case 'Not Interested':
-      case 'Inactive':
-      case 'Number not in Service':
-      case 'Not Eligible':
       default:
         return {
           requiresClient: false,
@@ -121,6 +121,10 @@ export class StatusRuleEngine {
     }
 
     const isPayroll = input.status === 'Active' && clientType === 'Payroll';
+
+    if (isPayroll && !input.payrollEmployeeId) {
+      errors.push('Payroll Employee ID is required for active Payroll placements.');
+    }
 
     return {
       isValid: errors.length === 0,

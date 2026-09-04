@@ -1,0 +1,483 @@
+[
+  {
+    "id": "IMP-client-001-1787511623462",
+    "version": 1,
+    "columnMapping": {
+      "Net Salary": "earnings",
+      "Trips": "orders"
+    },
+    "isApproved": true,
+    "totalEarnings": 0,
+    "month": "2026-07",
+    "clientId": "client-001",
+    "totalRecords": 1,
+    "totalOrders": 0,
+    "matchedRecords": 1,
+    "importedBy": "Development Admin",
+    "rows": [
+      {
+        "validationStatus": "Valid",
+        "earnings": 0,
+        "employeeId": "xUUBMbrB4gxqv7ouraYE",
+        "orders": 0,
+        "matched": true,
+        "candidateName": "sdsa"
+      }
+    ],
+    "importedAt": "2026-08-23T19:00:23.462Z",
+    "isLocked": true,
+    "unmatchedRecords": 0,
+    "clientName": "Elastic Run",
+    "invalidEarningsCount": 0,
+    "duplicateCount": 0,
+    "missingIdCount": 0,
+    "importPeriod": "Monthly"
+  },
+  {
+    "id": "IMP-client-001-1787594614243",
+    "totalRecords": 3,
+    "unmatchedRecords": 0,
+    "version": 4,
+    "missingIdCount": 0,
+    "invalidEarningsCount": 0,
+    "duplicateCount": 0,
+    "totalEarnings": 3700,
+    "isLocked": true,
+    "columnMapping": {
+      "Order": "orders",
+      "Earning": "earnings"
+    },
+    "isApproved": true,
+    "matchedRecords": 3,
+    "importPeriod": "Monthly",
+    "clientName": "Elastic Run",
+    "totalOrders": 150,
+    "rows": [
+      {
+        "matched": true,
+        "candidateName": "Rahul Singh",
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "validationStatus": "Valid",
+        "orders": 90,
+        "date": "24-08-2026",
+        "earnings": 150
+      },
+      {
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "earnings": 3300,
+        "matched": true,
+        "validationStatus": "Valid",
+        "date": "24-08-2026",
+        "candidateName": "Sayan Mondal",
+        "orders": 50
+      },
+      {
+        "validationStatus": "Valid",
+        "orders": 10,
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "earnings": 250,
+        "candidateName": "Suraj Mahato",
+        "matched": true,
+        "date": "24-08-2026"
+      }
+    ],
+    "month": "2026-07",
+    "importedAt": "2026-08-24T18:03:34.243Z",
+    "importedBy": "Development Admin",
+    "clientId": "client-001"
+  },
+  {
+    "id": "IMP-client-001-1787594642270",
+    "clientId": "client-001",
+    "columnMapping": {
+      "Order": "orders",
+      "Earning": "earnings"
+    },
+    "unmatchedRecords": 0,
+    "importPeriod": "Monthly",
+    "matchedRecords": 3,
+    "totalOrders": 150,
+    "isApproved": true,
+    "missingIdCount": 0,
+    "month": "2026-07",
+    "duplicateCount": 0,
+    "totalEarnings": 3700,
+    "invalidEarningsCount": 0,
+    "rows": [
+      {
+        "candidateName": "Rahul Singh",
+        "orders": 90,
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "matched": true,
+        "validationStatus": "Valid",
+        "earnings": 150,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)"
+      },
+      {
+        "matched": true,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "orders": 50,
+        "earnings": 3300,
+        "validationStatus": "Valid",
+        "candidateName": "Sayan Mondal"
+      },
+      {
+        "candidateName": "Suraj Mahato",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "earnings": 250,
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "matched": true,
+        "orders": 10,
+        "validationStatus": "Valid"
+      }
+    ],
+    "isLocked": true,
+    "totalRecords": 3,
+    "clientName": "Elastic Run",
+    "version": 6,
+    "importedAt": "2026-08-24T18:04:02.270Z",
+    "importedBy": "Development Admin"
+  },
+  {
+    "id": "IMP-client-001-1787596012237",
+    "isLocked": true,
+    "version": 8,
+    "matchedRecords": 3,
+    "unmatchedRecords": 0,
+    "totalRecords": 3,
+    "totalOrders": 150,
+    "month": "2026-07",
+    "duplicateCount": 0,
+    "rows": [
+      {
+        "earnings": 150,
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "validationStatus": "Valid",
+        "candidateName": "Rahul Singh",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "orders": 90,
+        "matched": true
+      },
+      {
+        "earnings": 3300,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "validationStatus": "Valid",
+        "orders": 50,
+        "candidateName": "Sayan Mondal",
+        "matched": true,
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB"
+      },
+      {
+        "validationStatus": "Valid",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "earnings": 250,
+        "candidateName": "Suraj Mahato",
+        "orders": 10,
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "matched": true
+      }
+    ],
+    "isApproved": true,
+    "missingIdCount": 0,
+    "clientName": "Elastic Run",
+    "totalEarnings": 3700,
+    "clientId": "client-001",
+    "importPeriod": "Monthly",
+    "columnMapping": {
+      "Order": "orders",
+      "Earning": "earnings"
+    },
+    "importedBy": "Development Admin",
+    "importedAt": "2026-08-24T18:26:52.237Z",
+    "invalidEarningsCount": 0
+  },
+  {
+    "id": "IMP-client-001-1787596055978",
+    "importedBy": "Development Admin",
+    "totalRecords": 2,
+    "month": "2026-07",
+    "importedAt": "2026-08-24T18:27:35.978Z",
+    "isLocked": true,
+    "version": 9,
+    "rows": [
+      {
+        "earnings": 150,
+        "employeeId": "WF-OLIYdjMmzZdXovVn9keG",
+        "validationStatus": "Valid",
+        "orders": 90,
+        "matched": true,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "candidateName": "SOMNATH"
+      },
+      {
+        "validationStatus": "Valid",
+        "employeeId": "WF-aIOLiXi1d9SX09RvpzHZ",
+        "matched": true,
+        "candidateName": "Ashim",
+        "earnings": 3300,
+        "orders": 50,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)"
+      }
+    ],
+    "clientName": "Elastic Run",
+    "importPeriod": "Monthly",
+    "duplicateCount": 0,
+    "columnMapping": {
+      "Earning": "earnings",
+      "Order": "orders"
+    },
+    "clientId": "client-001",
+    "missingIdCount": 0,
+    "isApproved": true,
+    "unmatchedRecords": 0,
+    "invalidEarningsCount": 0,
+    "totalOrders": 140,
+    "matchedRecords": 2,
+    "totalEarnings": 3450
+  },
+  {
+    "id": "IMP-client-001-1787595971512",
+    "importPeriod": "Monthly",
+    "version": 7,
+    "clientName": "Elastic Run",
+    "totalOrders": 150,
+    "unmatchedRecords": 0,
+    "importedAt": "2026-08-24T18:26:11.512Z",
+    "month": "2026-07",
+    "clientId": "client-001",
+    "importedBy": "Development Admin",
+    "rows": [
+      {
+        "orders": 90,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "candidateName": "Rahul Singh",
+        "validationStatus": "Valid",
+        "matched": true,
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "earnings": 150
+      },
+      {
+        "orders": 50,
+        "candidateName": "Sayan Mondal",
+        "earnings": 3300,
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "validationStatus": "Valid",
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "matched": true
+      },
+      {
+        "orders": 10,
+        "validationStatus": "Valid",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "earnings": 250,
+        "matched": true,
+        "candidateName": "Suraj Mahato",
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe"
+      }
+    ],
+    "matchedRecords": 3,
+    "totalRecords": 3,
+    "invalidEarningsCount": 0,
+    "totalEarnings": 3700,
+    "isApproved": true,
+    "duplicateCount": 0,
+    "isLocked": true,
+    "missingIdCount": 0,
+    "columnMapping": {
+      "Order": "orders",
+      "Earning": "earnings"
+    }
+  },
+  {
+    "id": "IMP-client-001-1787516601171",
+    "isRollbacked": true,
+    "totalEarnings": 0,
+    "isApproved": true,
+    "rollbackedAt": "2026-08-24T17:33:47.295Z",
+    "clientId": "client-001",
+    "totalOrders": 0,
+    "rollbackedBy": "Development Admin",
+    "version": 2,
+    "totalRecords": 7,
+    "invalidEarningsCount": 0,
+    "columnMapping": {
+      "Net Salary": "earnings",
+      "Trips": "orders"
+    },
+    "importedAt": "2026-08-23T20:23:21.171Z",
+    "matchedRecords": 7,
+    "month": "2026-08",
+    "importedBy": "Development Admin",
+    "isLocked": false,
+    "unmatchedRecords": 0,
+    "clientName": "Elastic Run",
+    "duplicateCount": 0,
+    "importPeriod": "Monthly",
+    "missingIdCount": 0,
+    "rows": [
+      {
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "validationStatus": "Valid",
+        "earnings": 0,
+        "matched": true,
+        "orders": 0,
+        "candidateName": "Rahul Singh"
+      },
+      {
+        "earnings": 0,
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "orders": 0,
+        "matched": true,
+        "validationStatus": "Valid",
+        "candidateName": "Sayan Mondal"
+      },
+      {
+        "employeeId": "WF-OLIYdjMmzZdXovVn9keG",
+        "matched": true,
+        "orders": 0,
+        "earnings": 0,
+        "candidateName": "SOMNATH",
+        "validationStatus": "Valid"
+      },
+      {
+        "orders": 0,
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "validationStatus": "Valid",
+        "matched": true,
+        "candidateName": "Suraj Mahato",
+        "earnings": 0
+      },
+      {
+        "validationStatus": "Valid",
+        "matched": true,
+        "employeeId": "WF-aIOLiXi1d9SX09RvpzHZ",
+        "orders": 0,
+        "earnings": 0,
+        "candidateName": "Ashim"
+      },
+      {
+        "matched": true,
+        "validationStatus": "Valid",
+        "orders": 0,
+        "earnings": 0,
+        "candidateName": "Ranjeet kumar",
+        "employeeId": "WF-4m5IXKBpX5s70APpIchr"
+      },
+      {
+        "matched": true,
+        "candidateName": "sdsa",
+        "employeeId": "xUUBMbrB4gxqv7ouraYE",
+        "orders": 0,
+        "validationStatus": "Valid",
+        "earnings": 0
+      }
+    ]
+  },
+  {
+    "id": "IMP-client-001-1787594636349",
+    "clientId": "client-001",
+    "columnMapping": {
+      "Earning": "earnings",
+      "Order": "orders"
+    },
+    "importedAt": "2026-08-24T18:03:56.350Z",
+    "importedBy": "Development Admin",
+    "clientName": "Elastic Run",
+    "version": 5,
+    "month": "2026-07",
+    "invalidEarningsCount": 0,
+    "totalEarnings": 3700,
+    "importPeriod": "Monthly",
+    "unmatchedRecords": 0,
+    "isLocked": true,
+    "isApproved": true,
+    "matchedRecords": 3,
+    "missingIdCount": 0,
+    "duplicateCount": 0,
+    "totalRecords": 3,
+    "rows": [
+      {
+        "earnings": 150,
+        "candidateName": "Rahul Singh",
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "validationStatus": "Valid",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "orders": 90,
+        "matched": true
+      },
+      {
+        "matched": true,
+        "orders": 50,
+        "earnings": 3300,
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "validationStatus": "Valid",
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "candidateName": "Sayan Mondal"
+      },
+      {
+        "date": "Mon Aug 24 2026 05:30:00 GMT+0530 (India Standard Time)",
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "matched": true,
+        "validationStatus": "Valid",
+        "candidateName": "Suraj Mahato",
+        "orders": 10,
+        "earnings": 250
+      }
+    ],
+    "totalOrders": 150
+  },
+  {
+    "id": "IMP-client-001-1787594470394",
+    "isApproved": true,
+    "totalEarnings": 3700,
+    "rows": [
+      {
+        "date": "24-08-2026",
+        "earnings": 150,
+        "candidateName": "Rahul Singh",
+        "employeeId": "WF-29m9I6OXradvS0lIOH0h",
+        "orders": 90,
+        "matched": true,
+        "validationStatus": "Valid"
+      },
+      {
+        "earnings": 3300,
+        "orders": 50,
+        "employeeId": "WF-G2upe7vKNwDAMgaRsblB",
+        "candidateName": "Sayan Mondal",
+        "date": "24-08-2026",
+        "validationStatus": "Valid",
+        "matched": true
+      },
+      {
+        "employeeId": "WF-TfLt8NVWsmzRiX6rSlHe",
+        "candidateName": "Suraj Mahato",
+        "earnings": 250,
+        "orders": 10,
+        "validationStatus": "Valid",
+        "date": "24-08-2026",
+        "matched": true
+      }
+    ],
+    "invalidEarningsCount": 0,
+    "unmatchedRecords": 0,
+    "version": 3,
+    "importPeriod": "Monthly",
+    "isLocked": true,
+    "columnMapping": {
+      "Order": "orders",
+      "Earning": "earnings"
+    },
+    "matchedRecords": 3,
+    "importedAt": "2026-08-24T18:01:10.394Z",
+    "importedBy": "Development Admin",
+    "month": "2026-07",
+    "clientId": "client-001",
+    "duplicateCount": 0,
+    "totalRecords": 3,
+    "totalOrders": 150,
+    "clientName": "Elastic Run",
+    "missingIdCount": 0
+  }
+]

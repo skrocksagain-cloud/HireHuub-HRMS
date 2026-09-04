@@ -2,36 +2,79 @@ import { auditService } from '../../../core/audit/auditService';
 import { notificationService } from '../../../core/notifications/notificationService';
 import { permissionService } from '../../../core/permissions/permissionService';
 import { attendanceService } from '../../Attendance/services/attendanceService';
+import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { leaveRepository } from '../repositories/leaveRepository';
-import { datesInRange, getLeaveDays } from '../utils/leave';
+import { calculateProbationState, leaveAccrualService } from './leaveAccrualService';
+import { datesInRange, getLeaveDays, getLeaveSummary } from '../utils/leave';
 import { validateCarryForward, validateLeaveApplication, validateLeaveDecision } from '../validation/leaveValidation';
-import type { CarryForwardInput, LeaveActor, LeaveApplicationInput, LeaveDashboardData, LeaveDecisionInput, LeaveSummary } from '../types/leave';
-import { getLeaveSummary } from '../utils/leave';
+import type {
+  CarryForwardInput,
+  LeaveActor,
+  LeaveApplicationInput,
+  LeaveDashboardData,
+  LeaveDecisionInput,
+  LeaveSummary,
+} from '../types/leave';
+
+import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
 
 class LeaveService {
-  async getDashboard(actor: LeaveActor): Promise<LeaveDashboardData> {
-    const [balances, requests, approvalRequests, organizationRequests] = await Promise.all([
+  async getDashboard(actor: LeaveActor & { assignedRole?: string }): Promise<LeaveDashboardData> {
+    // Check dynamic probation and trigger monthly accrual if post 90-days
+    try {
+      const emp = await employeeRepository.getEmployeeById(actor.employeeId).catch(() => null);
+      if (emp?.joiningDate) {
+        await leaveAccrualService.processMonthlyAccrualForEmployee(actor.employeeId, emp.joiningDate);
+      }
+    } catch {
+      // Non-blocking
+    }
+
+    const scope = getSimplifiedModuleScope(actor.assignedRole);
+
+    const [balances, requests, organizationRequests] = await Promise.all([
       leaveRepository.getBalances(actor.employeeId),
       leaveRepository.getRequestsForEmployee(actor.employeeId),
-      permissionService.canApproveLeave(actor.role) ? leaveRepository.getPendingRequests() : Promise.resolve([]),
-      permissionService.canViewOrganizationAttendance(actor.role) ? leaveRepository.getOrganizationRequests() : Promise.resolve([]),
+      scope === 'GLOBAL'
+        ? leaveRepository.getOrganizationRequests()
+        : scope === 'DEPARTMENT'
+        ? leaveRepository.getOrganizationRequestsForDepartment(actor.department)
+        : Promise.resolve([]),
     ]);
-    return { balances, requests, approvalRequests, organizationRequests };
+
+    const finalApprovalRequests = (scope === 'GLOBAL' || scope === 'DEPARTMENT')
+      ? organizationRequests.filter(req => req.status === 'Pending')
+      : [];
+
+    return { balances, requests, approvalRequests: finalApprovalRequests, organizationRequests };
   }
 
   async apply(actor: LeaveActor, input: LeaveApplicationInput): Promise<void> {
     validateLeaveApplication(input);
 
-    const isProbation = true; // Probation status check for first 90 days
-    const isRestrictedType = input.leaveType.includes('Casual') || input.leaveType.includes('Paid');
-
-    // PO Probation Rule (Backend Service Enforcement):
-    // First 90 Days -> Sick Leave available, Casual/Paid Leave unavailable without Super Admin approval
-    if (isProbation && isRestrictedType && !permissionService.isSuperAdmin(actor.role)) {
-      throw new Error('Casual and Paid Leaves during 90-day probation require Super Admin approval.');
-    }
+    const emp = await employeeRepository.getEmployeeById(actor.employeeId).catch(() => null);
+    const joiningDateStr = emp?.joiningDate || '';
+    const probationState = calculateProbationState(joiningDateStr);
+    const isProbation = probationState.isProbation;
 
     const days = getLeaveDays(input.startDate, input.endDate);
+
+    // Rule A — First 90 Days probation enforcement
+    if (isProbation) {
+      const isSickLeave = input.leaveType.toLowerCase().includes('sick');
+      const isRestrictedType = input.leaveType.includes('Casual') || input.leaveType.includes('Paid');
+
+      if (isSickLeave) {
+        // Enforce 1-day max Sick Leave during probation
+        const validation = await leaveAccrualService.validateSickLeaveProbationAllowance(actor.employeeId, days);
+        if (!validation.allowed) {
+          throw new Error(validation.message || 'Sick Leave entitlement during probation is capped at 1 day total.');
+        }
+      } else if (isRestrictedType && !permissionService.isSuperAdmin(actor.role)) {
+        throw new Error('Casual and Paid Leaves during 90-day probation require Super Admin approval.');
+      }
+    }
+
     await leaveRepository.createRequest({
       employeeId: actor.employeeId,
       employeeName: actor.name,
@@ -44,6 +87,7 @@ class LeaveService {
       reason: input.reason.trim(),
       medicalCertificateReference: input.medicalCertificateReference.trim(),
     });
+
     await auditService.record({
       module: 'Leave',
       action: 'Apply',
@@ -70,15 +114,33 @@ class LeaveService {
     if (!request || request.status !== 'Pending') {
       throw new Error('This leave request is no longer pending.');
     }
+
     await leaveRepository.decideRequest(request.id, actor.employeeId, input.decision, input.reason.trim());
+
     if (input.decision === 'Approved') {
+      // Sync approved leave to Attendance Resolution Engine
       await attendanceService.syncApprovedLeave({
         employeeId: request.employeeId,
         employeeName: request.employeeName,
         department: request.department,
         attendanceDates: datesInRange(request.startDate, request.endDate),
       });
+
+      // Deduct used balance for approved leave
+      const balances = await leaveRepository.getBalances(request.employeeId);
+      const targetBalance = balances.find(
+        (b) => b.leaveType.toLowerCase() === request.leaveType.toLowerCase()
+      );
+      if (targetBalance) {
+        const newUsed = targetBalance.used + request.days;
+        const newAvailable = Math.max(0, targetBalance.available - request.days);
+        await leaveRepository.updateBalance(targetBalance.id, {
+          used: newUsed,
+          available: newAvailable,
+        });
+      }
     }
+
     await auditService.record({
       module: 'Leave',
       action: input.decision,

@@ -33,6 +33,22 @@ const MASTER_DATA_DOC_ID = 'hirehuub_master_data';
 const NOTIFICATION_SETTINGS_DOC_ID = 'hirehuub_notification_settings';
 const SECURITY_SETTINGS_DOC_ID = 'hirehuub_security_settings';
 
+export function sanitizePayload<T>(obj: T): T {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePayload) as unknown as T;
+  }
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+    if (value !== undefined) {
+      result[key] = sanitizePayload(value);
+    }
+  }
+  return result as T;
+}
+
 const slugify = (text: string) =>
   text
     .toLowerCase()
@@ -40,7 +56,7 @@ const slugify = (text: string) =>
     .replace(/(^-|-$)/g, '');
 
 export interface AdminRepository {
-  getCompanySettings(): Promise<CompanySettings>;
+  getCompanySettings(): Promise<CompanySettings | null>;
   updateCompanySettings(settings: CompanySettings): Promise<void>;
 
   getDepartments(): Promise<DepartmentItem[]>;
@@ -73,13 +89,13 @@ export interface AdminRepository {
   saveBigDay(config: BigDayConfig): Promise<void>;
   updateBigDay(id: string, updates: Partial<BigDayConfig>): Promise<void>;
 
-  getMasterData(): Promise<MasterDataConfig>;
+  getMasterData(): Promise<MasterDataConfig | null>;
   updateMasterData(data: MasterDataConfig): Promise<void>;
 
-  getNotificationSettings(): Promise<NotificationSettings>;
+  getNotificationSettings(): Promise<NotificationSettings | null>;
   updateNotificationSettings(settings: NotificationSettings): Promise<void>;
 
-  getSecuritySettings(): Promise<SecuritySettings>;
+  getSecuritySettings(): Promise<SecuritySettings | null>;
   updateSecuritySettings(settings: SecuritySettings): Promise<void>;
 
   getPasswordResetRequests(): Promise<PasswordResetRequest[]>;
@@ -91,56 +107,15 @@ export interface AdminRepository {
 }
 
 class FirestoreAdminRepository implements AdminRepository {
-  async getCompanySettings(): Promise<CompanySettings> {
+  async getCompanySettings(): Promise<CompanySettings | null> {
     const docRef = doc(db, 'admin_company', COMPANY_DOC_ID);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
-      const data = snap.data() as CompanySettings;
-      return {
-        ...data,
-      };
+      return snap.data() as CompanySettings;
     }
 
-    const defaultCompany: CompanySettings = {
-      id: COMPANY_DOC_ID,
-      companyName: '',
-      brandName: '',
-      gstin: '',
-      pan: '',
-      cin: '',
-      address: '',
-      registeredState: '',
-      registeredCity: '',
-      postalCode: '',
-      invoicePrefix: '',
-      creditNotePrefix: '',
-      employeeCodePrefix: '',
-      offerPrefix: '',
-      documentPrefix: '',
-      expensePrefix: '',
-      campaignPrefix: '',
-      openingPrefix: '',
-      financialYearStartMonth: undefined,
-      defaultGstRate: undefined,
-      defaultTdsRate: undefined,
-      bankDetails: {
-        bankName: '',
-        accountNumber: '',
-        ifscCode: '',
-        branchName: '',
-      },
-      website: '',
-      email: '',
-      phone: '',
-      logoUrl: '',
-      stampUrl: '',
-      signatures: [],
-      updatedAt: new Date().toISOString(),
-    };
-
-    await setDoc(docRef, defaultCompany);
-    return defaultCompany;
+    return null;
   }
 
   async updateCompanySettings(settings: CompanySettings): Promise<void> {
@@ -178,7 +153,7 @@ class FirestoreAdminRepository implements AdminRepository {
 
   async getRoles(): Promise<RoleItem[]> {
     const snap = await getDocs(query(collection(db, 'admin_roles'), orderBy('name')));
-    const roles = snap.docs.map((d) => {
+    return snap.docs.map((d) => {
       const data = d.data() as Omit<RoleItem, 'id'>;
       return {
         id: d.id,
@@ -193,153 +168,6 @@ class FirestoreAdminRepository implements AdminRepository {
         companyIds: data.companyIds || [],
       };
     });
-
-    if (roles.length > 0) return roles;
-
-    // Default Presets Seed
-    const defaultPresets: RoleItem[] = [
-      {
-        id: 'role-super-admin',
-        name: 'Super Admin',
-        description: 'Full unconstrained access to all organization records and administration',
-        permissions: ['*'],
-        viewScope: 'Organization',
-        approvalScope: 'Organization',
-        reportingScope: 'ReportingTree',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Super Admin',
-        isActive: true,
-      },
-      {
-        id: 'role-hr-admin',
-        name: 'HR Admin',
-        description: 'Manages employee records, onboarding, leave, attendance, and HR documents',
-        permissions: ['employees:view', 'employees:create', 'employees:edit', 'employees:delete', 'leave:view', 'leave:approve', 'documents:generate'],
-        viewScope: 'Organization',
-        approvalScope: 'Organization',
-        reportingScope: 'ReportingTree',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'HR Admin',
-        isActive: true,
-      },
-      {
-        id: 'role-dept-admin',
-        name: 'Department Admin',
-        description: 'Manages employees, approvals, and workflows within assigned departments',
-        permissions: ['employees:view', 'employees:create', 'leave:view', 'leave:approve', 'attendance:view', 'attendance:approve'],
-        viewScope: 'Departments',
-        approvalScope: 'Departments',
-        reportingScope: 'DirectReports',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Department Admin',
-        isActive: true,
-      },
-      {
-        id: 'role-recruitment-manager',
-        name: 'Recruitment Manager',
-        description: 'Manages candidate pipelines, recruiter performance, and staffing openings',
-        permissions: ['recruitment:view', 'recruitment:create', 'recruitment:edit', 'recruitment:approve', 'recruitment:export'],
-        viewScope: 'Departments',
-        approvalScope: 'Departments',
-        reportingScope: 'DirectReports',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Recruitment Manager',
-        isActive: true,
-      },
-      {
-        id: 'role-recruiter',
-        name: 'Recruiter',
-        description: 'Sources candidates, schedules interviews, and tracks activations',
-        permissions: ['recruitment:view', 'recruitment:create', 'recruitment:edit'],
-        viewScope: 'Assigned',
-        approvalScope: 'Selected',
-        reportingScope: 'DirectReports',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Recruiter',
-        isActive: true,
-      },
-      {
-        id: 'role-finance-manager',
-        name: 'Finance Manager',
-        description: 'Manages billing, invoices, credit notes, and financial transactions',
-        permissions: ['finance:view', 'finance:create', 'finance:edit', 'finance:approve', 'finance:export'],
-        viewScope: 'Organization',
-        approvalScope: 'Organization',
-        reportingScope: 'ReportingTree',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Finance Manager',
-        isActive: true,
-      },
-      {
-        id: 'role-payroll-executive',
-        name: 'Payroll Executive',
-        description: 'Generates payslips, salary registers, and processes monthly payroll',
-        permissions: ['payroll:view', 'payroll:generate', 'payroll:approve', 'payroll:export'],
-        viewScope: 'Organization',
-        approvalScope: 'Organization',
-        reportingScope: 'ReportingTree',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Payroll Executive',
-        isActive: true,
-      },
-      {
-        id: 'role-employee',
-        name: 'Employee',
-        description: 'Standard team member access to own profile, leave, and documents',
-        permissions: ['employees:view', 'leave:view', 'leave:apply', 'attendance:view', 'documents:view'],
-        viewScope: 'Own',
-        approvalScope: 'Selected',
-        reportingScope: 'DirectReports',
-        departmentIds: [],
-        teamIds: [],
-        employeeIds: [],
-        branchIds: [],
-        companyIds: [],
-        isPreset: true,
-        presetName: 'Employee',
-        isActive: true,
-      },
-    ];
-
-    for (const r of defaultPresets) {
-      await setDoc(doc(db, 'admin_roles', r.id), r);
-    }
-    return defaultPresets;
   }
 
   async saveRole(role: RoleItem): Promise<void> {
@@ -413,14 +241,18 @@ class FirestoreAdminRepository implements AdminRepository {
   async saveDocumentTemplate(template: DocumentTemplateConfig): Promise<void> {
     const id = template.id || slugify(`${template.type}-${template.templateName || Date.now()}`);
     const docRef = doc(db, 'document_templates', id);
-    await setDoc(docRef, { ...template, id, createdAt: new Date().toISOString() });
+    const rawPayload = { ...template, id, createdAt: new Date().toISOString() };
+    const cleanPayload = sanitizePayload(rawPayload);
+    await setDoc(docRef, cleanPayload);
   }
 
   async updateDocumentTemplate(id: string, updates: Partial<DocumentTemplateConfig>): Promise<void> {
-    await updateDoc(doc(db, 'document_templates', id), {
+    const rawPayload = {
       ...updates,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    const cleanPayload = sanitizePayload(rawPayload);
+    await updateDoc(doc(db, 'document_templates', id), cleanPayload);
   }
 
   async deleteDocumentTemplate(id: string): Promise<void> {
@@ -441,7 +273,7 @@ class FirestoreAdminRepository implements AdminRepository {
     await updateDoc(doc(db, 'admin_big_day', id), { ...updates, updatedAt: new Date().toISOString() });
   }
 
-  async getMasterData(): Promise<MasterDataConfig> {
+  async getMasterData(): Promise<MasterDataConfig | null> {
     const docRef = doc(db, 'admin_master_data', MASTER_DATA_DOC_ID);
     const snap = await getDoc(docRef);
 
@@ -449,26 +281,7 @@ class FirestoreAdminRepository implements AdminRepository {
       return snap.data() as MasterDataConfig;
     }
 
-    const defaultMaster: MasterDataConfig = {
-      employeePrefix: 'HH',
-      invoicePrefix: 'HH2026-',
-      documentPrefix: 'DOC-',
-      offerPrefix: 'OFF-',
-      leaveTypes: ['Casual Leave', 'Sick Leave', 'Earned Leave', 'Maternity Leave', 'Paternity Leave', 'Loss of Pay'],
-      employmentTypes: ['Full-Time', 'Part-Time', 'Contract', 'Intern', 'Probation'],
-      bloodGroups: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
-      genderOptions: ['Male', 'Female', 'Non-Binary', 'Prefer not to say'],
-      states: ['Maharashtra', 'Karnataka', 'Delhi', 'Tamil Nadu', 'Telangana', 'Gujarat'],
-      cities: ['Pune', 'Bengaluru', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai'],
-      countries: ['India', 'United States', 'United Kingdom', 'Singapore', 'UAE'],
-      currencies: ['INR', 'USD', 'EUR', 'GBP', 'AED'],
-      taxRates: [0, 5, 12, 18, 28],
-      financialYears: ['2024-2025', '2025-2026', '2026-2027'],
-      updatedAt: new Date().toISOString(),
-    };
-
-    await setDoc(docRef, defaultMaster);
-    return defaultMaster;
+    return null;
   }
 
   async updateMasterData(data: MasterDataConfig): Promise<void> {
@@ -476,7 +289,7 @@ class FirestoreAdminRepository implements AdminRepository {
     await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
   }
 
-  async getNotificationSettings(): Promise<NotificationSettings> {
+  async getNotificationSettings(): Promise<NotificationSettings | null> {
     const docRef = doc(db, 'admin_notification_settings', NOTIFICATION_SETTINGS_DOC_ID);
     const snap = await getDoc(docRef);
 
@@ -484,28 +297,7 @@ class FirestoreAdminRepository implements AdminRepository {
       return snap.data() as NotificationSettings;
     }
 
-    const defaultSettings: NotificationSettings = {
-      channels: {
-        inApp: true,
-        email: false,
-        whatsapp: false,
-        sms: false,
-        push: false,
-      },
-      triggers: {
-        employeeOnboarding: true,
-        leaveRequest: true,
-        leaveApproval: true,
-        offerGeneration: true,
-        invoiceApproval: true,
-        passwordResetRequest: true,
-        bigDayActivation: true,
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
-    await setDoc(docRef, defaultSettings);
-    return defaultSettings;
+    return null;
   }
 
   async updateNotificationSettings(settings: NotificationSettings): Promise<void> {
@@ -513,7 +305,7 @@ class FirestoreAdminRepository implements AdminRepository {
     await setDoc(docRef, { ...settings, updatedAt: new Date().toISOString() }, { merge: true });
   }
 
-  async getSecuritySettings(): Promise<SecuritySettings> {
+  async getSecuritySettings(): Promise<SecuritySettings | null> {
     const docRef = doc(db, 'admin_security_settings', SECURITY_SETTINGS_DOC_ID);
     const snap = await getDoc(docRef);
 
@@ -521,17 +313,7 @@ class FirestoreAdminRepository implements AdminRepository {
       return snap.data() as SecuritySettings;
     }
 
-    const defaultSecurity: SecuritySettings = {
-      maxFailedAttempts: 5,
-      lockoutDurationMinutes: 30,
-      passwordMinLength: 8,
-      requireSpecialChar: true,
-      sessionTimeoutMinutes: 60,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await setDoc(docRef, defaultSecurity);
-    return defaultSecurity;
+    return null;
   }
 
   async updateSecuritySettings(settings: SecuritySettings): Promise<void> {

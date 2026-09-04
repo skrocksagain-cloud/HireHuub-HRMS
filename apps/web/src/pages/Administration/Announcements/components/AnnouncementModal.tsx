@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileUp, Megaphone, ShieldCheck, X } from 'lucide-react';
 import type {
   AnnouncementCategory,
@@ -9,6 +9,8 @@ import type {
 } from '../../../../types/Announcement';
 import ActiveEmployeePicker from './ActiveEmployeePicker';
 import { usePermissions } from '../../../../hooks/usePermissions';
+import { useAdminCompany, useAdminDepartments } from '../../../../hooks/admin/useAdmin';
+import { employeeRepository } from '../../../Employee/repositories/employeeRepository';
 
 interface Props {
   isOpen: boolean;
@@ -38,29 +40,10 @@ const PRIORITIES: AnnouncementPriority[] = ['Low', 'Medium', 'High', 'Critical']
 
 const SCOPES: AnnouncementVisibilityScope[] = [
   'Organization',
-  'Company',
   'Department',
   'Team',
   'Selected Employees',
-];
-
-const DEMO_COMPANIES = [
-  { id: 'cmp_1', name: 'Hire Huub One ERP Corp' },
-  { id: 'cmp_2', name: 'Huub HR Technologies Ltd' },
-];
-
-const DEMO_DEPTS = [
-  { id: 'dept_hr', name: 'Human Resources' },
-  { id: 'dept_fin', name: 'Finance & Accounting' },
-  { id: 'dept_eng', name: 'Engineering & IT' },
-  { id: 'dept_mkt', name: 'Marketing & Sales' },
-  { id: 'dept_ops', name: 'Operations & Staffing' },
-];
-
-const DEMO_TEAMS = [
-  { id: 'team_core', name: 'Core Platform Engineering' },
-  { id: 'team_payroll', name: 'Payroll Operations' },
-  { id: 'team_talent', name: 'Talent Acquisition' },
+  'Private',
 ];
 
 export default function AnnouncementModal({
@@ -71,8 +54,9 @@ export default function AnnouncementModal({
   initialData,
   isUploading = false,
 }: Props) {
-  const { activeRole } = usePermissions();
-  const isSuperAdmin = activeRole.name === 'Super Admin' || activeRole.name === 'admin';
+  const { isSuperAdmin } = usePermissions();
+  const { company } = useAdminCompany();
+  const { departments: liveDepts, isLoading: isDeptsLoading } = useAdminDepartments();
 
   const [title, setTitle] = useState(initialData?.title || '');
   const [summary, setSummary] = useState(initialData?.summary || '');
@@ -80,10 +64,40 @@ export default function AnnouncementModal({
   const [priority, setPriority] = useState<AnnouncementPriority>(initialData?.priority || 'Medium');
   const [visibility, setVisibility] = useState<AnnouncementVisibilityScope>(initialData?.visibility || 'Organization');
 
-  const [companyIds, setCompanyIds] = useState<string[]>(initialData?.companyIds || []);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>(initialData?.companyIds?.[0] || 'all');
   const [departmentIds, setDepartmentIds] = useState<string[]>(initialData?.departmentIds || []);
   const [teamIds, setTeamIds] = useState<string[]>(initialData?.teamIds || []);
   const [employeeIds, setEmployeeIds] = useState<string[]>(initialData?.employeeIds || []);
+
+  // Live teams derived from employee department assignments
+  const [liveTeams, setLiveTeams] = useState<{ id: string; name: string }[]>([]);
+  const [isTeamsLoading, setIsTeamsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    employeeRepository.getEmployees().then((list) => {
+      if (!isMounted) return;
+      const activeEmps = list.filter(
+        (e) => (e.status === 'Active' || e.employmentStatus === 'Active') &&
+               e.status !== 'Inactive' && e.employmentStatus !== 'Terminated' && e.employmentStatus !== 'Notice Period'
+      );
+      const uniqueDepts = Array.from(new Set(activeEmps.map((e) => e.department).filter(Boolean)));
+      const derivedTeams = uniqueDepts.map((d) => ({
+        id: d.toLowerCase().replace(/\s+/g, '-'),
+        name: `${d} Team`,
+      }));
+      setLiveTeams(derivedTeams);
+      setIsTeamsLoading(false);
+    }).catch(() => {
+      if (isMounted) setIsTeamsLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const activeDepartments = liveDepts.filter((d) => d.isActive !== false);
 
   const [circularMetadata, setCircularMetadata] = useState<CircularFileMetadata | null>(initialData?.circularMetadata || null);
   const [requireAcknowledgement, setRequireAcknowledgement] = useState<boolean>(Boolean(initialData?.requireAcknowledgement));
@@ -129,7 +143,7 @@ export default function AnnouncementModal({
         priority,
         status: submitStatus,
         visibility,
-        companyIds,
+        companyIds: [selectedOrgId === 'all' ? company?.companyId || 'company-main' : selectedOrgId],
         departmentIds,
         teamIds,
         employeeIds,
@@ -318,74 +332,80 @@ export default function AnnouncementModal({
 
             {/* Dynamic Pickers based on Scope */}
             {visibility === 'Organization' && (
-              <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 font-medium">
-                Visible to everyone across the entire organization.
-              </div>
-            )}
-
-            {visibility === 'Company' && (
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-2">
-                <span className="font-bold block text-slate-700 dark:text-slate-300">Select Companies</span>
-                <div className="space-y-1">
-                  {DEMO_COMPANIES.map((cmp) => (
-                    <label key={cmp.id} className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={companyIds.includes(cmp.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setCompanyIds([...companyIds, cmp.id]);
-                          else setCompanyIds(companyIds.filter((id) => id !== cmp.id));
-                        }}
-                        className="rounded border-slate-300 text-emerald-600"
-                      />
-                      {cmp.name}
-                    </label>
-                  ))}
-                </div>
+                <label className="font-bold block text-slate-700 dark:text-slate-300">Target Organization</label>
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-800 dark:text-white focus:outline-none"
+                >
+                  <option value="all">All Organization ({company?.companyName || company?.brandName || 'HireHuub ERP'})</option>
+                  {company?.companyName && (
+                    <option value={company.companyId || 'primary-org'}>{company.companyName}</option>
+                  )}
+                </select>
               </div>
             )}
 
             {visibility === 'Department' && (
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-2">
                 <span className="font-bold block text-slate-700 dark:text-slate-300">Select Target Departments</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {DEMO_DEPTS.map((d) => (
-                    <label key={d.id} className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={departmentIds.includes(d.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setDepartmentIds([...departmentIds, d.id]);
-                          else setDepartmentIds(departmentIds.filter((id) => id !== d.id));
-                        }}
-                        className="rounded border-slate-300 text-emerald-600"
-                      />
-                      {d.name}
-                    </label>
-                  ))}
-                </div>
+                {isDeptsLoading ? (
+                  <span className="text-slate-400 font-mono">Loading Departments from Firestore...</span>
+                ) : activeDepartments.length === 0 ? (
+                  <span className="text-slate-400 italic">No active departments found in Department Control.</span>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {activeDepartments.map((d) => (
+                      <label key={d.id} className="flex items-center gap-2 text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={departmentIds.includes(d.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setDepartmentIds([...departmentIds, d.id]);
+                            else setDepartmentIds(departmentIds.filter((id) => id !== d.id));
+                          }}
+                          className="rounded border-slate-300 text-emerald-600"
+                        />
+                        {d.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {visibility === 'Team' && (
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-2">
                 <span className="font-bold block text-slate-700 dark:text-slate-300">Select Target Teams</span>
-                <div className="space-y-1">
-                  {DEMO_TEAMS.map((t) => (
-                    <label key={t.id} className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={teamIds.includes(t.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) setTeamIds([...teamIds, t.id]);
-                          else setTeamIds(teamIds.filter((id) => id !== t.id));
-                        }}
-                        className="rounded border-slate-300 text-emerald-600"
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-                </div>
+                {isTeamsLoading ? (
+                  <span className="text-slate-400 font-mono">Loading Active Teams...</span>
+                ) : liveTeams.length === 0 ? (
+                  <span className="text-slate-400 italic">No active team assignments found.</span>
+                ) : (
+                  <div className="space-y-1">
+                    {liveTeams.map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={teamIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setTeamIds([...teamIds, t.id]);
+                            else setTeamIds(teamIds.filter((id) => id !== t.id));
+                          }}
+                          className="rounded border-slate-300 text-emerald-600"
+                        />
+                        {t.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {visibility === 'Private' && (
+              <div className="p-3 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs text-amber-900 dark:text-amber-300 font-medium">
+                Private Announcement: Delivered exclusively to Management Team (Founder, Co-Founder, Director, Super Admin).
               </div>
             )}
 

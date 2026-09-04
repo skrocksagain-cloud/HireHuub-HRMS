@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { invoiceService } from '../services/invoiceService';
 import { billingService } from '../services/billingService';
 import { clientService, type ResolvedClientBilling } from '../../../Workbench/Network/clients/services/clientService';
-import { permissionService } from '../../../../core/permissions/permissionService';
+import { canReadFinanceGlobally, type FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
 import type { Invoice, CreateInvoiceDraftInput, RecordClientPaymentInput, InvoiceDocumentStorage } from '../../../../types/Invoice';
 import type { Client } from '../../../../types/Client';
 
@@ -27,7 +27,7 @@ export interface UseInvoicesReturn {
   recordClientPayment: (invoiceId: string, input: RecordClientPaymentInput, actorName: string) => Promise<void>;
 }
 
-export function useInvoices(userRole: string, defaultClientId?: string): UseInvoicesReturn {
+export function useInvoices(actor: FinanceAuthorizationContext, defaultClientId?: string): UseInvoicesReturn {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -35,18 +35,18 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
   const [selectedClientId, setSelectedClientId] = useState<string>(defaultClientId || '');
   const [selectedStateName, setSelectedStateName] = useState<string>('');
   const [resolvedBilling, setResolvedBilling] = useState<ResolvedClientBilling | null>(null);
-  const [previewInvoiceNumber, setPreviewInvoiceNumber] = useState<string>('HH2026-0001');
+  const [previewInvoiceNumber, setPreviewInvoiceNumber] = useState<string>('');
 
-  const hasFinanceAccess = permissionService.canAccessFinance(userRole);
-  const hasWriteAccess = permissionService.canWriteFinance(userRole);
-  const hasReportAccess = permissionService.canReadFinanceReports(userRole);
+  const hasFinanceAccess = canReadFinanceGlobally(actor);
+  const hasWriteAccess = canReadFinanceGlobally(actor);
+  const hasReportAccess = canReadFinanceGlobally(actor);
 
   const loadInvoices = useCallback(async () => {
     if (!hasFinanceAccess) return;
     setLoading(true);
     setError('');
     try {
-      const data = await invoiceService.getInvoiceHistory();
+      const data = await invoiceService.getInvoiceHistory(actor);
       setInvoices(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fetch invoices register.');
@@ -98,8 +98,7 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
         setPreviewInvoiceNumber(num);
       })
       .catch(() => {
-        const year = new Date().getFullYear();
-        setPreviewInvoiceNumber(`HH${year}-${String(invoices.length + 1).padStart(4, '0')}`);
+        setPreviewInvoiceNumber('');
       });
   }, [invoices.length]);
 
@@ -112,7 +111,7 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
 
   const generateInvoice = async (invoiceId: string, actorName: string): Promise<InvoiceDocumentStorage> => {
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to generate invoices.');
-    const invoice = await invoiceService.getInvoice(invoiceId);
+    const invoice = await invoiceService.getInvoice(invoiceId, actor);
     if (!invoice) throw new Error('Invoice not found.');
     const client = await clientService.resolveClientBillingForState(invoice.clientId, selectedStateName);
     const docInfo = await invoiceService.generate(invoiceId, {
@@ -121,20 +120,20 @@ export function useInvoices(userRole: string, defaultClientId?: string): UseInvo
       gstin: client.gstin,
       billingAddress: client.billingAddress,
       billingState: client.billingState,
-    }, actorName);
+    }, actorName, actor);
     await loadInvoices();
     return docInfo;
   };
 
   const approveInvoice = async (invoiceId: string, actorName: string): Promise<void> => {
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to approve invoices.');
-    await invoiceService.approveInvoice(invoiceId, actorName);
+    await invoiceService.approveInvoice(invoiceId, actorName, actor);
     await loadInvoices();
   };
 
   const recordClientPayment = async (invoiceId: string, input: RecordClientPaymentInput, actorName: string): Promise<void> => {
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to record payments.');
-    await invoiceService.recordClientPayment(invoiceId, input, actorName, userRole);
+    await invoiceService.recordClientPayment(invoiceId, input, actorName, actor.role || '', actor);
     await loadInvoices();
   };
 

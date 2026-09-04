@@ -4,7 +4,7 @@ export type WorkforceType = 'Payroll' | 'OTS';
 
 export type WorkingStatus = 'Working' | 'Not Working';
 
-export type OtsEligibility = 'Eligible' | 'Not Eligible' | 'Pending';
+export type OtsEligibility = 'Eligible' | 'Not Eligible';
 
 export type OtsBillingStatus = 'Pending' | 'Billed';
 
@@ -31,6 +31,8 @@ export interface WorkforceItem {
   phone: string;
   area: string;
   city: string;
+  candidateLifecycleStatus?: string;
+  hasActivePlacement: boolean;
 
   clientId: string;
   clientName: string;
@@ -41,16 +43,22 @@ export interface WorkforceItem {
   associatePartnerName?: string;
   teamLeadId?: string;
   teamLeadName?: string;
+  teamId?: string;
+  teamName?: string;
+  departmentId?: string;
+  department?: string;
   activeDate: string; // ISO date string
   workingFrom: string; // Calculated from activeDate
   dateOfBirth?: string;
   joiningDate?: string;
   lastWorkingDate?: string;
+  terminationReason?: string;
   tenureDays: number;
   tenureDisplay: string;
   workingStatus: WorkingStatus;
   totalEarnings: number;
   totalOrders?: number;
+  payrollEmployeeId?: string;
   rank?: number;
   eligibility: OtsEligibility;
   billingStatus: OtsBillingStatus;
@@ -65,17 +73,24 @@ export interface WorkforceItem {
   systemAudit: SystemAuditRecord[];
   createdAt: string;
   updatedAt: string;
+
+  // Payroll-specific KYC fields (added for Phase 3A)
+  aadhaarNumber?: string;
+  panNumber?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
 }
 
 export interface ClientPayoutImportRow {
   employeeId: string;
   candidateName: string;
   earnings: number;
-  orders?: number;
-  periodStart?: string;
-  periodEnd?: string;
+  orders: number;
+  date: string;
   matched: boolean;
-  validationStatus: 'Valid' | 'Duplicate Employee ID' | 'Missing Employee ID' | 'Invalid Earnings';
+  validationStatus: 'Valid' | 'Duplicate Employee ID' | 'Missing Employee ID' | 'Invalid Earnings' | 'Invalid Date';
+  placementId?: string;
+  candidateId?: string;
 }
 
 export interface ClientPayoutImportRecord {
@@ -95,6 +110,7 @@ export interface ClientPayoutImportRecord {
   duplicateCount: number;
   missingIdCount: number;
   invalidEarningsCount: number;
+  invalidDateCount: number;
   totalEarnings: number;
   totalOrders: number;
   columnMapping: Record<string, string>; // Saved mapping for Client ID
@@ -114,6 +130,7 @@ export interface ImportValidationSummary {
   duplicateCount: number;
   missingIdCount: number;
   invalidEarningsCount: number;
+  invalidDateCount: number;
   canProceed: boolean;
 }
 
@@ -140,4 +157,5 @@ export interface WorkforceKpiSummary {
   topPerformerName?: string;
   eligibleForBilling: number;
   pendingBilling: number;
+  lastMonthWorkingCount: number;
 }

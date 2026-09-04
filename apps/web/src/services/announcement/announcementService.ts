@@ -10,6 +10,7 @@ import type {
   CircularFileMetadata,
 } from '../../types/Announcement';
 import type { RoleItem } from '../../types/Admin';
+import { resolveAudienceEmployeeIds } from '../audience/audienceService';
 
 export class AnnouncementService {
   /**
@@ -104,6 +105,13 @@ export class AnnouncementService {
       }
     }
 
+    const targetEmployeeIds = await resolveAudienceEmployeeIds({
+      visibility: annData.visibility || 'Organization',
+      departmentIds: annData.departmentIds,
+      teamIds: annData.teamIds,
+      selectedEmployeeIds: annData.employeeIds,
+    });
+
     const payload: Omit<AnnouncementItem, 'id'> = {
       title: annData.title.trim(),
       summary: annData.summary.trim(),
@@ -114,7 +122,7 @@ export class AnnouncementService {
       companyIds: annData.companyIds || [],
       departmentIds: annData.departmentIds || [],
       teamIds: annData.teamIds || [],
-      employeeIds: annData.employeeIds || [],
+      employeeIds: targetEmployeeIds,
       circularMetadata: annData.circularMetadata || null,
       requireAcknowledgement: Boolean(annData.requireAcknowledgement),
       isPinned: annData.priority === 'Critical' ? true : Boolean(annData.isPinned),

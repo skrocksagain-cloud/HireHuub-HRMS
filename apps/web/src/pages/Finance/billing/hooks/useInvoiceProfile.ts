@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoiceService } from '../services/invoiceService';
 import { clientService } from '../../../Workbench/Network/clients/services/clientService';
-import { permissionService } from '../../../../core/permissions/permissionService';
+import { canReadFinanceGlobally, type FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
 import type { Invoice, InvoiceStatus, RecordClientPaymentInput, CreateInvoiceDraftInput, InvoiceDocumentStorage } from '../../../../types/Invoice';
 
 export interface UseInvoiceProfileReturn {
@@ -20,15 +20,15 @@ export interface UseInvoiceProfileReturn {
   recordPayment: (input: RecordClientPaymentInput, actorName: string) => Promise<void>;
 }
 
-export function useInvoiceProfile(invoiceId: string | undefined, userRole: string): UseInvoiceProfileReturn {
+export function useInvoiceProfile(invoiceId: string | undefined, actor: FinanceAuthorizationContext): UseInvoiceProfileReturn {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [actionSuccess, setActionSuccess] = useState<string>('');
   const [actionError, setActionError] = useState<string>('');
 
-  const hasFinanceAccess = permissionService.canAccessFinance(userRole);
-  const hasWriteAccess = permissionService.canWriteFinance(userRole);
+  const hasFinanceAccess = canReadFinanceGlobally(actor);
+  const hasWriteAccess = canReadFinanceGlobally(actor);
 
   const reload = useCallback(async () => {
     if (!invoiceId) return;
@@ -40,7 +40,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     setLoading(true);
     setError('');
     try {
-      const data = await invoiceService.getInvoice(invoiceId);
+      const data = await invoiceService.getInvoice(invoiceId, actor);
       if (!data) {
         setError(`Invoice '${invoiceId}' was not found.`);
       } else {
@@ -63,7 +63,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     setActionError('');
     setActionSuccess('');
     try {
-      await invoiceService.updateStatus(invoiceId, newStatus, actorName);
+      await invoiceService.updateStatus(invoiceId, newStatus, actorName, '', actor);
       setActionSuccess(`Invoice status updated to ${newStatus}.`);
       await reload();
     } catch (err: unknown) {
@@ -95,7 +95,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
         gstAmount: updates.gstAmount,
         grandTotal: updates.grandTotal,
       };
-      await invoiceService.updateDraft(invoiceId, inputPayload, actorName);
+      await invoiceService.updateDraft(invoiceId, inputPayload, actorName, actor);
       setActionSuccess('Invoice updated successfully.');
       await reload();
     } catch (err: unknown) {
@@ -126,7 +126,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
         billingState,
       };
 
-      const docStorage = await invoiceService.generate(invoiceId, clientPayload, actorName);
+      const docStorage = await invoiceService.generate(invoiceId, clientPayload, actorName, actor);
       setActionSuccess('Invoice PDF generated successfully.');
       await reload();
       return docStorage;
@@ -143,7 +143,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     setActionError('');
     setActionSuccess('');
     try {
-      await invoiceService.approveInvoice(invoiceId, actorName);
+      await invoiceService.approveInvoice(invoiceId, actorName, actor);
       setActionSuccess('Invoice officially approved and locked.');
       await reload();
     } catch (err: unknown) {
@@ -159,7 +159,7 @@ export function useInvoiceProfile(invoiceId: string | undefined, userRole: strin
     setActionError('');
     setActionSuccess('');
     try {
-      await invoiceService.recordClientPayment(invoiceId, input, actorName, userRole);
+      await invoiceService.recordClientPayment(invoiceId, input, actorName, actor.role || '', actor);
       setActionSuccess(`Payment of ₹${input.amountReceived.toLocaleString('en-IN')} recorded successfully.`);
       await reload();
     } catch (err: unknown) {

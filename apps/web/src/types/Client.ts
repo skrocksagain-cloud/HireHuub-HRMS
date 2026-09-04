@@ -36,7 +36,8 @@ export interface ClientFinanceSummary {
 }
 
 export interface Client {
-  id: string;
+  id: string; // Internal Firebase document ID
+  clientId?: string; // Business Client ID (e.g. HH/CLI/000001)
   name: string; // Short / Commonly Used Name (e.g. Elastic Run)
   billingName: string; // Legal Name (e.g. Ntex Logistics Pvt Ltd)
   billingAddress: BillingAddress;
@@ -58,6 +59,7 @@ export interface Client {
 }
 
 export interface CreateClientInput {
+  clientId?: string;
   name: string;
   billingName: string;
   billingAddress: BillingAddress;

@@ -13,6 +13,7 @@ export interface LeaveRepository {
   getRequestsForEmployee(employeeId: string): Promise<LeaveRequest[]>;
   getPendingRequests(): Promise<LeaveRequest[]>;
   getOrganizationRequests(): Promise<LeaveRequest[]>;
+  getOrganizationRequestsForDepartment(department: string): Promise<LeaveRequest[]>;
   getRequest(requestId: string): Promise<LeaveRequest | null>;
   createRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'approverEmployeeId' | 'decisionReason' | 'isArchived' | 'createdAt' | 'updatedAt'>): Promise<void>;
   decideRequest(requestId: string, approverEmployeeId: string, status: 'Approved' | 'Rejected', decisionReason: string): Promise<void>;
@@ -23,16 +24,7 @@ export interface LeaveRepository {
 class FirestoreLeaveRepository implements LeaveRepository {
   async getBalances(employeeId: string): Promise<LeaveBalance[]> {
     const result = await getDocs(query(collection(db, LEAVE_BALANCES_COLLECTION), where('employeeId', '==', employeeId)));
-    if (!result.empty) {
-      const list = result.docs.map(balanceFrom);
-      return list.sort((a, b) => a.leaveType.localeCompare(b.leaveType));
-    }
-    // Default Fallback Balances matching PO Directive #6 (24 Days Annual, Allocated Monthly: 2 Days/Mo; Probation: 1 SL/Mo)
-    return [
-      { id: `bal-pl-${employeeId}`, employeeId, leaveType: 'Privilege Leave (PL)', available: 8, credited: 12, carriedForward: 2, used: 4, updatedAt: Timestamp.now() },
-      { id: `bal-cl-${employeeId}`, employeeId, leaveType: 'Casual Leave (CL)', available: 4, credited: 6, carriedForward: 0, used: 2, updatedAt: Timestamp.now() },
-      { id: `bal-sl-${employeeId}`, employeeId, leaveType: 'Sick Leave (SL)', available: 3, credited: 6, carriedForward: 0, used: 3, updatedAt: Timestamp.now() },
-    ];
+    return result.docs.map(balanceFrom).sort((a, b) => a.leaveType.localeCompare(b.leaveType));
   }
   async getRequestsForEmployee(employeeId: string): Promise<LeaveRequest[]> {
     const result = await getDocs(query(collection(db, LEAVE_REQUESTS_COLLECTION), where('employeeId', '==', employeeId)));
@@ -46,6 +38,12 @@ class FirestoreLeaveRepository implements LeaveRepository {
   }
   async getOrganizationRequests(): Promise<LeaveRequest[]> {
     const result = await getDocs(collection(db, LEAVE_REQUESTS_COLLECTION));
+    const list = result.docs.map(requestFrom).filter((req) => !req.isArchived);
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)).slice(0, 100);
+  }
+  async getOrganizationRequestsForDepartment(department: string): Promise<LeaveRequest[]> {
+    if (!department?.trim()) return [];
+    const result = await getDocs(query(collection(db, LEAVE_REQUESTS_COLLECTION), where('department', '==', department)));
     const list = result.docs.map(requestFrom).filter((req) => !req.isArchived);
     return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)).slice(0, 100);
   }

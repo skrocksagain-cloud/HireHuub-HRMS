@@ -7,36 +7,20 @@ const slugify = (text: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-/**
- * Helper to convert file/blob to data URL as safe fallback if network/CORS fails
- */
-const fileToDataUrl = (file: File | Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-};
-
 class AdminStorageService {
+  private async upload(path: string, file: File | Blob): Promise<{ url: string; path: string }> {
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return { url: await getDownloadURL(storageRef), path };
+  }
+
   /**
    * Upload Company Logo to /company/logo/
    */
   async uploadCompanyLogo(file: File): Promise<{ url: string; path: string }> {
     const ext = file.name.split('.').pop() || 'png';
     const path = `company/logo/logo_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch (err) {
-      // Log error for debugging as required by Task 3 & 4
-      // Return Data URL fallback so UI & Firestore persist the uploaded asset cleanly
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
+    return this.upload(path, file);
   }
 
   /**
@@ -45,50 +29,10 @@ class AdminStorageService {
   async uploadOfficialStamp(file: File): Promise<{ url: string; path: string }> {
     const ext = file.name.split('.').pop() || 'png';
     const path = `company/stamps/official_stamp_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch {
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
+    return this.upload(path, file);
   }
 
-  /**
-   * Upload Top Letterhead Image to /company/letterhead/
-   */
-  async uploadLetterheadImage(file: File, profileId = 'default'): Promise<{ url: string; path: string }> {
-    const ext = file.name.split('.').pop() || 'png';
-    const path = `company/letterhead/top_letterhead_${profileId}_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch {
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
-  }
 
-  /**
-   * Upload Bottom Letter Footer Image to /company/letterfooter/
-   */
-  async uploadLetterFooterImage(file: File, profileId = 'default'): Promise<{ url: string; path: string }> {
-    const ext = file.name.split('.').pop() || 'png';
-    const path = `company/letterfooter/bottom_footer_${profileId}_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch {
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
-  }
 
   /**
    * Upload Authorized Signature to /company/signatures/
@@ -96,41 +40,11 @@ class AdminStorageService {
   async uploadSignature(signatoryId: string, file: File): Promise<{ url: string; path: string }> {
     const ext = file.name.split('.').pop() || 'png';
     const path = `company/signatures/${signatoryId}_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch (err) {
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
+    return this.upload(path, file);
   }
 
   /**
-   * Upload Document Template (DOCX / XLSX) to /templates/[document-type-slug]/
-   */
-  async uploadTemplateFile(
-    documentType: string,
-    version: string,
-    file: File
-  ): Promise<{ url: string; path: string }> {
-    const slug = slugify(documentType);
-    const ext = file.name.split('.').pop() || 'docx';
-    const path = `templates/${slug}/${version}_${Date.now()}.${ext}`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch (err) {
-      const dataUrl = await fileToDataUrl(file);
-      return { url: dataUrl, path };
-    }
-  }
-
-  /**
-   * Upload Generated PDF to /generated/[document-type-slug]/
+   * Upload Generated Output File to /generated/[document-type-slug]/
    */
   async uploadGeneratedPdf(
     documentType: string,
@@ -139,15 +53,7 @@ class AdminStorageService {
   ): Promise<{ url: string; path: string }> {
     const slug = slugify(documentType);
     const path = `generated/${slug}/${fileName}_${Date.now()}.pdf`;
-    try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, pdfBlob);
-      const url = await getDownloadURL(storageRef);
-      return { url, path };
-    } catch (err) {
-      const dataUrl = await fileToDataUrl(pdfBlob);
-      return { url: dataUrl, path };
-    }
+    return this.upload(path, pdfBlob);
   }
 
   /**

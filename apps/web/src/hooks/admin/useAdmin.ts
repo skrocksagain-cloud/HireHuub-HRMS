@@ -79,28 +79,6 @@ export function useAdminCompany() {
     await fetchCompany();
   };
 
-  const uploadLetterhead = async (file: File, profileId = 'default', actorId = 'admin', actorName = 'Super Admin') => {
-    const url = await adminService.uploadLetterheadImage(file, profileId, actorId, actorName);
-    await fetchCompany();
-    return url;
-  };
-
-  const deleteLetterhead = async (actorId = 'admin', actorName = 'Super Admin') => {
-    await adminService.deleteLetterheadImage(actorId, actorName);
-    await fetchCompany();
-  };
-
-  const uploadLetterFooter = async (file: File, profileId = 'default', actorId = 'admin', actorName = 'Super Admin') => {
-    const url = await adminService.uploadLetterFooterImage(file, profileId, actorId, actorName);
-    await fetchCompany();
-    return url;
-  };
-
-  const deleteLetterFooter = async (actorId = 'admin', actorName = 'Super Admin') => {
-    await adminService.deleteLetterFooterImage(actorId, actorName);
-    await fetchCompany();
-  };
-
   return {
     company,
     isLoading,
@@ -110,10 +88,6 @@ export function useAdminCompany() {
     uploadLogo,
     uploadStamp,
     deleteStamp,
-    uploadLetterhead,
-    deleteLetterhead,
-    uploadLetterFooter,
-    deleteLetterFooter,
     uploadSignature,
     deleteSignature,
   };
@@ -324,22 +298,12 @@ export function useAdminDocumentTemplates() {
     await fetchTemplates();
   };
 
-  const uploadTemplateFile = async (
-    documentType: string,
-    file: File,
-    version: string,
-    actorId = 'admin',
-    actorName = 'Super Admin'
-  ) => {
-    return adminService.uploadTemplateFile(documentType, file, version, actorId, actorName);
-  };
-
   const deleteTemplate = async (id: string, actorId = 'admin', actorName = 'Super Admin') => {
     await adminService.deleteDocumentTemplate(id, actorId, actorName);
     await fetchTemplates();
   };
 
-  return { templates, isLoading, refresh: fetchTemplates, saveTemplate, uploadTemplateFile, deleteTemplate };
+  return { templates, isLoading, refresh: fetchTemplates, saveTemplate, deleteTemplate };
 }
 
 export function useAdminBigDay() {

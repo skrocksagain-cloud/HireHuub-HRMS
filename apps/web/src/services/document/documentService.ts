@@ -11,7 +11,7 @@ export interface DocumentMetadataService {
   update(id: string, documentData: Partial<Document>): Promise<void>;
   getById(id: string): Promise<Document | null>;
   getByDocumentId(documentId: string): Promise<Document | null>;
-  getAll(): Promise<Document[]>;
+  getAllGlobally(actorRole: string): Promise<Document[]>;
   getByModule(module: Document['module']): Promise<Document[]>;
   getByReference(referenceId: string): Promise<Document[]>;
   archive(id: string): Promise<void>;
@@ -42,24 +42,23 @@ export const documentService: DocumentMetadataService = {
   },
 
   async getByDocumentId(documentId) {
-    const list = await documentCenterRepository.getDocuments();
-    const found = list.find((d) => d.documentId === documentId);
-    return (found as unknown as Document) || null;
+    const list = await documentCenterRepository.getDocuments({ documentId });
+    return (list[0] as unknown as Document) || null;
   },
 
-  async getAll() {
-    const list = await documentCenterRepository.getDocuments();
+  async getAllGlobally(actorRole: string) {
+    const list = await documentCenterRepository.getAllDocumentsGlobally(actorRole);
     return list as unknown as Document[];
   },
 
   async getByModule(module) {
-    const list = await documentCenterRepository.getDocuments();
-    return list.filter((d) => (d.module as string) === module) as unknown as Document[];
+    const list = await documentCenterRepository.getDocuments({ module: module as any });
+    return list as unknown as Document[];
   },
 
   async getByReference(referenceId) {
-    const list = await documentCenterRepository.getDocuments();
-    return list.filter((d) => (d as unknown as { referenceId?: string }).referenceId === referenceId) as unknown as Document[];
+    const list = await documentCenterRepository.getDocuments({ referenceId });
+    return list as unknown as Document[];
   },
 
   async archive(id) {
@@ -96,7 +95,7 @@ export const createDocument = documentService.create;
 export const updateDocument = documentService.update;
 export const getDocumentById = documentService.getById;
 export const getDocumentByNumber = documentService.getByDocumentId;
-export const getDocuments = documentService.getAll;
+export const getAllDocumentsGlobally = documentService.getAllGlobally;
 export const getDocumentsByModule = documentService.getByModule;
 export const getDocumentsByReference = documentService.getByReference;
 export const archiveDocument = documentService.archive;

@@ -57,7 +57,7 @@ class OfferRepository {
 
   async getNextOfferNumber(): Promise<string> {
     const company = await adminService.getCompanySettings();
-    if (!company.offerPrefix?.trim()) {
+    if (!company || !company.offerPrefix?.trim()) {
       throw new Error('Administration → Company Settings is missing the offer prefix.');
     }
     const year = new Date().getFullYear();

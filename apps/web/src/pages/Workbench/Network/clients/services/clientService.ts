@@ -21,6 +21,17 @@ const validateClientInput = (input: CreateClientInput): void => {
   if (!input.gstin.trim()) throw new Error('GSTIN is required.');
   if (!input.state.trim()) throw new Error('State is required.');
   if (!input.invoiceConfig.templateReference.trim()) throw new Error('Invoice Template Reference is required.');
+
+  if (input.commercial?.type === 'OTS') {
+    const tenure = input.commercial.tenureCondition;
+    if (tenure === undefined || tenure === null || (typeof tenure === 'string' && (tenure as string).trim() === '')) {
+      throw new Error('Tenure Condition is required for OTS clients.');
+    }
+    const num = typeof tenure === 'number' ? tenure : Number(tenure);
+    if (isNaN(num) || !Number.isInteger(num) || num < 1) {
+      throw new Error('Tenure Condition must be a valid whole number of at least 1 day.');
+    }
+  }
 };
 
 class ClientService {

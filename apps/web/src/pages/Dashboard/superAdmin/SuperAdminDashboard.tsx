@@ -19,7 +19,7 @@ interface WorkspaceDashboardProps {
 export default function SuperAdminDashboard({ dashboard }: WorkspaceDashboardProps) {
   return (
     <div className="space-y-6">
-      <LiveStatusStrip />
+      <LiveStatusStrip metrics={dashboard.statusMetrics} />
       <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Executive Management & Governance" designation="Super Admin" />
       <FavoritesBar />
 

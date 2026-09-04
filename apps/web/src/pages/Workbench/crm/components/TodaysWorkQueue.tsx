@@ -4,14 +4,13 @@ import type { Candidate } from '../types/crm';
 interface TodaysWorkQueueProps {
   queue: Candidate[];
   onSelectCandidate: (candidate: Candidate) => void;
-  onQuickUpdate: (candidate: Candidate) => void;
 }
 
-export default function TodaysWorkQueue({ queue, onSelectCandidate, onQuickUpdate }: TodaysWorkQueueProps) {
+export default function TodaysWorkQueue({ queue, onSelectCandidate }: TodaysWorkQueueProps) {
   const today = new Date().toISOString().split('T')[0];
 
   const getPriorityBadge = (c: Candidate) => {
-    if (c.followUpDate && c.followUpDate < today && c.status !== 'Active' && c.status !== 'Inactive') {
+    if (c.followUpDate && c.followUpDate < today && c.currentCrmStatus !== 'Active' && c.currentCrmStatus !== 'Inactive') {
       return (
         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
           <AlertTriangle size={10} /> Overdue
@@ -25,7 +24,7 @@ export default function TodaysWorkQueue({ queue, onSelectCandidate, onQuickUpdat
         </span>
       );
     }
-    if (c.interviewDate === today && c.status === 'Line Up') {
+    if (c.interviewDate === today && c.currentCrmStatus === 'Line Up') {
       return (
         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
           <UserCheck size={10} /> Today's Interview
@@ -34,7 +33,7 @@ export default function TodaysWorkQueue({ queue, onSelectCandidate, onQuickUpdat
     }
     return (
       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-        <Sparkles size={10} /> New Assignment
+        <Sparkles size={10} /> New Lead
       </span>
     );
   };
@@ -66,7 +65,7 @@ export default function TodaysWorkQueue({ queue, onSelectCandidate, onQuickUpdat
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   {getPriorityBadge(cand)}
-                  <span className="text-[10px] font-mono text-slate-400">{cand.id}</span>
+                  <span className="text-[10px] font-mono text-slate-400"></span>
                 </div>
 
                 <button
@@ -90,10 +89,10 @@ export default function TodaysWorkQueue({ queue, onSelectCandidate, onQuickUpdat
                 <span className="text-[10px] text-slate-400">Recruiter: {cand.assignedRecruiterName.split(' ')[0]}</span>
                 <button
                   type="button"
-                  onClick={() => onQuickUpdate(cand)}
-                  className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  onClick={() => onSelectCandidate(cand)}
+                  className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
                 >
-                  <PhoneCall size={10} /> Quick Update
+                  <PhoneCall size={10} /> Call
                 </button>
               </div>
             </div>

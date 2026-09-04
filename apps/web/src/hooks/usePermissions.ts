@@ -3,7 +3,8 @@ import { permissionService, type NavigationItem } from '../core/permissions/perm
 import type { RoleItem } from '../types/Admin';
 import { useAuth } from '../context/AuthContext';
 
-export function usePermissions(currentRole?: RoleItem | string) {
+
+export function usePermissions(_currentRole?: RoleItem | string) {
   const { user } = useAuth();
   const [simulatedRole, setSimulatedRoleState] = useState<RoleItem | null>(permissionService.getSimulatedRole());
 
@@ -12,11 +13,13 @@ export function usePermissions(currentRole?: RoleItem | string) {
     setSimulatedRoleState(role);
   }, []);
 
-  const effectiveRoleInput = currentRole ?? user?.role;
+  const employee = user as any;
 
+  // We hack the department and assignedRole into the string if it's string. But we're just making a synthetic RoleItem.
   const activeRole = useMemo(() => {
-    return permissionService.getEffectiveRole(effectiveRoleInput);
-  }, [effectiveRoleInput, simulatedRole?.id]);
+    if (simulatedRole) return simulatedRole;
+    return permissionService.getEffectiveRole(employee?.assignedRole || employee?.role, employee?.department);
+  }, [employee, simulatedRole]);
 
   const canAccessModule = useCallback(
     (moduleKey: string) => permissionService.canAccessModule(activeRole, moduleKey),
@@ -85,6 +88,8 @@ export function usePermissions(currentRole?: RoleItem | string) {
     [activeRole]
   );
 
+  const isSuperAdmin = useMemo(() => permissionService.isSuperAdmin(activeRole), [activeRole]);
+
   const visibleModules = useMemo(() => permissionService.getVisibleModules(activeRole), [activeRole]);
   const visibleNavigation: NavigationItem[] = useMemo(() => permissionService.getVisibleNavigation(activeRole), [activeRole]);
   const dashboardWidgets = useMemo(() => permissionService.getDashboardWidgets(activeRole), [activeRole]);
@@ -131,6 +136,7 @@ export function usePermissions(currentRole?: RoleItem | string) {
     canGenerateDocument,
     canManage,
     isFeatureEnabled,
+    isSuperAdmin,
     visibleModules,
     visibleNavigation,
     dashboardWidgets,

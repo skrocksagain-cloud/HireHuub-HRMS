@@ -1,9 +1,11 @@
 import { Timestamp } from 'firebase/firestore';
 
 import { transactionRepository } from '../repositories/transactionRepository';
-import { invoiceNumberService } from '../../../../services/numbering/invoiceNumberService';
+import type { FinanceAuthorizationContext } from '../../../../core/authorization/financeAuthorization';
 import type {
   AssociatePartner,
+  AssociatePartnerPayout,
+  ConsolidatedPaymentHistoryItem,
   ExpenseCategory,
   ExpenseLedgerEntry,
   ExpenseTransaction,
@@ -11,33 +13,8 @@ import type {
   ExpenseTransactionStatusHistoryEntry,
   PaymentSource,
   RecordExpenseInput,
+  RecruiterIncentivePayout,
 } from '../../../../types/Transaction';
-
-const DEFAULT_EXPENSE_TYPES = [
-  'Recruiter Incentive',
-  'Associate Partner Payment',
-  'Salary',
-  'Office Rent',
-  'Internet',
-  'Electricity',
-  'Travel',
-  'Food & Refreshment',
-  'Stationery',
-  'Software Subscription',
-  'Marketing',
-  'Recruitment Expense',
-  'Training',
-  'Miscellaneous',
-];
-
-const DEFAULT_FINANCE_ACCOUNTS = [
-  'HDFC Current Account',
-  'ICICI Current Account',
-  'Axis Bank Current Account',
-  'Cash',
-  'Petty Cash',
-  'UPI Collection Account',
-];
 
 const validateDate = (value: string, label: string): void => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00`))) {
@@ -61,23 +38,11 @@ const validateExpense = (input: RecordExpenseInput): void => {
 
 class TransactionService {
   async getExpenseCategoriesList(): Promise<string[]> {
-    try {
-      const config = await transactionRepository.getExpenseCategories();
-      const active = config.filter((c) => c.isActive).map((c) => c.name);
-      return active.length > 0 ? active : DEFAULT_EXPENSE_TYPES;
-    } catch {
-      return DEFAULT_EXPENSE_TYPES;
-    }
+    return (await transactionRepository.getExpenseCategories()).filter((c) => c.isActive).map((c) => c.name);
   }
 
   async getFinanceAccountsList(): Promise<string[]> {
-    try {
-      const sources = await transactionRepository.getPaymentSources();
-      const active = sources.filter((s) => s.isActive).map((s) => s.name);
-      return active.length > 0 ? active : DEFAULT_FINANCE_ACCOUNTS;
-    } catch {
-      return DEFAULT_FINANCE_ACCOUNTS;
-    }
+    return (await transactionRepository.getPaymentSources()).filter((s) => s.isActive).map((s) => s.name);
   }
 
   async getConfiguration(): Promise<{ expenseCategories: ExpenseCategory[]; paymentSources: PaymentSource[] }> {
@@ -96,26 +61,24 @@ class TransactionService {
     return partners.filter((partner) => partner.isActive);
   }
 
-  async previewNextExpenseNumber(knownCount = 0): Promise<string> {
-    return invoiceNumberService.previewNextExpenseNumber(knownCount);
+  async previewNextExpenseNumber(): Promise<string> {
+    return 'Auto-generated on save';
   }
 
   async recordExpense(input: RecordExpenseInput, createdBy: string): Promise<string> {
     validateExpense(input);
     if (!createdBy.trim()) throw new Error('Transaction creator is required.');
 
-    const dateObj = new Date(`${input.transactionDate}T00:00:00`);
-    const expenseNumber = input.expenseNumber || await invoiceNumberService.previewNextExpenseNumber(0, dateObj);
     const isManagement = input.paidFrom === 'Management';
 
     return transactionRepository.createDraftExpense({
-      expenseNumber,
-      transactionNumber: expenseNumber,
+      expenseNumber: '', // ignored
+      transactionNumber: '', // ignored
       transactionDate: input.transactionDate,
-      expenseCategoryId: input.expenseCategoryId || 'cat-gen',
+      expenseCategoryId: input.expenseCategoryId,
       expenseCategoryName: input.expenseType,
       expenseType: input.expenseType,
-      paidFromId: input.paidFromId || 'acc-gen',
+      paidFromId: input.paidFromId,
       paidFromName: input.paidFrom,
       paidFrom: input.paidFrom,
       paidById: isManagement ? input.paidById : undefined,
@@ -170,13 +133,19 @@ class TransactionService {
     ]);
   }
 
-  async getExpenseHistory(): Promise<ExpenseTransaction[]> {
-    return transactionRepository.getExpenseTransactions();
+  async getExpenseHistory(actor: FinanceAuthorizationContext): Promise<ExpenseTransaction[]> {
+    return transactionRepository.getExpenseTransactions(actor);
   }
 
-  async getLedger(): Promise<ExpenseLedgerEntry[]> {
-    return transactionRepository.getLedgerEntries();
+  async getLedger(actor: FinanceAuthorizationContext): Promise<ExpenseLedgerEntry[]> {
+    return transactionRepository.getLedgerEntries(actor);
   }
+
+  async getRecruiterPayouts(actor: FinanceAuthorizationContext): Promise<RecruiterIncentivePayout[]> { return transactionRepository.getRecruiterPayouts(actor); }
+  async getAssociatePartnerPayouts(actor: FinanceAuthorizationContext): Promise<AssociatePartnerPayout[]> { return transactionRepository.getAssociatePartnerPayouts(actor); }
+  async getPaymentHistory(actor: FinanceAuthorizationContext): Promise<ConsolidatedPaymentHistoryItem[]> { return transactionRepository.getPaymentHistory(actor); }
+  async updateRecruiterPayoutStatus(id: string, status: RecruiterIncentivePayout['status'], actor: string): Promise<void> { await transactionRepository.updateRecruiterPayoutStatus(id, status, actor); }
+  async updateAssociatePartnerPayoutStatus(id: string, status: AssociatePartnerPayout['status'], actor: string): Promise<void> { await transactionRepository.updateAssociatePartnerPayoutStatus(id, status, actor); }
 
   private statusEntry(status: ExpenseTransactionStatus, changedBy: string, remarks: string): ExpenseTransactionStatusHistoryEntry {
     return { status, changedAt: Timestamp.now(), changedBy, remarks };

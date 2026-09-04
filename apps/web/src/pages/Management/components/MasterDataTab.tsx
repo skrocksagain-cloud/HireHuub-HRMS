@@ -8,24 +8,10 @@ export default function MasterDataTab() {
   const [statusMsg, setStatusMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [form, setForm] = useState<MasterDataConfig>(
-    masterData || {
-      employeePrefix: 'HH',
-      invoicePrefix: 'HH2026-',
-      documentPrefix: 'DOC-',
-      offerPrefix: 'OFF-',
-      leaveTypes: ['Casual Leave', 'Sick Leave', 'Earned Leave', 'Maternity Leave', 'Paternity Leave', 'Loss of Pay'],
-      employmentTypes: ['Full-Time', 'Part-Time', 'Contract', 'Intern', 'Probation'],
-      bloodGroups: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
-      genderOptions: ['Male', 'Female', 'Non-Binary', 'Prefer not to say'],
-      states: ['Maharashtra', 'Karnataka', 'Delhi', 'Tamil Nadu', 'Telangana', 'Gujarat'],
-      cities: ['Pune', 'Bengaluru', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai'],
-      countries: ['India', 'United States', 'United Kingdom', 'Singapore', 'UAE'],
-      currencies: ['INR', 'USD', 'EUR', 'GBP', 'AED'],
-      taxRates: [0, 5, 12, 18, 28],
-      financialYears: ['2024-2025', '2025-2026', '2026-2027'],
-    }
-  );
+  const [form, setForm] = useState<MasterDataConfig>(masterData || {
+    employeePrefix: '', invoicePrefix: '', documentPrefix: '', offerPrefix: '', leaveTypes: [], employmentTypes: [],
+    bloodGroups: [], genderOptions: [], states: [], cities: [], countries: [], currencies: [], taxRates: [], financialYears: [],
+  });
 
   if (masterData && form.employeePrefix !== masterData.employeePrefix && !isSaving) {
     setForm(masterData);

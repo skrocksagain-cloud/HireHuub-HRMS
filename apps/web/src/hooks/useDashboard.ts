@@ -13,7 +13,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
 
   const [serverTime, setServerTime] = useState<ServerTimeInfo>(dashboardService.getServerTimeInfo());
   const [attendance, setAttendance] = useState<DashboardAttendanceRecord | null>(null);
-  const [leaveBalance, setLeaveBalance] = useState<{ remainingDays: number; label: string }>({ remainingDays: 12, label: '12 Days Remaining' });
+  const [leaveBalance, setLeaveBalance] = useState<{ remainingDays: number; label: string }>({ remainingDays: 0, label: '0 Days Remaining' });
   const [kpis, setKpis] = useState<DepartmentKpiSnapshot[]>([]);
   const [ranking, setRanking] = useState<UserRankingInfo>(dashboardService.getUserRanking(activeRole));
   const [preferences, setPreferences] = useState<UserDashboardPreference | null>(null);
@@ -21,6 +21,14 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
   const [notifications, setNotifications] = useState<DashboardNotificationItem[]>([]);
   const [recentActivities, setRecentActivities] = useState<{ id: string; title: string; description: string; timestamp: string; category: string }[]>([]);
+  const [statusMetrics, setStatusMetrics] = useState({
+    workingToday: 0,
+    present: 0,
+    onLeave: 0,
+    meetingsToday: 0,
+    birthdays: 0,
+    pendingApprovals: 0,
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Synchronized Server Time Clock (updates every minute)
@@ -35,13 +43,14 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [todayAtt, pref, cal, ann, notifs, audit] = await Promise.all([
+      const [todayAtt, pref, cal, ann, notifs, audit, liveMetrics] = await Promise.all([
         dashboardService.getTodayAttendance(effectiveUserId),
         dashboardService.getUserPreferences(effectiveUserId),
         dashboardRepository.getCalendarEvents(),
         dashboardRepository.getAnnouncements(),
         dashboardRepository.getNotifications(effectiveUserId),
         dashboardRepository.getRecentAuditLogs(10),
+        dashboardService.getLiveStatusMetrics(),
       ]);
 
       setAttendance(todayAtt);
@@ -50,6 +59,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
       setAnnouncements(ann);
       setNotifications(notifs);
       setRecentActivities(audit);
+      setStatusMetrics(liveMetrics);
       setKpis(dashboardService.getDepartmentKPIs(activeRole));
       setRanking(dashboardService.getUserRanking(activeRole));
 
@@ -92,16 +102,16 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   };
 
   // Compute live duration timer if signed in
-  const isSuperAdmin = activeRole.permissions.includes('*') || activeRole.name === 'Super Admin';
+  const { isSuperAdmin } = usePermissions();
   const isSignedIn = !!attendance && attendance.status === 'Present';
   const isSignedOut = !!attendance && attendance.status === 'SignedOut';
 
   let workingDurationFormatted = '0h 0m';
-  let expectedLogoutTime = '06:30 PM';
+  let expectedLogoutTime = '--:--';
 
   if (attendance && attendance.signInTime) {
-    expectedLogoutTime = '06:30 PM'; // Standard 9-hour shift
-    workingDurationFormatted = isSignedIn ? '4h 15m' : '8h 30m';
+    expectedLogoutTime = '06:30 PM';
+    workingDurationFormatted = isSignedIn ? 'Active' : 'Finalized';
   }
 
   const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
@@ -123,6 +133,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
     notifications,
     unreadNotificationCount,
     recentActivities,
+    statusMetrics,
     isLoading,
     refresh: loadDashboardData,
     signIn: handleSignIn,

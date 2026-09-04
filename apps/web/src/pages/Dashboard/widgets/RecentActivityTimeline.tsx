@@ -8,39 +8,7 @@ interface RecentActivityTimelineProps {
 }
 
 export default function RecentActivityTimeline({ activities }: RecentActivityTimelineProps) {
-  const defaultActivities = [
-    {
-      id: 'act-1',
-      title: 'New Client Onboarded',
-      description: 'Acme Tech Solutions registered in Workbench Network',
-      timestamp: '25 mins ago',
-      category: 'Client' as ActivityCategory,
-    },
-    {
-      id: 'act-2',
-      title: 'Invoice #HH2026-0004 Generated',
-      description: 'Monthly staffing bill generated for Apex Systems (₹3.4L)',
-      timestamp: '1 hour ago',
-      category: 'Finance' as ActivityCategory,
-    },
-    {
-      id: 'act-3',
-      title: 'Offer Letter Released',
-      description: 'Offer sent to Senior Frontend Engineer candidate',
-      timestamp: '3 hours ago',
-      category: 'Employee' as ActivityCategory,
-    },
-    {
-      id: 'act-4',
-      title: 'Casual Leave Approved',
-      description: 'Leave approved for Amit Kumar (2 Days)',
-      timestamp: '5 hours ago',
-      category: 'Employee' as ActivityCategory,
-    },
-  ];
-
-  const rawList = activities.length > 0 ? activities : defaultActivities;
-  const list = rawList.map((a) => ({
+  const list = activities.map((a) => ({
     ...a,
     category: (['Finance', 'Network', 'Management', 'Employee', 'Client'].includes(a.category)
       ? a.category
@@ -57,7 +25,13 @@ export default function RecentActivityTimeline({ activities }: RecentActivityTim
         <span className="text-[10px] text-slate-400 font-mono">Live Audit Feed</span>
       </div>
 
-      <Timeline items={list} />
+      {list.length === 0 ? (
+        <div className="py-8 text-center text-slate-400 text-xs font-medium">
+          No activity available.
+        </div>
+      ) : (
+        <Timeline items={list} />
+      )}
     </div>
   );
 }
