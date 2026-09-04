@@ -138,10 +138,10 @@ class DashboardService {
   /**
    * Get Department KPIs filtered by Role & Scope
    */
-  getDepartmentKPIs(role?: any | string): DepartmentKpiSnapshot[] {
-    const active = true;
+  getDepartmentKPIs(role?: string): DepartmentKpiSnapshot[] {
+    const roleName = role || 'User';
 
-    if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) {
+    if (roleName === 'Super Admin') {
       return [
         { title: 'Total Active Candidates', value: 0, subtext: '0 Staffing + 0 OTS', change: '0%', trend: 'neutral' },
         { title: 'Org Revenue (MTD)', value: '₹0', subtext: '₹0 Pending Collections', change: '0%', trend: 'neutral' },
@@ -150,7 +150,7 @@ class DashboardService {
       ];
     }
 
-    if (true) {
+    if (roleName === 'Master Admin') {
       return [
         { title: 'Active Candidates', value: 0, subtext: '0 joining this week', change: '0%', trend: 'neutral' },
         { title: 'Recruiter Points', value: '0 pts', subtext: 'Target: 0 pts', change: '0%', trend: 'neutral' },
@@ -159,7 +159,7 @@ class DashboardService {
       ];
     }
 
-    if (true) {
+    if (roleName === 'Admin') {
       return [
         { title: 'Revenue MTD', value: '₹0', subtext: 'Billing Goal: ₹0', change: '0%', trend: 'neutral' },
         { title: 'GST Liability', value: '₹0', subtext: 'No pending filing', change: 'Optimal', trend: 'neutral' },
@@ -179,10 +179,10 @@ class DashboardService {
   /**
    * Get User Ranking according to strict Enterprise Scope rules
    */
-  getUserRanking(role?: any | string): UserRankingInfo {
-    const active = true;
+  getUserRanking(role?: string): UserRankingInfo {
+    const roleName = role || 'User';
 
-    if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) {
+    if (roleName === 'Super Admin') {
       return {
         rank: 0,
         totalParticipants: 0,
@@ -193,7 +193,7 @@ class DashboardService {
       };
     }
 
-    if (active.viewScope === 'Departments' || active.name.includes('Admin')) {
+    if (roleName === 'Master Admin') {
       return {
         rank: 0,
         totalParticipants: 0,
@@ -204,7 +204,7 @@ class DashboardService {
       };
     }
 
-    if (active.viewScope === 'Teams' || active.reportingScope === 'OwnTeam') {
+    if (roleName === 'Admin') {
       return {
         rank: 0,
         totalParticipants: 0,
@@ -215,7 +215,7 @@ class DashboardService {
       };
     }
 
-    // Default Recruiter / Employee (OWN RANK ONLY, never expose others)
+    // Default User (OWN RANK ONLY, never expose others)
     return {
       rank: 0,
       totalParticipants: 0,

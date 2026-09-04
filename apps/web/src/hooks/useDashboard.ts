@@ -10,12 +10,13 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
 
   const effectiveUserId = currentUserId || user?.employeeId || user?.id || '';
   const effectiveUserName = currentUserName || user?.name || 'Somnath';
+  const roleName = activeRole?.name || 'User';
 
   const [serverTime, setServerTime] = useState<ServerTimeInfo>(dashboardService.getServerTimeInfo());
   const [attendance, setAttendance] = useState<DashboardAttendanceRecord | null>(null);
   const [leaveBalance, setLeaveBalance] = useState<{ remainingDays: number; label: string }>({ remainingDays: 0, label: '0 Days Remaining' });
   const [kpis, setKpis] = useState<DepartmentKpiSnapshot[]>([]);
-  const [ranking, setRanking] = useState<UserRankingInfo>(dashboardService.getUserRanking(activeRole));
+  const [ranking, setRanking] = useState<UserRankingInfo>(dashboardService.getUserRanking(roleName));
   const [preferences, setPreferences] = useState<UserDashboardPreference | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<DashboardCalendarEvent[]>([]);
   const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
@@ -60,8 +61,8 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
       setNotifications(notifs);
       setRecentActivities(audit);
       setStatusMetrics(liveMetrics);
-      setKpis(dashboardService.getDepartmentKPIs(activeRole));
-      setRanking(dashboardService.getUserRanking(activeRole));
+      setKpis(dashboardService.getDepartmentKPIs(roleName));
+      setRanking(dashboardService.getUserRanking(roleName));
 
       const leave = await dashboardService.getRemainingLeaveBalance(effectiveUserId);
       setLeaveBalance(leave);
@@ -70,7 +71,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [effectiveUserId, activeRole.id, activeRole.name]);
+  }, [effectiveUserId, roleName]);
 
   useEffect(() => {
     loadDashboardData();
