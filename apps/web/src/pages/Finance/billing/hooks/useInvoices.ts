@@ -113,7 +113,7 @@ export function useInvoices(actor: FinanceAuthorizationContext, defaultClientId?
     if (!hasWriteAccess) throw new Error('Permission Denied: Full Finance Access required to generate invoices.');
     const invoice = await invoiceService.getInvoice(invoiceId, actor);
     if (!invoice) throw new Error('Invoice not found.');
-    const client = await clientService.resolveClientBillingForState(invoice.clientId, selectedStateName);
+    const client = await clientService.resolveClientBillingForState(invoice.clientId, invoice.selectedStateName);
     const docInfo = await invoiceService.generate(invoiceId, {
       clientId: client.clientId,
       clientName: client.clientName,

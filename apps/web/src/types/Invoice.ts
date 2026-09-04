@@ -161,6 +161,7 @@ export interface Invoice {
   billOfMonth?: string;
   stationCode?: string;
   placeOfSupply?: string;
+  selectedStateName?: string;
   signatoryId?: string;
   signatorySnapshot?: InvoiceSignatorySnapshot;
   bankAccountId?: string;

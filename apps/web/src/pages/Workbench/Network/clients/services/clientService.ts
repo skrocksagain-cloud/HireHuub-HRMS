@@ -84,12 +84,15 @@ class ClientService {
       };
     }
 
-    const matchedRecord = selectedStateName
-      ? client.gstConfig.stateGstRecords.find((r) => r.stateName.toLowerCase() === selectedStateName.toLowerCase())
+    const normalizedSelectedState = selectedStateName?.trim().toLowerCase();
+    const matchedRecord = normalizedSelectedState
+      ? client.gstConfig.stateGstRecords.find((r) => r.stateName.toLowerCase() === normalizedSelectedState)
       : client.gstConfig.stateGstRecords.find((r) => r.isPrimary) ?? client.gstConfig.stateGstRecords[0];
 
     if (!matchedRecord) {
-      throw new Error(`GST record for state '${selectedStateName}' not found for client ${client.name}.`);
+      const requestedState = selectedStateName || '(none provided)';
+      const availableStateNames = availableStates.map((s) => s.stateName).join(', ');
+      throw new Error(`GST record for state '${requestedState}' not found for client ${client.name}. Available states: ${availableStateNames}`);
     }
 
     return {
