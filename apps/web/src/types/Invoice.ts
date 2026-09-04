@@ -28,6 +28,7 @@ export interface InvoiceLineItem extends InvoiceLineItemInput {
 export interface WorkbenchClientInvoiceData {
   clientId: string;
   clientName: string;
+  billingName?: string;
   gstin: string;
   billingAddress: BillingAddress;
   billingState: string;
@@ -50,6 +51,7 @@ export interface InvoiceCompanySnapshot {
 export interface InvoiceClientSnapshot {
   clientId: string;
   clientName: string;
+  billingName?: string;
   gstin: string;
   billingAddress: BillingAddress;
   billingState: string;

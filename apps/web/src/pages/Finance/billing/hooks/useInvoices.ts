@@ -117,6 +117,7 @@ export function useInvoices(actor: FinanceAuthorizationContext, defaultClientId?
     const docInfo = await invoiceService.generate(invoiceId, {
       clientId: client.clientId,
       clientName: client.clientName,
+      billingName: client.billingName,
       gstin: client.gstin,
       billingAddress: client.billingAddress,
       billingState: client.billingState,

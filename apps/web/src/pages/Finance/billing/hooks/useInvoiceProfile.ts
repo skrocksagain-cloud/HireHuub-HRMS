@@ -111,19 +111,14 @@ export function useInvoiceProfile(invoiceId: string | undefined, actor: FinanceA
     setActionError('');
     setActionSuccess('');
     try {
-      const fetchedClient = await clientService.getClientById(invoice.clientId);
-      if (!fetchedClient) throw new Error('Invoice generation requires an active client record from Workbench.');
-      const primaryGst = (fetchedClient as any).gstinRecords?.[0];
-      const billingAddress = primaryGst?.billingAddress || fetchedClient.billingAddress;
-      const gstin = primaryGst?.gstin || fetchedClient.gstin;
-      const billingState = primaryGst?.stateName || billingAddress?.state;
-      if (!fetchedClient.name || !gstin || !billingAddress?.line1 || !billingState) {
-        throw new Error('Invoice generation requires complete client GST and billing-address data in Workbench.');
-      }
+      const resolved = await clientService.resolveClientBillingForState(invoice.clientId, invoice.selectedStateName);
       const clientPayload = {
-        clientId: fetchedClient.id, clientName: fetchedClient.name, gstin,
-        billingAddress: { line1: billingAddress.line1, line2: billingAddress.line2 || '', city: billingAddress.city || '', state: billingAddress.state || '', postalCode: billingAddress.postalCode || '', country: billingAddress.country || '' },
-        billingState,
+        clientId: resolved.clientId,
+        clientName: resolved.clientName,
+        billingName: resolved.billingName,
+        gstin: resolved.gstin,
+        billingAddress: resolved.billingAddress,
+        billingState: resolved.billingState,
       };
 
       const docStorage = await invoiceService.generate(invoiceId, clientPayload, actorName, actor);
