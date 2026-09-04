@@ -22,14 +22,12 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from 'lucide-react';
-
 import DashboardLayout from '../../../../../layouts/DashboardLayout';
 import StatusBadge from '../../../../../ui/StatusBadge';
 import KpiCard from '../../../../../ui/KpiCard';
 import Drawer from '../../../../../ui/Drawer';
 import { useClientProfile } from '../hooks/useClients';
 import { formatTenureCondition } from '../../../../../types/ClientCommercial';
-import { useAuth } from '../../../../../context/AuthContext';
 import type { StateGSTRecord } from '../../../../../types/ClientGST';
 import type { ClientSPOC, SpocRole, SpocScope } from '../../../../../types/ClientSPOC';
 
@@ -57,10 +55,9 @@ export default function ClientProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { client, loading, error, updateProfile } = useClientProfile(id);
-  const { user } = useAuth();
 
   // Role derived from authentication context
-  const activeRole = true;
+  const activeRole: any = null;  // Placeholder for future authorization implementation
   const [activeTab, setActiveTab] = useState<'overview' | 'highlights' | 'commercial' | 'spocs' | 'finance' | 'gst' | 'templates' | 'recruitment' | 'history'>('overview');
 
   // Edit State

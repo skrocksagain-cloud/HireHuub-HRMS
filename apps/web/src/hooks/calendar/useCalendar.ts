@@ -56,7 +56,7 @@ export function useCalendar(currentUserId = 'HH0001', currentUserName = 'Somnath
       unsubscribeEvents();
       unsubscribeHolidays();
     };
-  }, [activeRole.id, activeRole.name, currentUserId]);
+  }, [activeRole.name, currentUserId]);
 
   const uploadAttachment = async (file: File, meetingId: string): Promise<CalendarAttachmentMetadata> => {
     setIsUploading(true);

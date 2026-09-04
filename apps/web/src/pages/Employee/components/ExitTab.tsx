@@ -74,9 +74,9 @@ export default function ExitTab({ employee, onRefresh }: ExitTabProps) {
 
   // "Admin -> Team", "Master Admin -> Department", "Super Admin -> All"
   // handled by canApprove hook, but here we can check the exit scope specifically.
-  // Using canApprove('Employees', employee.departmentId, employee.id) to check scope
-  const canApproveOrManageExit = isSuperAdmin || isManager || canApprove('Employees', employee.departmentId, employee.id);
-  const canGenerateRelieving = isSuperAdmin || canApprove('Employees', employee.departmentId, employee.id);
+  // Using canApprove('Employees') to check scope
+  const canApproveOrManageExit = isSuperAdmin || isManager || canApprove('Employees');
+  const canGenerateRelieving = isSuperAdmin || canApprove('Employees');
 
   // Eligibility calculation for Relieving Letter: Must have lastWorkingDate AND (Inactive | Terminated | Exit Completed)
   const hasValidExit =

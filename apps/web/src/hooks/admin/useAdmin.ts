@@ -11,7 +11,6 @@ import type {
   MasterDataConfig,
   NotificationSettings,
   PasswordResetRequest,
-  any,
   SecuritySettings,
   WorkflowRule,
   AdminAuditEntry,

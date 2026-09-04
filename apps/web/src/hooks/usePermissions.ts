@@ -21,7 +21,34 @@ function mapModuleToErpArea(moduleKey: string): ErpArea | null {
   return null;
 }
 
-export function usePermissions() {
+export function usePermissions(): {
+  authContext: AuthorizationContext;
+  activeRole: { name: string };
+  simulatedRole: { name: string } | null;
+  setSimulatedRole: () => void;
+  canAccessModule: (moduleKey: string) => boolean;
+  canAccessPage: (pageKey: string) => boolean;
+  canAccessRoute: (path: string) => boolean;
+  canView: (moduleKey: string) => boolean;
+  canCreate: (moduleKey: string) => boolean;
+  canEdit: (moduleKey: string) => boolean;
+  canDelete: (moduleKey: string) => boolean;
+  canApprove: (moduleKey: string) => boolean;
+  canReject: (moduleKey: string) => boolean;
+  canExport: (moduleKey: string) => boolean;
+  canGenerateDocument: (docType?: string) => boolean;
+  canManage: (moduleKey: string) => boolean;
+  isFeatureEnabled: () => boolean;
+  isSuperAdmin: boolean;
+  visibleModules: never[];
+  visibleNavigation: never[];
+  dashboardWidgets: never[];
+  landingModule: string;
+  getVisibleEmployees: <T,>(items: T[]) => T[];
+  getVisibleCandidates: <T,>(items: T[]) => T[];
+  getVisibleInvoices: <T,>(items: T[]) => T[];
+  getVisibleDocuments: <T,>(items: T[]) => T[];
+} {
   const { user } = useAuth();
 
   const authContext: AuthorizationContext = useMemo(() => ({
@@ -33,7 +60,7 @@ export function usePermissions() {
   }), [user]);
 
   const activeRole = useMemo(() => ({ name: user?.assignedRole || 'User' }), [user]);
-  const simulatedRole = null;
+  const simulatedRole: { name: string } | null = null;
   const setSimulatedRole = useCallback(() => {}, []);
   const visibleModules = useMemo(() => [], []);
   const visibleNavigation = useMemo(() => [], []);

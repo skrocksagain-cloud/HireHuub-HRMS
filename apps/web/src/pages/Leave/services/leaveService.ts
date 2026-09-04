@@ -70,7 +70,7 @@ class LeaveService {
         if (!validation.allowed) {
           throw new Error(validation.message || 'Sick Leave entitlement during probation is capped at 1 day total.');
         }
-      } else if (isRestrictedType && !['Super Admin', 'Super_Admin'].includes(actor.role?.assignedRole || actor.role?.role || actor.role?.name || '')) {
+      } else if (isRestrictedType && !['Super Admin', 'Super_Admin'].includes(actor.role)) {
         throw new Error('Casual and Paid Leaves during 90-day probation require Super Admin approval.');
       }
     }

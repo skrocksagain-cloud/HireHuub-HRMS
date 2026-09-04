@@ -51,7 +51,7 @@ export default function CrmFilters({
   activeEmployees = [] 
 }: CrmFiltersProps) {
   const scope = getAuthorizationScope(userAssignedRole || userRole);
-  const isTLOrAbove = scope !== 'SELF';
+  const isTLOrAbove = scope !== 'OWN';
 
   const resetFilters = () => {
     onFilterChange({

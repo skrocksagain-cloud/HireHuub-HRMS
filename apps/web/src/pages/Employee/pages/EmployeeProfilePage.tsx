@@ -69,13 +69,13 @@ export default function EmployeeProfilePage() {
 
   // Permission & Context Evaluation
   const fromSearch = searchParams.get('fromSearch') === 'true';
-  const userRole = user?.role || '';
+  const userRole = user?.role || user?.assignedRole || '';
   const currentUserId = user?.employeeId || user?.id || '';
   const targetId = employee?.employeeId || employee?.employeeCode || employee?.id || '';
 
   const isSelf = Boolean(currentUserId && (currentUserId === targetId || user?.email === employee?.email));
   const isHrOrAdmin =
-    ['Super Admin', 'Super_Admin'].includes(userRole?.assignedRole || userRole?.role || userRole?.name || '') ||
+    ['Super Admin', 'Super_Admin'].includes(userRole) ||
     userRole.toLowerCase().includes('admin') ||
     userRole.toLowerCase().includes('hr');
 

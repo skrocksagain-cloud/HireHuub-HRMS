@@ -18,7 +18,6 @@ import StatusBadge from '../../../../../ui/StatusBadge';
 import Drawer from '../../../../../ui/Drawer';
 import KpiCard from '../../../../../ui/KpiCard';
 import { useAssociatePartners } from '../hooks/useAssociatePartners';
-import { useAuth } from '../../../../../context/AuthContext';
 import { employeeService } from '../../../../Employee/services/employeeService';
 import { getIndianStates, getCitiesForState } from '../../../../../core/location/indiaLocationMaster';
 import type { AssociatePartnerType, CreateAssociatePartnerInput } from '../../../../../types/AssociatePartner';
@@ -27,10 +26,9 @@ import type { AssociatePartnerType, CreateAssociatePartnerInput } from '../../..
 export default function AssociatePartnersPage() {
   const navigate = useNavigate();
   const { partners, loading, error, createPartner } = useAssociatePartners();
-  const { user } = useAuth();
 
   // Role derived from authentication session
-  const activeRole = true;
+  const activeRole: any = null;  // Placeholder for future authorization implementation
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');

@@ -156,9 +156,8 @@ export default function AddCandidateDrawer({
     setFormError(null);
   };
 
-  const activeRole = true;
-  const viewScope = true.toLowerCase();
-  const isTLOrAbove = viewScope !== 'own' && viewScope !== 'restricted' && viewScope !== 'none';
+  // Default scope in bypass mode
+  const isTLOrAbove = false;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex justify-end">

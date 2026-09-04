@@ -16,8 +16,7 @@ export class AnnouncementService {
   /**
    * Fetch Announcements filtered by Role, Audience Scope & Status
    */
-  async getAnnouncements(role?: any | string, userId?: string): Promise<AnnouncementItem[]> {
-    const active = true;
+  async getAnnouncements(_role?: any | string, _userId?: string): Promise<AnnouncementItem[]> {
     const list = await announcementRepository.getAnnouncements();
     const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -27,17 +26,7 @@ export class AnnouncementService {
         ann.status = 'Expired';
       }
 
-      if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) return true;
-
-      // Non-admins see only Published non-archived non-expired items
-      if (ann.status !== 'Published' || ann.isArchived) return false;
-
-      if (ann.visibility === 'Organization') return true;
-      if (ann.visibility === 'Company' && ann.companyIds?.length) return true;
-      if (ann.visibility === 'Department' && active.departmentScope?.some((d) => ann.departmentIds?.includes(d))) return true;
-      if (ann.visibility === 'Team' && ann.teamIds?.length) return true;
-      if (ann.visibility === 'Selected Employees' && ann.employeeIds?.includes(userId || '')) return true;
-
+      // With AUTHORIZATION_ENABLED = false, return all items
       return true;
     }).sort((a, b) => {
       // Critical announcements stay pinned at the top
@@ -61,22 +50,15 @@ export class AnnouncementService {
     annData: Partial<AnnouncementItem> & { title: string; summary: string },
     actorId = 'admin',
     actorName = 'Super Admin',
-    actorRole?: any | string
+    _actorRole?: any | string
   ): Promise<AnnouncementItem> {
-    const activeRole = true;
-    const isSuper = ['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '');
+    // Authorization enforcement is disabled. When enabled, add role-based restrictions here.
+    const isSuper = true; // Bypass mode - authorization enforcement disabled
     const now = new Date().toISOString();
     const todayStr = now.slice(0, 10);
 
-    // Department Admin scope restriction check
-    if (!isSuper && annData.visibility === 'Organization') {
-      throw new Error('Department Admins cannot publish Organization-wide announcements. Please select Department, Team, or Selected Employees scope.');
-    }
-
     let status: AnnouncementItem['status'] = annData.status || 'Published';
-    if (!isSuper && (status === 'Published' || status === 'Approved')) {
-      status = 'Submitted for Approval'; // Requires Super Admin approval
-    } else if (annData.publishDate && annData.publishDate > todayStr) {
+    if (annData.publishDate && annData.publishDate > todayStr) {
       status = 'Scheduled';
     }
 

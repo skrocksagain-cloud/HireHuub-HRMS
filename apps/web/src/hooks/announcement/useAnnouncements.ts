@@ -36,7 +36,7 @@ export function useAnnouncements(currentUserId = 'HH0001', currentUserName = 'So
     } finally {
       setIsLoading(false);
     }
-  }, [activeRole.id, activeRole.name, currentUserId]);
+  }, [activeRole.name, currentUserId]);
 
   useEffect(() => {
     fetchAnnouncements();

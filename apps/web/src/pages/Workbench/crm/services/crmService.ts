@@ -1,5 +1,4 @@
 import type { Candidate, CandidateStatus, DuplicateCheckResult } from '../types/crm';
-import { permissionService } from '../../../../core/permissions/permissionService';
 import { crmRepository } from '../repositories/crmRepository';
 
 export interface CrmFilterState {
@@ -85,23 +84,12 @@ export class CrmService {
     const today = new Date().toISOString().split('T')[0];
 
     return candidates.filter((c) => {
-      // 1. Role-based Visibility Filter
-      const activeRole = permissionService.getEffectiveRole((currentUser as any).assignedRole || currentUser.role, (currentUser as any).department);
-      const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
-      
-      if (viewScope === 'restricted' || viewScope === 'none') {
-        return false;
-      } else if (viewScope === 'own' || viewScope === 'own and team') {
-        if (viewScope === 'own and team' && (currentUser as any).teamId) {
-          if (c.teamId !== (currentUser as any).teamId && c.assignedRecruiterId !== currentUser.id) return false;
-        } else {
-          if (c.assignedRecruiterId !== currentUser.id) return false;
-        }
-      } else if (viewScope === 'department' || viewScope === 'departments' || viewScope.includes('team')) {
-        if (c.assignedRecruiterId !== currentUser.id && c.teamId !== (currentUser as any).teamId && c.departmentId !== (currentUser as any).departmentId) return false;
-      }
+      // Authorization enforcement is disabled - bypass mode
+      // All candidates are accessible
 
-      // 2. Global Search (Name & Phone number)
+      // Business logic filtering follows below
+
+      // 1. Global Search (Name & Phone number)
       if (filters.searchQuery && filters.searchQuery.trim()) {
         const q = filters.searchQuery.trim().toLowerCase();
         const qDigits = q.replace(/\D/g, '');
@@ -113,7 +101,7 @@ export class CrmService {
         if (!matchesName && !matchesPhone && !matchesRole && !matchesCity && !matchesArea) return false;
       }
 
-      // 3. Quick Filters
+      // 2. Quick Filters
       if (filters.quickFilter === 'Assigned') {
         if (c.assignedRecruiterId !== currentUser.id) return false;
       } else if (filters.quickFilter === 'Today\'s Follow Up') {
@@ -136,7 +124,7 @@ export class CrmService {
         if (!c.lastCalledAt || !c.lastCalledAt.startsWith(today)) return false;
       }
 
-      // 4. Advanced Filters
+      // 3. Advanced Filters
       if (filters.status && filters.status !== 'All') {
          if (filters.status === 'Not Contacted') {
            if (c.currentCrmStatus !== null) return false;
@@ -261,56 +249,19 @@ export class CrmService {
   /**
    * Role-masked Duplicate Phone Check
    */
-  async checkDuplicatePhone(phone: string, userSession: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<DuplicateCheckResult> {
+  async checkDuplicatePhone(phone: string, _userSession: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<DuplicateCheckResult> {
     const candidate = await crmRepository.findDuplicateByPhone(phone);
     if (!candidate) {
       return { isDuplicate: false, isRestrictedView: false };
     }
 
-    const activeRole = permissionService.getEffectiveRole(userSession.assignedRole || userSession.role, userSession.department);
-    const viewScope = permissionService.getMatrixValue(activeRole, 'CRM', 'View').toLowerCase();
-    
-    // Check if user is allowed to view this specific candidate's info fully
-    let isRestricted = true;
-    if (permissionService.isSuperAdmin(activeRole)) {
-      isRestricted = false;
-    } else if (viewScope === 'all') {
-      isRestricted = false;
-    } else if (viewScope.includes('department') && candidate.departmentId === userSession.departmentId) {
-      isRestricted = false;
-    } else if (viewScope.includes('team') && candidate.teamId === userSession.teamId) {
-      isRestricted = false;
-    } else if ((viewScope === 'own' || viewScope === 'own and team') && candidate.assignedRecruiterId === userSession.id) {
-      isRestricted = false;
-    }
+    // Authorization enforcement is disabled - bypass mode
+    // All candidates are visible without restriction
+    const isRestricted = false;
 
     return {
       isDuplicate: true,
-      existingCandidate: isRestricted
-        ? {
-            // Masked candidate details for Restricted view
-            id: candidate.id,
-            name: 'Candidate already exists',
-            phone: '**********',
-            area: '***',
-            city: '***',
-            role: '***',
-            currentCrmStatus: 'Interested',
-            assignedRecruiterId: '***',
-            assignedRecruiterName: '***',
-            source: candidate.source,
-            sourceHistory: [],
-            phoneHistory: [],
-            placementHistory: [],
-            documents: [],
-            attachments: [],
-            systemAudit: [],
-            isBlacklisted: false,
-            callsCount: 0,
-            createdAt: candidate.createdAt,
-            updatedAt: candidate.updatedAt,
-          }
-        : candidate,
+      existingCandidate: candidate,
       isRestrictedView: isRestricted,
     };
   }

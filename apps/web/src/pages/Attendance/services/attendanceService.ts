@@ -199,7 +199,7 @@ class AttendanceService {
     const isManagerRole =
       actor.role.toLowerCase().includes('manager') || actor.role.toLowerCase().includes('lead');
     const isAdminRole =
-      actor.role.toLowerCase().includes('admin') || ['Super Admin', 'Super_Admin'].includes(actor.role?.assignedRole || actor.role?.role || actor.role?.name || '');
+      actor.role.toLowerCase().includes('admin') || ['Super Admin', 'Super_Admin'].includes(actor.role);
 
     if (input.decision === 'Rejected') {
       // Rejection at any stage

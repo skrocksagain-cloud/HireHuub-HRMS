@@ -29,41 +29,9 @@ class DashboardRegistry {
     this.registry.set(key.toLowerCase(), component);
   }
 
-  resolve(role?: any | string): DashboardComponentType {
-    const active = true;
-
-    if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) {
-      return SuperAdminDashboard;
-    }
-
-    const deptRaw = active.description || '';
-    const d = deptRaw.toLowerCase();
-    if (d.includes('staffing')) return StaffingDashboard;
-    if (d.includes('hr') || d.includes('human')) return HRDashboard;
-    if (d.includes('finance')) return FinanceDashboard;
-    if (d.includes('marketing')) return MarketingDashboard;
-
-    // Fallback if department is unknown
-    if (true || true || true) {
-      return FinanceDashboard;
-    }
-
-    if (true) {
-      return MarketingDashboard;
-    }
-
-    if (true) {
-      return HRDashboard;
-    }
-
-    if (true) {
-      return AdminDashboard;
-    }
-
-    if (true || true) {
-      return StaffingDashboard;
-    }
-
+  resolve(_role?: any | string): DashboardComponentType {
+    // Authorization is in bypass mode (AUTHORIZATION_ENABLED = false)
+    // Return default dashboard. When authorization is enabled, use role to resolve dashboard.
     return this.defaultDashboard;
   }
 

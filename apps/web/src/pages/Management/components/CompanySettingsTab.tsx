@@ -64,7 +64,7 @@ export default function CompanySettingsTab() {
   const { isSuperAdmin: checkSuper, activeRole } = usePermissions();
 
   // Super Admin check: admin management roles or default super admin
-  const isSuperAdmin = checkSuper || activeRole?.name === 'Super Admin' || activeRole?.id === 'super_admin' || true;
+  const isSuperAdmin = checkSuper || activeRole?.name === 'Super Admin';
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

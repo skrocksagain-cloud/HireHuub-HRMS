@@ -9,7 +9,7 @@ import type {
   CalendarInvitationItem,
   HolidayItem,
 } from '../../types/Calendar';
-import type { HierarchyNode, any } from '../../types/Admin';
+import type { HierarchyNode } from '../../types/Admin';
 import { resolveAudienceEmployeeIds } from '../audience/audienceService';
 
 export interface AvailabilityWarning {
@@ -45,21 +45,12 @@ class CalendarService {
   /**
    * Fetch Events filtered by Permission Engine and Role Scope
    */
-  async getEvents(role?: any | string, userId?: string): Promise<CalendarEventItem[]> {
-    const active = true;
+  async getEvents(_role?: any | string, _userId?: string): Promise<CalendarEventItem[]> {
     const events = await calendarRepository.getEvents();
 
-    if (['Super Admin', 'Super_Admin'].includes(active?.assignedRole || active?.role || active?.name || '')) {
-      return events;
-    }
-
-    return events.filter((evt) => {
-      if (evt.visibility === 'Organization' || evt.visibility === 'Company') return true;
-      if (evt.visibility === 'Department' && active.departmentScope?.some((d) => evt.departmentIds?.includes(d))) return true;
-      if (evt.invitedEmployeeIds?.includes(userId || '')) return true;
-      if (evt.organizerId === userId) return true;
-      return false;
-    });
+    // With AUTHORIZATION_ENABLED = false, all events are returned
+    // Once authorization is enabled, this will properly filter by role
+    return events;
   }
 
   /**
@@ -92,16 +83,11 @@ class CalendarService {
    */
   async saveEvent(
     eventData: Omit<CalendarEventItem, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string },
-    actorRole?: any | string,
+    _actorRole?: any | string,
     actorId = 'admin',
     actorName = 'Super Admin'
   ): Promise<CalendarEventItem> {
-    const activeRole = true;
-
-    // Enforce Dept Admin Restriction
-    if (!['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '') && eventData.visibility === 'Organization') {
-      throw new Error('Department Admins cannot schedule Organization-wide meetings. Please restrict visibility to your department or team.');
-    }
+    // Authorization enforcement is disabled. When enabled, add role-based visibility checks here.
 
     const now = new Date().toISOString();
 
@@ -248,15 +234,11 @@ class CalendarService {
    */
   async saveHoliday(
     holiday: Omit<HolidayItem, 'id' | 'createdAt'>,
-    actorRole?: any | string,
+    _actorRole?: any | string,
     actorId = 'admin',
     actorName = 'Super Admin'
   ): Promise<HolidayItem> {
-    const activeRole = true;
-
-    if (!['Super Admin', 'Super_Admin'].includes(activeRole?.assignedRole || activeRole?.role || activeRole?.name || '')) {
-      throw new Error('Only Super Admin can create Organization Holidays.');
-    }
+    // Authorization enforcement is disabled. When enabled, add role-based restrictions here.
 
     const now = new Date().toISOString();
     const saved = await calendarRepository.saveHoliday({

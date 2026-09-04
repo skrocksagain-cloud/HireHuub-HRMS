@@ -15,11 +15,9 @@ import { documentCenterService } from "../../services/document/documentCenterSer
 import { adminService } from "../../services/admin/adminService";
 
 import useDocumentDashboard from "./useDocumentDashboard";
-import { useAuth } from "../../context/AuthContext";
 
 
 export default function DocumentDashboard() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'content_hub' | 'history'>('history');
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
@@ -62,7 +60,6 @@ export default function DocumentDashboard() {
   const brandList = companySettings?.brandProfilesList || [];
   const activeBrand = brandList.find((b) => b.id === selectedBrandId) || brandList[0];
 
-  const currentRole = (user?.role as string) || 'Super Admin';
   const canUpload = true;
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {

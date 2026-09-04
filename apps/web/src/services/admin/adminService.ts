@@ -10,7 +10,6 @@ import type {
   MasterDataConfig,
   NotificationSettings,
   PasswordResetRequest,
-  any,
   SecuritySettings,
   TemplateHistoryEntry,
   WorkflowRule,

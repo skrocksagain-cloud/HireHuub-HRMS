@@ -14,7 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-
+import { usePermissions } from '../../hooks/usePermissions';
 import { useAuthEngine } from '../../hooks/useAuthEngine';
 import OtpVerificationModal from '../../components/auth/OtpVerificationModal';
 import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
@@ -24,6 +24,7 @@ import type { AuthTabMode } from '../../hooks/useAuthEngine';
 export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
+  const { landingModule } = usePermissions();
 
   const {
     activeTab,
@@ -66,7 +67,6 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
 
   if (!authLoading && user) {
     if (!user.mustChangePassword && activeTab !== 'change_password') {
-      const landingModule = true;
       return <Navigate to={landingModule || '/dashboard'} replace />;
     } else if (user.mustChangePassword && activeTab !== 'change_password') {
       return <Navigate to="/change-password" replace />;
@@ -80,7 +80,6 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
       if (res.mustChangePassword) {
         navigate('/change-password', { replace: true, state: { empId: res.employee?.employeeId } });
       } else if (res.employee) {
-        const landingModule = true;
         navigate(landingModule || '/dashboard');
       }
     }
@@ -98,7 +97,6 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
     e.preventDefault();
     const res = await handleCompleteActivation(fallbackEmpId);
     if (res && res.success && res.employee) {
-      const landingModule = true;
       navigate(landingModule || '/dashboard');
     }
   };
@@ -107,7 +105,6 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
     e.preventDefault();
     const res = await handleCompleteResetPassword();
     if (res && res.success && res.employee) {
-      const landingModule = true;
       navigate(landingModule || '/dashboard');
     }
   };

@@ -18,7 +18,7 @@ export class CampaignService {
   /**
    * Checks if user has permission to manage Campaign Hub.
    */
-  canAccess(role: string): boolean {
+  canAccess(_role: string): boolean {
     return true;
   }
 

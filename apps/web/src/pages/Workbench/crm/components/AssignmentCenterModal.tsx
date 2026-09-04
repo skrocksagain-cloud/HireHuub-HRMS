@@ -67,7 +67,7 @@ export default function AssignmentCenterModal({
   const activeFromId = fromRecruiterId || (recruiters[0]?.id ?? '');
 
   const scope = getAuthorizationScope(userAssignedRole || userRole);
-  const canAssign = scope !== 'SELF';
+  const canAssign = scope !== 'OWN';
 
   if (!isOpen) return null;
 

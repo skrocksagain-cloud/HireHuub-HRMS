@@ -19,7 +19,11 @@ export function useCrm() {
     name: 'Beta Super Admin',
     role: 'Super Admin',
     designation: 'Super Admin',
-    companyId: 'HH0000'
+    companyId: 'HH0000',
+    assignedRole: 'Super Admin',
+    department: 'Administration',
+    departmentId: 'admin',
+    teamId: undefined,
   };
 
   if (!user) {
@@ -30,10 +34,10 @@ export function useCrm() {
     id: effectiveUser.employeeId,
     name: effectiveUser.name,
     role: effectiveUser.role,
-    assignedRole: (effectiveUser as any).assignedRole,
-    department: (effectiveUser as any).department,
-    teamId: (effectiveUser as any).teamId,
-    departmentId: (effectiveUser as any).department
+    assignedRole: effectiveUser.assignedRole || effectiveUser.role,
+    department: effectiveUser.department,
+    teamId: effectiveUser.teamId,
+    departmentId: effectiveUser.departmentId || effectiveUser.department
   }), [effectiveUser]);
   const [allCandidates, setCandidates] = useState<Candidate[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -85,8 +89,9 @@ export function useCrm() {
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.employmentStatus === 'Active' || employee.status === 'Active'), [employees]);
   const assignableEmployees = useMemo(() => {
     const scope = getAuthorizationScope(sessionUser.assignedRole || sessionUser.role);
-    if (scope === 'SELF') return [];
-    if (scope === 'SELF_AND_DIRECT_REPORTS') {
+    // Authorization bypass mode - all employees are assignable when scope is GLOBAL
+    if (scope === 'OWN') return [];
+    if (scope === 'DIRECT_REPORTS') {
       return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.employeeId === sessionUser.id);
     }
     if (scope === 'DEPARTMENT') {

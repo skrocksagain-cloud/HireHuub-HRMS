@@ -52,7 +52,7 @@ export default function BulkImportModal({
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
 
   const scope = getAuthorizationScope(userAssignedRole || userRole);
-  const isTLOrAbove = scope !== 'SELF';
+  const isTLOrAbove = scope !== 'OWN';
 
   if (!isOpen) return null;
 

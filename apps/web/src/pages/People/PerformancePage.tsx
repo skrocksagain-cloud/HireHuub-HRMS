@@ -49,10 +49,10 @@ export default function PerformancePage() {
   const [targetBrandId, setTargetBrandId] = useState<string>('');
   const [targetPointsInput, setTargetPointsInput] = useState<number>(500);
 
-  const activeRole = true;
+  const activeRole: any = null;  // Placeholder for future authorization implementation
   const userEmpId = user?.employeeId || user?.id || '';
-  const canManage = true;
-  const viewScope = true.toLowerCase();
+  const canManage = true; // Authorization is in bypass mode
+  const viewScope = 'GLOBAL'; // Authorization is in bypass mode, always GLOBAL scope
 
   // Load Active Brands from Company Settings
   useEffect(() => {

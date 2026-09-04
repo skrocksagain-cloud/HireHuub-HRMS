@@ -39,7 +39,7 @@ const repoPlacements: any = {
         if (data.employeeId) authorizedIds!.push(data.employeeId);
       });
       if (authorizedIds.length === 0) return [];
-    } else if (scope === 'SELF_AND_DIRECT_REPORTS') {
+    } else if (scope === 'DIRECT_REPORTS') {
       const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
       const empSnap = await getDocs(empQ);
       authorizedIds = [userSession.id];
