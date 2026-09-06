@@ -4,6 +4,7 @@ import { notificationService } from '../../../core/notifications/notificationSer
 import { calendarService } from '../../../services/calendar/calendarService';
 import { MINIMUM_HALF_DAY_WORK_MINUTES } from '../constants/attendance';
 import { attendanceRepository } from '../repositories/attendanceRepository';
+import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { compOffService } from './compOffService';
 import { getAttendanceStatusForLogin, getLocalAttendanceDate, getMonthBounds } from '../utils/attendance';
 import { validateAttendanceDecision, validateAttendanceRequest } from '../validation/attendanceValidation';
@@ -15,7 +16,7 @@ import type {
   DeviceDetails,
 } from '../types/attendance';
 
-import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
+import { getSimplifiedModuleScope, getCanonicalRole, ROLE_RANK } from '../../../core/authorization/authorizationResolver';
 
 export interface ApprovedLeaveAttendanceInput {
   employeeId: string;
@@ -187,22 +188,33 @@ class AttendanceService {
    * Only FULLY APPROVED requests update authoritative attendance in Firestore and feed payroll.
    */
   async decideRequest(actor: AttendanceActor, input: AttendanceApprovalInput): Promise<void> {
-    if (!true) {
-      throw new Error('You do not have permission to approve attendance requests.');
-    }
-    validateAttendanceDecision(input);
-
     const requests = await attendanceRepository.getPendingRequests();
     const request = requests.find(({ id }) => id === input.requestId);
     if (!request) throw new Error('This attendance request is no longer pending.');
 
-    const isManagerRole =
-      actor.role.toLowerCase().includes('manager') || actor.role.toLowerCase().includes('lead');
-    const isAdminRole =
-      actor.role.toLowerCase().includes('admin') || ['Super Admin', 'Super_Admin'].includes(actor.role);
+    const emp = await employeeRepository.getEmployeeById(request.employeeId).catch(() => null);
+    if (!emp) throw new Error('Employee not found.');
+
+    if (actor.employeeId === emp.employeeId) {
+      throw new Error('You cannot approve your own request.');
+    }
+
+    const actorRank = ROLE_RANK[getCanonicalRole(actor.role)];
+    const targetRank = ROLE_RANK[getCanonicalRole(emp.assignedRole)];
+
+    if (actorRank < targetRank) {
+      throw new Error('Insufficient role rank to approve this request.');
+    }
+
+    validateAttendanceDecision(input);
+
+    const isManager = !!emp.reportingManagerId && actor.employeeId === emp.reportingManagerId;
+    const currentStage = request.approvalStage || 'Pending';
 
     if (input.decision === 'Rejected') {
-      // Rejection at any stage
+      if (!isManager && actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('You do not have permission to reject this request.');
+      }
       await attendanceRepository.updateRequestStage(input.requestId, {
         status: 'Rejected',
         approvalStage: 'Rejected',
@@ -227,20 +239,13 @@ class AttendanceService {
     let finalStatus: 'Pending' | 'Approved' = 'Pending';
     let newStage: 'Approved by Manager' | 'Fully Approved' = 'Approved by Manager';
 
-    if (isAdminRole) {
-      // Admin / Super Admin provides final stage approval
-      finalStatus = 'Approved';
-      newStage = 'Fully Approved';
-      await attendanceRepository.updateRequestStage(input.requestId, {
-        status: 'Approved',
-        approvalStage: 'Fully Approved',
-        adminApproved: true,
-        adminApproverId: actor.employeeId,
-        approverEmployeeId: actor.employeeId,
-        decisionReason: input.reason.trim(),
-      });
-    } else if (isManagerRole) {
-      // Stage 1: Reporting Manager Approval
+    if (currentStage === 'Pending') {
+      if (emp.reportingManagerId && !isManager) {
+        throw new Error('Stage 1 approval must be performed by the direct reporting manager.');
+      }
+      if (!emp.reportingManagerId && actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('No reporting manager assigned. Master Admin or Super Admin approval required.');
+      }
       finalStatus = 'Pending';
       newStage = 'Approved by Manager';
       await attendanceRepository.updateRequestStage(input.requestId, {
@@ -250,8 +255,10 @@ class AttendanceService {
         managerApproverId: actor.employeeId,
         decisionReason: input.reason.trim(),
       });
-    } else {
-      // General approver (Admin override)
+    } else if (currentStage === 'Approved by Manager') {
+      if (actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('Stage 2 final approval requires Master Admin or Super Admin role.');
+      }
       finalStatus = 'Approved';
       newStage = 'Fully Approved';
       await attendanceRepository.updateRequestStage(input.requestId, {
@@ -262,6 +269,8 @@ class AttendanceService {
         approverEmployeeId: actor.employeeId,
         decisionReason: input.reason.trim(),
       });
+    } else {
+      throw new Error('Request is already fully approved.');
     }
 
     // Apply Authoritative Attendance Correction ONLY IF FULLY APPROVED

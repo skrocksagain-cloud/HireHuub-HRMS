@@ -16,7 +16,7 @@ import type {
   LeaveSummary,
 } from '../types/leave';
 
-import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
+import { getSimplifiedModuleScope, hasApprovalAuthority, ROLE_RANK, getCanonicalRole } from '../../../core/authorization/authorizationResolver';
 
 class LeaveService {
   async getDashboard(actor: LeaveActor & { assignedRole?: string }): Promise<LeaveDashboardData> {
@@ -70,7 +70,7 @@ class LeaveService {
         if (!validation.allowed) {
           throw new Error(validation.message || 'Sick Leave entitlement during probation is capped at 1 day total.');
         }
-      } else if (isRestrictedType && !['Super Admin', 'Super_Admin'].includes(actor.role)) {
+      } else if (isRestrictedType && !hasApprovalAuthority(actor.role, 'Super Admin')) {
         throw new Error('Casual and Paid Leaves during 90-day probation require Super Admin approval.');
       }
     }
@@ -106,13 +106,42 @@ class LeaveService {
   }
 
   async decide(actor: LeaveActor, input: LeaveDecisionInput): Promise<void> {
-    if (!true) {
-      throw new Error('You do not have permission to approve leave requests.');
-    }
     validateLeaveDecision(input);
     const request = await leaveRepository.getRequest(input.requestId);
     if (!request || request.status !== 'Pending') {
       throw new Error('This leave request is no longer pending.');
+    }
+
+    const emp = await employeeRepository.getEmployeeById(request.employeeId).catch(() => null);
+    if (!emp) throw new Error('Employee not found.');
+
+    if (actor.employeeId === emp.employeeId) {
+      throw new Error('You cannot approve your own request.');
+    }
+
+    const actorRank = ROLE_RANK[getCanonicalRole(actor.role)];
+    const targetRank = ROLE_RANK[getCanonicalRole(emp.assignedRole)];
+
+    if (actorRank < targetRank) {
+      throw new Error('Insufficient role rank to approve this request.');
+    }
+
+    const isManager = !!emp.reportingManagerId && actor.employeeId === emp.reportingManagerId;
+
+    if (emp.reportingManagerId) {
+      if (!isManager) {
+        throw new Error('Approval must be performed by the direct reporting manager.');
+      }
+    } else {
+      if (targetRank === ROLE_RANK['User'] || targetRank === ROLE_RANK['Admin']) {
+        if (actorRank < ROLE_RANK['Master Admin']) {
+          throw new Error('Escalation requires Master Admin or Super Admin.');
+        }
+      } else if (targetRank === ROLE_RANK['Master Admin']) {
+        if (actorRank < ROLE_RANK['Super Admin']) {
+          throw new Error('Escalation requires Super Admin.');
+        }
+      }
     }
 
     await leaveRepository.decideRequest(request.id, actor.employeeId, input.decision, input.reason.trim());
@@ -162,7 +191,7 @@ class LeaveService {
 
   async cancel(actor: LeaveActor, requestId: string): Promise<void> {
     const request = await leaveRepository.getRequest(requestId);
-    if (!request || !true || request.status !== 'Pending') {
+    if (!request || request.status !== 'Pending') {
       throw new Error('Only pending leave requests can be cancelled.');
     }
     await leaveRepository.cancelRequest(requestId);
@@ -178,7 +207,7 @@ class LeaveService {
   }
 
   async carryForward(actor: LeaveActor, input: CarryForwardInput): Promise<void> {
-    if (!true) {
+    if (!hasApprovalAuthority(actor.role, 'Master Admin')) {
       throw new Error('You do not have permission to carry leave forward.');
     }
     validateCarryForward(input.days);

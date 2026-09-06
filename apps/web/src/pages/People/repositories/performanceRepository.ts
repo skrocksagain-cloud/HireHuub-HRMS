@@ -35,7 +35,7 @@ export interface PerformanceRepository {
 }
 
 export interface PerformanceScopeQuery {
-  scope: 'SELF' | 'DEPARTMENT' | 'GLOBAL';
+  scope: 'SELF' | 'DEPARTMENT' | 'GLOBAL' | 'OWN' | 'TEAM';
   employeeId?: string;
   departmentId?: string;
   month?: string;

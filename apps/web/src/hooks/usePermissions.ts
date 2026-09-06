@@ -1,54 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  canAccessErpArea, 
-  type ErpArea, 
+import {
+  canAccessModule as checkModuleAccess,
   isSuperAdmin as checkSuperAdmin,
   type AuthorizationContext
 } from '../core/authorization/authorizationResolver';
 
-function mapModuleToErpArea(moduleKey: string): ErpArea | null {
-  const m = (moduleKey || '').toLowerCase();
-  
-  if (['employees', 'people', 'attendance', 'leave', 'performance', 'profile'].includes(m)) return 'People';
-  
-  if (['recruitment', 'openings', 'crm', 'workforce', 'client', 'associatepartner', 'campaignhub'].includes(m)) return 'Workbench';
-  
-  if (['finance', 'invoices', 'creditnotes', 'internalpayroll', 'transactions', 'payout'].includes(m)) return 'Finance';
-  
-  if (['managementcontrol', 'calendar', 'announcements'].includes(m)) return 'Administration';
-  
-  return null;
-}
-
-export function usePermissions(): {
-  authContext: AuthorizationContext;
-  activeRole: { name: string };
-  simulatedRole: { name: string } | null;
-  setSimulatedRole: () => void;
-  canAccessModule: (moduleKey: string) => boolean;
-  canAccessPage: (pageKey: string) => boolean;
-  canAccessRoute: (path: string) => boolean;
-  canView: (moduleKey: string) => boolean;
-  canCreate: (moduleKey: string) => boolean;
-  canEdit: (moduleKey: string) => boolean;
-  canDelete: (moduleKey: string) => boolean;
-  canApprove: (moduleKey: string) => boolean;
-  canReject: (moduleKey: string) => boolean;
-  canExport: (moduleKey: string) => boolean;
-  canGenerateDocument: (docType?: string) => boolean;
-  canManage: (moduleKey: string) => boolean;
-  isFeatureEnabled: () => boolean;
-  isSuperAdmin: boolean;
-  visibleModules: never[];
-  visibleNavigation: never[];
-  dashboardWidgets: never[];
-  landingModule: string;
-  getVisibleEmployees: <T,>(items: T[]) => T[];
-  getVisibleCandidates: <T,>(items: T[]) => T[];
-  getVisibleInvoices: <T,>(items: T[]) => T[];
-  getVisibleDocuments: <T,>(items: T[]) => T[];
-} {
+export function usePermissions() {
   const { user } = useAuth();
 
   const authContext: AuthorizationContext = useMemo(() => ({
@@ -60,74 +18,79 @@ export function usePermissions(): {
   }), [user]);
 
   const activeRole = useMemo(() => ({ name: user?.assignedRole || 'User' }), [user]);
-  const simulatedRole: { name: string } | null = null;
+  const simulatedRole = null as { name: string } | null;
   const setSimulatedRole = useCallback(() => {}, []);
   const visibleModules = useMemo(() => [], []);
   const visibleNavigation = useMemo(() => [], []);
   const dashboardWidgets = useMemo(() => [], []);
 
   const canAccessModule = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canAccessPage = useCallback((pageKey: string) => {
-    const area = mapModuleToErpArea(pageKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, pageKey);
   }, [authContext]);
 
   const canAccessRoute = useCallback((path: string) => {
     const p = (path || '').toLowerCase();
-    if (p.includes('workbench')) return canAccessErpArea(authContext, 'Workbench');
-    if (p.includes('finance')) return canAccessErpArea(authContext, 'Finance');
-    if (p.includes('administration') || p.includes('settings') || p.includes('management')) return canAccessErpArea(authContext, 'Administration');
+
+    if (p.includes('workbench')) {
+      if (p.includes('client')) return checkModuleAccess(authContext, 'clients');
+      if (p.includes('associate')) return checkModuleAccess(authContext, 'associatepartner');
+      if (p.includes('openings')) return checkModuleAccess(authContext, 'openings');
+      if (p.includes('crm')) return checkModuleAccess(authContext, 'crm');
+      if (p.includes('workforce')) return checkModuleAccess(authContext, 'workforce');
+      if (p.includes('campaign')) return checkModuleAccess(authContext, 'campaignhub');
+      // Default to returning staffing module check if it's general workbench
+      return checkModuleAccess(authContext, 'workforce');
+    }
+    if (p.includes('finance') || p.includes('payroll') || p.includes('invoices') || p.includes('credit-notes') || p.includes('transactions') || p.includes('payout')) return checkModuleAccess(authContext, 'finance');
+    if (p.includes('administration') || p.includes('settings') || p.includes('management') || p.includes('organization')) return checkModuleAccess(authContext, 'administration');
+    if (p.includes('people') || p.includes('employees')) return checkModuleAccess(authContext, 'employees');
+    if (p.includes('attendance')) return checkModuleAccess(authContext, 'attendance');
+    if (p.includes('leave')) return checkModuleAccess(authContext, 'leave');
+    if (p.includes('performance')) return checkModuleAccess(authContext, 'performance');
+    if (p.includes('recruitment') || p.includes('internal-hiring')) return checkModuleAccess(authContext, 'employees');
+
     if (p.includes('dashboard') || p.includes('profile')) return true;
     return false;
   }, [authContext]);
 
   const canView = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canCreate = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canEdit = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canDelete = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canApprove = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canReject = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canExport = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const canGenerateDocument = useCallback((docType?: string) => {
-    const area = mapModuleToErpArea(docType || 'documents');
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, docType || 'documents');
   }, [authContext]);
 
   const canManage = useCallback((moduleKey: string) => {
-    const area = mapModuleToErpArea(moduleKey);
-    return area ? canAccessErpArea(authContext, area) : false;
+    return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
   const isFeatureEnabled = useCallback(() => true, []);
