@@ -434,7 +434,7 @@ export const generateNativeDocument = onCall<GenerateNativeDocumentPayload>(
           INVOICE_DATE: String(data.invoiceDate || ''),
           PO_NUMBER: String(data.poNumber || ''),
 
-          CLIENT_NAME: String(data.clientName || data.clientLegalName || ''),
+          CLIENT_NAME: String(data.billingName || data.clientName || data.clientLegalName || ''),
           CLIENT_ADDRESS: String(data.clientAddress || ''),
           CLIENT_GSTIN: String(data.clientGstin || ''),
           CLIENT_STATE: String(data.clientState || ''),
