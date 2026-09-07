@@ -67,7 +67,7 @@ export function buildInvoicePlaceholders(snapshot: InvoiceSnapshot): Record<stri
     ClientAddress: formatAddress(client.billingAddress),
     ClientState: client.billingState,
     BillingAddress: formatAddress(client.billingAddress),
-    BillingName: client.clientName,
+    BillingName: client.billingName || client.clientName,
 
     // Line Items (flat text for single-cell templates)
     LineItems: lineItemsText,
