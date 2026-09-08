@@ -82,7 +82,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
   }, [initialItem]);
 
   const handleUpdateAssignment = async (_wfId: string, employee: Employee) => {
-    const placementId = (item as any)?.placementId;
+    const placementId = (item as any)?.placementDocId || (item as any)?.placementId;
     const candidateId = item?.candidateId;
 
     if (placementId && candidateId) {
@@ -123,7 +123,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
   };
 
   const handleSaveProfile = async (updates: any) => {
-    const placementId = (item as any)?.placementId;
+    const placementId = (item as any)?.placementDocId || (item as any)?.placementId;
     const candidateId = item?.candidateId;
 
     if (placementId && candidateId) {
@@ -197,7 +197,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
 
   const handleExecuteTerminate = async (_wfId: string, lastWorkingDate: string, _reason: string) => {
     const { placementService } = await import('../v2/hooks/useWorkforceV2');
-    const placementId = (item as any)?.placementId;
+    const placementId = (item as any)?.placementDocId || (item as any)?.placementId;
     if (placementId) {
       await placementService.terminatePlacement(placementId, lastWorkingDate, { id: userSession.id, name: userSession.name, role: currentRole });
       onRefresh();
@@ -206,7 +206,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
 
   const handleExecuteComplete = async (_wfId: string, lastWorkingDate: string) => {
     const { placementService } = await import('../v2/hooks/useWorkforceV2');
-    const placementId = (item as any)?.placementId;
+    const placementId = (item as any)?.placementDocId || (item as any)?.placementId;
     if (placementId) {
       await placementService.terminatePlacement(placementId, lastWorkingDate, { id: userSession.id, name: userSession.name, role: currentRole });
       onRefresh();
@@ -228,7 +228,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
     _ifscCode?: string
   ) => {
     const { placementService } = await import('../v2/hooks/useWorkforceV2');
-    const placementId = (item as any)?.placementId;
+    const placementId = (item as any)?.placementDocId || (item as any)?.placementId;
     if (placementId) {
       await placementService.transferPlacement(placementId, newClientId, lastWorkingDate, { id: userSession.id, name: userSession.name, role: currentRole } as any, {
         newPayrollEmployeeId: payrollEmployeeId,
