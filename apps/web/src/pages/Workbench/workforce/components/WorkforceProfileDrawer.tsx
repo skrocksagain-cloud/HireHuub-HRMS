@@ -30,19 +30,21 @@ import TerminateModal from '../components/TerminateModal';
 import CompleteModal from '../components/CompleteModal';
 
 interface WorkforceProfileDrawerProps {
-  placementId: string;
+  item: WorkforceItem;
+  onRefresh: () => void;
   onClose: () => void;
 }
 
-export default function WorkforceProfileDrawer({ placementId, onClose }: WorkforceProfileDrawerProps) {
+export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, onClose }: WorkforceProfileDrawerProps) {
   const { user } = useAuth();
   const currentRole = (user?.role as string) || 'Super Admin';
   const userSession = {
     id: user?.employeeId || user?.id || 'user-admin',
     name: user?.name || 'Super Admin',
+    departmentId: user?.departmentId,
+    assignedRole: user?.assignedRole || (user as any)?.authorization?.role,
   };
 
-  const id = placementId;
 
   const [item, setItem] = useState<WorkforceItem | null>(null);
   const [crmDocuments, setCrmDocuments] = useState<CandidateDocument[]>([]);
@@ -57,96 +59,13 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
   const [showPayoutHistoryModal, setShowPayoutHistoryModal] = useState<boolean>(false);
 
   const loadData = async () => {
-    if (!id) return;
     setLoading(true);
     setError('');
     try {
-      // Instead of using workforceRepository.getWorkforceItemById(id)
-      // We use the V2 active workforce list and find the correct record, mapping it locally.
-      const { workforceService } = await import('../v2/hooks/useWorkforceV2');
-      const v2Records = await workforceService.getActiveWorkforce({ id: userSession.id, name: userSession.name, role: currentRole as any });
-      const v2 = v2Records.find(r => r.placement.id === id || r.employeeId === id);
-      
-      if (!v2) {
-        setError(`Workforce record '${id}' not found.`);
-        return;
-      }
+      setItem(initialItem);
 
-      const formatDate = (isoStr?: string) => {
-        if (!isoStr) return undefined;
-        const d = new Date(isoStr);
-        if (isNaN(d.getTime())) return isoStr;
-        return d.toLocaleDateString('en-GB').replace(/\//g, '-');
-      };
-
-      // Map to legacy WorkforceItem shape
-      const found: any = {
-        id: v2.employeeId, 
-        placementId: v2.placement.id,
-        placementBusinessId: v2.placement.placementId || '',
-        candidateId: v2.candidate.id,
-        candidateName: v2.candidate.name,
-        phone: v2.candidate.phone,
-        area: v2.candidate.area,
-        city: v2.candidate.city,
-        hasActivePlacement: true, 
-        candidateLifecycleStatus: 'Active',
-        
-        clientId: v2.client.id,
-        clientName: v2.client.name,
-        workforceType: v2.workforceType, 
-        
-        recruiterId: v2.placement.recruiterId || '',
-        recruiterName: v2.placement.recruiterName || '',
-        associatePartnerId: v2.associatePartner?.id,
-        associatePartnerName: v2.associatePartner?.name,
-
-        activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-        workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-        dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
-        joiningDate: formatDate(v2.placement.joiningDate || v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-        lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
-        
-        tenureDays: v2.ots?.tenureDays || 0,
-        tenureDisplay: `${v2.ots?.tenureDays || 0} Days`,
-        
-        workingStatus: (v2.payroll?.currentWorkingStatus as 'Working' | 'Not Working') || 'Working',
-        
-        totalEarnings: v2.monthly?.totalEarnings || 0,
-        totalOrders: v2.monthly?.totalOrders || 0,
-        rank: v2.monthly?.rank,
-        
-        eligibility: (v2.ots?.eligibility as 'Eligible' | 'Not Eligible') || 'Not Eligible',
-        billingStatus: (v2.placement.billingStatus as 'Billed' | 'Pending') || 'Pending',
-        
-        activatedBy: '',
-        currentAssignee: '',
-        
-        payrollEmployeeId: v2.workforceType === 'Payroll' ? v2.employeeId : undefined,
-        supportsOrders: v2.workforceType === 'Payroll',
-
-        aadhaarNumber: v2.placement.operationalData?.aadhaar || (v2.placement.operationalData as any)?.aadhaarNumber || '',
-        panNumber: v2.placement.operationalData?.pan || (v2.placement.operationalData as any)?.panNumber || '',
-        bankAccountNumber: v2.placement.operationalData?.bankAccountNumber || '',
-        ifscCode: v2.placement.operationalData?.ifscCode || '',
-
-        placementHistory: [{
-          id: v2.placement.id,
-          clientId: v2.client.id,
-          clientName: v2.client.name,
-          clientType: v2.workforceType,
-          status: v2.placement.status || 'Active',
-          activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          joiningDate: formatDate(v2.placement.joiningDate || v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          recruiterId: v2.placement.recruiterId || '',
-          recruiterName: v2.placement.recruiterName || ''
-        }]
-      } as unknown as WorkforceItem;
-
-      setItem(found);
-
-      if (found.candidateId) {
-        const crmCandidate = await crmRepository.getCandidateById(found.candidateId);
+      if (initialItem.candidateId) {
+        const crmCandidate = await crmRepository.getCandidateById(initialItem.candidateId);
         if (crmCandidate) {
           setCrmDocuments(crmCandidate.documents || []);
         }
@@ -160,7 +79,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
 
   useEffect(() => {
     loadData();
-  }, [id]);
+  }, [initialItem]);
 
   const handleUpdateAssignment = async (_wfId: string, employee: Employee) => {
     const placementId = (item as any)?.placementId;
@@ -168,7 +87,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
       const { updateDoc, doc } = await import('firebase/firestore');
       const { db } = await import('../../../../firebase/firebase');
       await updateDoc(doc(db, 'placements', placementId), { recruiterId: employee.id, recruiterName: employee.fullName });
-      await loadData();
+      onRefresh();
     }
   };
 
@@ -198,21 +117,16 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
         if (updates.ifscCode) operationalDataUpdates['operationalData.ifscCode'] = updates.ifscCode;
       } else {
         if (updates.dateOfBirth) operationalDataUpdates['operationalData.dateOfBirth'] = parseDateToIso(updates.dateOfBirth);
-        if (updates.joiningDate) operationalDataUpdates.joiningDate = parseDateToIso(updates.joiningDate);
         if (updates.lastWorkingDate) operationalDataUpdates.lastWorkingDate = parseDateToIso(updates.lastWorkingDate);
         if (updates.billingStatus) operationalDataUpdates.billingStatus = updates.billingStatus;
       }
 
       if (updates.activeDate) {
         operationalDataUpdates.activeDate = parseDateToIso(updates.activeDate);
-        // Synchronize joiningDate with activeDate for Payroll, but do NOT change OTS logic
-        if (item?.workforceType === 'Payroll') {
-           operationalDataUpdates.joiningDate = parseDateToIso(updates.activeDate);
-        }
       }
 
       await updateDoc(doc(db, 'placements', placementId), operationalDataUpdates);
-      await loadData();
+      onRefresh();
     }
   };
 
@@ -221,7 +135,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
     const placementId = (item as any)?.placementId;
     if (placementId) {
       await placementService.terminatePlacement(placementId, lastWorkingDate, { id: userSession.id, name: userSession.name, role: currentRole });
-      await loadData();
+      onRefresh();
     }
   };
 
@@ -230,7 +144,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
     const placementId = (item as any)?.placementId;
     if (placementId) {
       await placementService.terminatePlacement(placementId, lastWorkingDate, { id: userSession.id, name: userSession.name, role: currentRole });
-      await loadData();
+      onRefresh();
     }
   };
 
@@ -255,7 +169,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
         newPayrollEmployeeId: payrollEmployeeId,
         newActiveDate: newActiveDate
       });
-      await loadData();
+      onRefresh();
     }
   };
 
@@ -382,7 +296,7 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
               </span>
             ) : (
               <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                Not Eligible
+                {item.eligibility}
               </span>
             )}
           </div>
@@ -536,8 +450,8 @@ export default function WorkforceProfileDrawer({ placementId, onClose }: Workfor
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
                       <div>
-                        <span className="text-slate-400 block text-[10px]">Joining Date</span>
-                        <span className="font-bold text-slate-800">{item.joiningDate || item.activeDate}</span>
+                        <span className="text-slate-400 block text-[10px]">Active Date</span>
+                        <span className="font-bold text-slate-800">{item.activeDate}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[10px]">Last Working Date</span>

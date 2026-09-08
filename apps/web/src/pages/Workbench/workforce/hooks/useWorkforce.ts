@@ -104,7 +104,6 @@ export function useWorkforce() {
         activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
         workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
         dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
-        joiningDate: formatDate(v2.placement.joiningDate || v2.placement.activeDate) || formatDate(new Date().toISOString())!,
         lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
         
         tenureDays: v2.ots?.tenureDays || 0,
@@ -133,7 +132,6 @@ export function useWorkforce() {
           clientType: v2.workforceType,
           status: v2.placement.status || 'Active',
           activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          joiningDate: formatDate(v2.placement.joiningDate || v2.placement.activeDate) || formatDate(new Date().toISOString())!,
           recruiterId: v2.placement.recruiterId || '',
           recruiterName: v2.placement.recruiterName || ''
         }] as any[]
@@ -189,23 +187,43 @@ export function useWorkforce() {
       const matchesRecruiter =
         filters.recruiter === 'ALL' || item.recruiterName === filters.recruiter;
 
+      // Month filter: Candidate's Active Date must be within the selected month
+      let matchesMonth = true;
+      if (filters.activeMonth && filters.activeMonth !== 'ALL') {
+        // activeMonth is format "YYYY-MM"
+        const [yearStr, monthStr] = filters.activeMonth.split('-');
+        const filterYear = parseInt(yearStr, 10);
+        const filterMonth = parseInt(monthStr, 10) - 1; // 0-indexed
+
+        const filterStart = new Date(filterYear, filterMonth, 1);
+        const filterEnd = new Date(filterYear, filterMonth + 1, 0); // Last day of month
+
+        // item.activeDate could be DD-MM-YYYY or YYYY-MM-DD
+        let activeDateObj: Date;
+        if (item.activeDate.includes('-') && item.activeDate.split('-')[0].length === 2) {
+          const [d, m, y] = item.activeDate.split('-');
+          activeDateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+        } else {
+          activeDateObj = new Date(item.activeDate);
+        }
+
+        matchesMonth = activeDateObj >= filterStart && activeDateObj <= filterEnd;
+      }
+
       return (
         matchesSearch &&
         matchesClient &&
-        matchesRecruiter
+        matchesRecruiter &&
+        matchesMonth
       );
     });
   }, [rawItems, filters]);
 
   const kpiSummary: WorkforceKpiSummary = useMemo(() => {
-    // C2. Total Active OTS: active OTS placements + LWD is empty.
-    const otsCount = filteredWorkforce.filter((w) => w.workforceType === 'OTS' && !w.lastWorkingDate).length;
+    const activeWorkforce = filteredWorkforce.length;
 
-    // C1. Total Active Payroll: active Payroll placements + completed at least one delivery/order (totalOrders > 0).
-    const payrollCount = filteredWorkforce.filter((w) => w.workforceType === 'Payroll' && (w.totalOrders || 0) > 0).length;
-
-    // C3. Total Active = sum of approved active definitions.
-    const activeWorkforce = otsCount + payrollCount;
+    const otsCount = filteredWorkforce.filter((w) => w.workforceType === 'OTS').length;
+    const payrollCount = filteredWorkforce.filter((w) => w.workforceType === 'Payroll').length;
 
     const workingCount = filteredWorkforce.filter((w) => w.workingStatus === 'Working').length;
     const notWorkingCount = filteredWorkforce.filter((w) => w.workingStatus === 'Not Working').length;

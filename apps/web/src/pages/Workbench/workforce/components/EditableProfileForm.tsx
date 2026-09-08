@@ -21,7 +21,6 @@ export default function EditableProfileForm({ item, onSave }: EditableProfileFor
   const [formData, setFormData] = useState({
     activeDate: toIso(item.activeDate),
     dateOfBirth: toIso(item.dateOfBirth),
-    joiningDate: toIso(item.joiningDate),
     lastWorkingDate: toIso(item.lastWorkingDate),
     aadhaarNumber: item.aadhaarNumber || '',
     panNumber: item.panNumber || '',
@@ -136,16 +135,6 @@ export default function EditableProfileForm({ item, onSave }: EditableProfileFor
                 type="date"
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
-                onChange={handleChange}
-                className="w-full border-slate-200 rounded-lg text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-500 mb-1">Joining Date</label>
-              <input
-                type="date"
-                name="joiningDate"
-                value={formData.joiningDate}
                 onChange={handleChange}
                 className="w-full border-slate-200 rounded-lg text-xs"
               />

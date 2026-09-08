@@ -18,7 +18,7 @@ export interface OtsOperationalDataV2 {
 
   tenureDays: number;
 
-  eligibility: 'Eligible' | 'Not Eligible';
+  eligibility: 'Eligible' | 'Not Eligible' | 'Config Missing';
   currentWorkingStatus?: 'Working' | 'Not Working';
 }
 

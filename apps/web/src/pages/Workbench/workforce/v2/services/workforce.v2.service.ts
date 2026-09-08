@@ -51,6 +51,41 @@ export class WorkforceServiceImplV2 {
     // Optional: fetch monthly payouts to resolve Working Status and Earnings/Orders
     const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month) : [];
 
+    const uniqueCandidateIds = Object.keys(placementsByCandidate);
+    const uniqueClientIds = Array.from(new Set(activePlacements.map(p => p.clientId)));
+
+    const candidateMap = new Map<string, any>();
+    const apInfoMap = new Map<string, any>();
+    const clientConfigMap = new Map<string, any>();
+
+    // Parallel fetch Candidate & Client & AP info to fix N+1 query problem
+    await Promise.all([
+      // Candidates and APs
+      Promise.all(uniqueCandidateIds.map(async (cId) => {
+        const candidate = await this.candidateRepo.getCandidateById(cId);
+        if (candidate) {
+          candidateMap.set(cId, candidate);
+          if (candidate.currentStatus === 'Active') {
+            const apInfo = await this.apIntegration.getAssociatePartnerForCandidate(cId, candidate);
+            if (apInfo) {
+              apInfoMap.set(cId, apInfo);
+            }
+          }
+        }
+      })),
+      // Clients
+      Promise.all(uniqueClientIds.map(async (clientId) => {
+        try {
+          const config = await this.clientIntegration.getClientConfig(clientId);
+          if (config && config.commercialType) {
+            clientConfigMap.set(clientId, config);
+          }
+        } catch (e) {
+          console.error(`Data Integrity: Client configuration missing or invalid for client ${clientId}.`);
+        }
+      }))
+    ]);
+
     for (const [candidateId, placements] of Object.entries(placementsByCandidate)) {
       if (placements.length > 1) {
         console.error(`Data Integrity Conflict: Candidate ${candidateId} has ${placements.length} active placements. Only one is permitted.`);
@@ -59,22 +94,16 @@ export class WorkforceServiceImplV2 {
 
       const placement = placements[0];
 
-      // 2. Fetch candidate
-      const candidate = await this.candidateRepo.getCandidateById(placement.candidateId);
+      // 2. Lookup candidate
+      const candidate = candidateMap.get(placement.candidateId);
       if (!candidate || candidate.currentStatus !== 'Active') continue;
 
       // 3. Client Verification (Authoritative Lookup)
-      let clientConfig;
-      try {
-        clientConfig = await this.clientIntegration.getClientConfig(placement.clientId);
-        if (!clientConfig || !clientConfig.commercialType) throw new Error();
-      } catch (e) {
-        console.error(`Data Integrity: Client configuration missing or invalid for client ${placement.clientId}.`);
-        continue;
-      }
+      const clientConfig = clientConfigMap.get(placement.clientId);
+      if (!clientConfig) continue;
 
       // 4. AP Gate Check
-      const apInfo = await this.apIntegration.getAssociatePartnerForCandidate(candidate.id);
+      const apInfo = apInfoMap.get(candidate.id);
       if (!apInfo || apInfo.status !== 'Joined') continue;
 
       // 5. Employee ID Sourcing
@@ -104,13 +133,12 @@ export class WorkforceServiceImplV2 {
           currentWorkingStatus: filters?.month ? (hasOrders ? 'Working' : 'Not Working') : 'Not Working'
         };
       } else if (placement.clientType === 'OTS') {
-        const tenureDays = this.calculateOtsTenure(placement.activeDate, placement.lastWorkingDate, placement.joiningDate);
-        // We assume clientConfig has tenure configured or fallback to 90
-        const configuredTenure = clientConfig.tenureDaysConfig || 90;
+        const tenureDays = this.calculateOtsTenure(placement.activeDate, placement.lastWorkingDate);
+        const configuredTenure = clientConfig.tenureDaysConfig;
         otsData = {
           dateOfBirth: placement.operationalData?.dateOfBirth,
           tenureDays,
-          eligibility: this.calculateOtsEligibility(tenureDays, configuredTenure, placement.lastWorkingDate),
+          eligibility: this.calculateOtsEligibility(tenureDays, configuredTenure),
           currentWorkingStatus: placement.lastWorkingDate ? 'Not Working' : 'Working'
         };
       }
@@ -138,7 +166,6 @@ export class WorkforceServiceImplV2 {
         monthly: matchedPayout ? {
           totalEarnings: matchedPayout.earning,
           totalOrders: matchedPayout.orders,
-          // rank would be attached post-aggregation if needed
         } : undefined
       });
     }
@@ -165,8 +192,8 @@ export class WorkforceServiceImplV2 {
     return records;
   }
 
-  calculateOtsTenure(activeDate: string, lastWorkingDate?: string, joiningDate?: string): number {
-    const startDate = joiningDate ? new Date(joiningDate) : new Date(activeDate);
+  calculateOtsTenure(activeDate: string, lastWorkingDate?: string): number {
+    const startDate = new Date(activeDate);
     const endDate = lastWorkingDate ? new Date(lastWorkingDate) : new Date();
     
     // reset times to midnight
@@ -178,7 +205,10 @@ export class WorkforceServiceImplV2 {
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   }
 
-  calculateOtsEligibility(tenureDays: number, clientConfiguredTenure: number, _lastWorkingDate?: string): 'Eligible' | 'Not Eligible' {
+  calculateOtsEligibility(tenureDays: number, clientConfiguredTenure?: number): 'Eligible' | 'Not Eligible' | 'Config Missing' {
+    if (clientConfiguredTenure === undefined || clientConfiguredTenure === null) {
+      return 'Config Missing';
+    }
     return tenureDays >= clientConfiguredTenure ? 'Eligible' : 'Not Eligible';
   }
 

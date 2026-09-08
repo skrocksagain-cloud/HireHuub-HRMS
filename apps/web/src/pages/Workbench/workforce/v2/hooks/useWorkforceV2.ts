@@ -129,13 +129,16 @@ const repoPlacements: any = {
   }
 };
 const integrationAp: any = {
-  getAssociatePartnerForCandidate: async (candidateId: string) => {
+  getAssociatePartnerForCandidate: async (candidateId: string, candidateData?: any) => {
     try {
       // Very basic AP discovery: Check if candidate was sourced by an AP
-      const snap = await getDoc(doc(db, 'crm_candidates', candidateId));
-      if (!snap.exists()) return null;
+      let cData = candidateData;
+      if (!cData) {
+        const snap = await getDoc(doc(db, 'crm_candidates', candidateId));
+        if (!snap.exists()) return null;
+        cData = snap.data();
+      }
       
-      const cData = snap.data();
       if (!cData.source || cData.source !== 'Associate Partner' || !cData.associatePartnerId) {
         // If not AP sourced, we consider them "Joined" by default to bypass the AP gate
         return {
@@ -149,7 +152,7 @@ const integrationAp: any = {
       const apDoc = await getDoc(doc(db, 'associate_partners', cData.associatePartnerId));
       if (apDoc.exists()) {
         const apData = apDoc.data();
-        const submission = (apData.submissions || []).find((s: any) => s.mobileNumber === cData.phone);
+        const submission = (apData.submissions || []).find((s: any) => s.mobileNumber === cData.phone || s.mobileNumber === cData.mobile);
         return {
           id: apDoc.id,
           name: apData.name || apData.subVendorName,
@@ -196,7 +199,7 @@ const integrationClient: any = {
       return {
         clientName: data.name,
         commercialType: data.commercial?.type,
-        tenureDaysConfig: data.commercial?.tenure || 90,
+        tenureDaysConfig: data.commercial?.tenureCondition,
         points: basePoints,
         bigDayBonus: resolvedBigDayBonus,
         totalPoints: totalPoints,

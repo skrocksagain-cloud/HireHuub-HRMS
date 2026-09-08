@@ -4,7 +4,7 @@ import type { WorkforceItem } from '../types/workforce';
 interface ActiveWorkforceTableProps {
   workforce: WorkforceItem[];
   loading: boolean;
-  onOpenCrmProfile: (candidateId: string) => void;
+  onOpenProfile: (item: WorkforceItem) => void;
   onOpenPayoutHistory: (item: WorkforceItem) => void;
   onUpdateLwd?: (id: string, phone: string, candidateId: string, date: string) => Promise<void>;
 }
@@ -12,7 +12,7 @@ interface ActiveWorkforceTableProps {
 export default function ActiveWorkforceTable({
   workforce,
   loading,
-  onOpenCrmProfile,
+  onOpenProfile,
   onOpenPayoutHistory,
   onUpdateLwd,
 }: ActiveWorkforceTableProps) {
@@ -36,7 +36,7 @@ export default function ActiveWorkforceTable({
                 <th className="py-3.5 px-4">Client Name</th>
                 <th className="py-3.5 px-4">Type</th>
                 <th className="py-3.5 px-4">Recruiter / AP</th>
-                <th className="py-3.5 px-4">Joining Date</th>
+                <th className="py-3.5 px-4">Active Date</th>
                 <th className="py-3.5 px-4">LWD</th>
                 <th className="py-3.5 px-4">Working Status</th>
                 <th className="py-3.5 px-4 text-center">Tenure / Elig.</th>
@@ -60,7 +60,7 @@ export default function ActiveWorkforceTable({
                   <td className="py-3.5 px-4">
                     <button
                       type="button"
-                      onClick={() => onOpenCrmProfile((item as any).placementDocId || item.id)}
+                      onClick={() => onOpenProfile(item)}
                       className="font-bold text-slate-900 text-sm hover:text-emerald-700 hover:underline text-left"
                     >
                       {item.candidateName}
@@ -99,9 +99,9 @@ export default function ActiveWorkforceTable({
                     )}
                   </td>
 
-                  {/* Joining Date */}
+                  {/* Active Date */}
                   <td className="py-3.5 px-4 text-slate-600 font-medium">
-                    {item.workforceType === 'Payroll' ? item.activeDate : item.joiningDate}
+                    {item.activeDate}
                   </td>
 
                   {/* LWD */}
@@ -186,7 +186,7 @@ export default function ActiveWorkforceTable({
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onOpenCrmProfile((item as any).placementDocId || item.id)}
+                        onClick={() => onOpenProfile(item)}
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-700 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 transition text-[11px] font-semibold"
                         title="View / Edit Placement Profile"
                       >

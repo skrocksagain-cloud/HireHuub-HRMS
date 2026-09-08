@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getAuthorizationScope } from '../../../../core/authorization/authorizationResolver';
 
 import {
@@ -34,6 +34,7 @@ export default function WorkforceWorkspacePage() {
     toggleLockImport,
     updateLastWorkingDate,
     staffingRecruiters,
+    refreshWorkforce,
   } = useWorkforce();
 
   const [selectedItem, setSelectedItem] = useState<WorkforceItem | null>(null);
@@ -41,14 +42,24 @@ export default function WorkforceWorkspacePage() {
   const [showPayoutHistoryModal, setShowPayoutHistoryModal] = useState<boolean>(false);
   
   // Drawer state
-  const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
+  const [selectedProfileItem, setSelectedProfileItem] = useState<WorkforceItem | null>(null);
 
   const scope = getAuthorizationScope((userSession as any).assignedRole);
   const isFinanceOrAdmin = scope === 'GLOBAL' || scope === 'DEPARTMENT';
 
-  const handleOpenCrmProfile = (placementId: string) => {
-    setSelectedPlacementId(placementId);
+  const handleOpenProfile = (item: WorkforceItem) => {
+    setSelectedProfileItem(item);
   };
+
+  // Sync selected item with latest workforce data after refresh
+  useEffect(() => {
+    if (selectedProfileItem && workforce) {
+      const updatedItem = allWorkforce.find(w => w.id === selectedProfileItem.id || (w as any).placementDocId === (selectedProfileItem as any).placementDocId);
+      if (updatedItem && JSON.stringify(updatedItem) !== JSON.stringify(selectedProfileItem)) {
+        setSelectedProfileItem(updatedItem);
+      }
+    }
+  }, [allWorkforce, selectedProfileItem]);
 
   const handleOpenPayoutHistory = (item: WorkforceItem) => {
     setSelectedItem(item);
@@ -111,7 +122,7 @@ export default function WorkforceWorkspacePage() {
       <ActiveWorkforceTable
         workforce={workforce}
         loading={loading}
-        onOpenCrmProfile={handleOpenCrmProfile}
+        onOpenProfile={handleOpenProfile}
         onOpenPayoutHistory={handleOpenPayoutHistory}
         onUpdateLwd={updateLastWorkingDate}
       />
@@ -138,10 +149,11 @@ export default function WorkforceWorkspacePage() {
       />
 
       {/* Profile Drawer */}
-      {selectedPlacementId && (
+      {selectedProfileItem && (
         <WorkforceProfileDrawer
-          placementId={selectedPlacementId}
-          onClose={() => setSelectedPlacementId(null)}
+          item={selectedProfileItem}
+          onRefresh={refreshWorkforce}
+          onClose={() => setSelectedProfileItem(null)}
         />
       )}
     </DashboardLayout>

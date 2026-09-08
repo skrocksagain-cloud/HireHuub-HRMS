@@ -46,7 +46,7 @@ const workforceFromDoc = (id: string, value: Record<string, unknown>): Workforce
   activeDate: String(value.activeDate ?? ''),
   workingFrom: String(value.workingFrom ?? ''),
   dateOfBirth: value.dateOfBirth ? String(value.dateOfBirth) : undefined,
-  joiningDate: value.joiningDate ? String(value.joiningDate) : undefined,
+
   lastWorkingDate: value.lastWorkingDate ? String(value.lastWorkingDate) : undefined,
   tenureDays: Number(value.tenureDays ?? 0),
   tenureDisplay: String(value.tenureDisplay ?? ''),
@@ -180,7 +180,7 @@ export class WorkforceRepository {
           activeDate: activePlacement?.activeDate || h?.activeDate || cand.updatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10),
           workingFrom: activePlacement?.activeDate || h?.workingFrom || cand.updatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10),
           dateOfBirth: cand.dateOfBirth,
-          joiningDate: h?.joiningDate || activePlacement?.activeDate || cand.updatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10),
+
           lastWorkingDate: h?.lastWorkingDate,
           tenureDays: 0,
           tenureDisplay: '',
@@ -235,7 +235,7 @@ export class WorkforceRepository {
             associatePartnerName: partner.subVendorName || partner.name,
             activeDate: sub.submissionDate,
             workingFrom: sub.submissionDate,
-            joiningDate: h?.joiningDate || sub.joiningDate,
+
             lastWorkingDate: h?.lastWorkingDate,
             tenureDays: 0,
             tenureDisplay: '',
@@ -270,7 +270,7 @@ export class WorkforceRepository {
       );
 
       const tenureDays = WorkforceNumberService.calculateTenureDays(
-        item.joiningDate || item.activeDate,
+        item.activeDate,
         item.lastWorkingDate
       );
 

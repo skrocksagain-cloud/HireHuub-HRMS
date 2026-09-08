@@ -48,7 +48,10 @@ export default function ClientPayoutImportModal({
   const [selectedClientId, setSelectedClientId] = useState<string>('client-001');
   const [selectedClientName, setSelectedClientName] = useState<string>('Elastic Run');
   const [importPeriod, setImportPeriod] = useState<ImportPeriod>('Monthly');
-  const [importMonth, setImportMonth] = useState<string>('2026-07');
+  const [importMonth, setImportMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
   const [fileUploaded, setFileUploaded] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -323,9 +326,20 @@ export default function ClientPayoutImportModal({
                       onChange={(e) => setImportMonth(e.target.value)}
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-800 focus:outline-none"
                     >
-                      <option value="2026-07">July 2026</option>
-                      <option value="2026-08">August 2026</option>
-                      <option value="2026-06">June 2026</option>
+                      {(() => {
+                        const currentYear = new Date().getFullYear();
+                        const months = [];
+                        for (let i = 0; i < 12; i++) {
+                          const monthStr = (i + 1).toString().padStart(2, '0');
+                          const monthName = new Date(currentYear, i).toLocaleString('en-US', { month: 'long' });
+                          months.push(
+                            <option key={`${currentYear}-${monthStr}`} value={`${currentYear}-${monthStr}`}>
+                              {monthName} {currentYear}
+                            </option>
+                          );
+                        }
+                        return months;
+                      })()}
                     </select>
                   </div>
                 </div>

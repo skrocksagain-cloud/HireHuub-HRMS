@@ -10,7 +10,7 @@ export interface ClientIntegrationV2 {
 }
 
 export interface AssociatePartnerIntegrationV2 {
-  getAssociatePartnerForCandidate(candidateId: string): Promise<{
+  getAssociatePartnerForCandidate(candidateId: string, candidateData?: any): Promise<{
     id: string;
     name?: string;
     status: 'Joined' | 'Not Joined' | 'Not Found';

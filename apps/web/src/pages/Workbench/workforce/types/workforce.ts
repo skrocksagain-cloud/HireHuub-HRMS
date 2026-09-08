@@ -4,7 +4,7 @@ export type WorkforceType = 'Payroll' | 'OTS';
 
 export type WorkingStatus = 'Working' | 'Not Working';
 
-export type OtsEligibility = 'Eligible' | 'Not Eligible';
+export type OtsEligibility = 'Eligible' | 'Not Eligible' | 'Config Missing';
 
 export type OtsBillingStatus = 'Pending' | 'Billed';
 
@@ -50,7 +50,7 @@ export interface WorkforceItem {
   activeDate: string; // ISO date string
   workingFrom: string; // Calculated from activeDate
   dateOfBirth?: string;
-  joiningDate?: string;
+
   lastWorkingDate?: string;
   terminationReason?: string;
   tenureDays: number;
