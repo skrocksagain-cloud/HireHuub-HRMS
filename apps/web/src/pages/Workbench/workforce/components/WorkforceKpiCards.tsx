@@ -53,12 +53,12 @@ export default function WorkforceKpiCards({ summary }: WorkforceKpiCardsProps) {
 
       <KpiCard
         metric={{
-          id: 'last-month-working',
-          title: 'Last Month Working',
-          value: summary.lastMonthWorkingCount.toString(),
-          change: 'Previous Month',
+          id: 'current-month-working',
+          title: 'Current Month Working',
+          value: summary.currentMonthWorkingCount.toString(),
+          change: 'Current Month',
           trend: 'up',
-          subtext: 'Historical payroll working count',
+          subtext: 'Active payroll working count',
           category: 'invoices',
         }}
         icon={<Clock size={20} className="text-emerald-600" />}

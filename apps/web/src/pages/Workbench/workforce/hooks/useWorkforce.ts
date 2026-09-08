@@ -6,7 +6,6 @@ import type {
   WorkforceKpiSummary,
   ClientPayoutImportRecord,
   OtsBillingStatus,
-  WorkingStatus,
   OtsEligibility
 } from '../types/workforce';
 import { workforceRepository } from '../repositories/workforceRepository';
@@ -61,9 +60,9 @@ export function useWorkforce() {
       // 1. Fetch data from V2 Service
       const { workforceService } = await import('../v2/hooks/useWorkforceV2');
       const v2Records = await workforceService.getActiveWorkforce(
-        { 
-          id: userSession.id, 
-          name: userSession.name, 
+        {
+          id: userSession.id,
+          name: userSession.name,
           role: currentRole,
           assignedRole: (userSession as any).assignedRole,
           departmentId: (userSession as any).departmentId
@@ -78,68 +77,89 @@ export function useWorkforce() {
         return d.toLocaleDateString('en-GB').replace(/\//g, '-');
       };
 
-      // 2. Map strictly to the legacy WorkforceItem shape to keep the UI unharmed
-      const mappedItems: WorkforceItem[] = v2Records.map(v2 => ({
-        id: v2.employeeId,
-        placementBusinessId: v2.placement.placementId || '',
-        placementDocId: v2.placement.id,
-        workforceType: v2.workforceType, 
-        
-        candidateId: v2.candidate.id,
-        candidateName: v2.candidate.name,
-        phone: v2.candidate.phone,
-        area: v2.candidate.area,
-        city: v2.candidate.city,
-        hasActivePlacement: true, 
-        candidateLifecycleStatus: 'Active',
-        
-        clientId: v2.client.id,
-        clientName: v2.client.name,
-        
-        recruiterId: v2.placement.recruiterId || '',
-        recruiterName: v2.placement.recruiterName || '',
-        associatePartnerId: v2.associatePartner?.id,
-        associatePartnerName: v2.associatePartner?.name,
+      // 2. Keep Payout Imports fetching for KPIs/History and Working Status
+      const imports = await workforceRepository.getPayoutImports();
 
-        activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-        workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-        dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
-        lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
-        
-        tenureDays: v2.ots?.tenureDays || 0,
-        tenureDisplay: `${v2.ots?.tenureDays || 0} Days`,
-        
-        workingStatus: (v2.workforceType === 'Payroll' 
-          ? v2.payroll?.currentWorkingStatus 
-          : v2.ots?.currentWorkingStatus) || 'Not Working' as WorkingStatus,
-        
-        totalEarnings: v2.monthly?.totalEarnings || 0,
-        totalOrders: v2.monthly?.totalOrders || 0,
-        rank: v2.monthly?.rank,
-        
-        eligibility: (v2.ots?.eligibility as OtsEligibility) || 'Not Eligible',
-        billingStatus: (v2.placement.billingStatus as OtsBillingStatus) || 'Pending',
-        
-        activatedBy: '',
-        currentAssignee: '',
-        
-        payrollEmployeeId: v2.workforceType === 'Payroll' ? v2.employeeId : undefined,
-        supportsOrders: v2.workforceType === 'Payroll',
-        placementHistory: [{
-          id: v2.placement.id,
+      const now = new Date();
+      const currentMonthString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const currentMonthApprovedImports = imports.filter(imp => imp.month === currentMonthString && imp.isApproved);
+
+      const currentMonthPayoutMap = new Map<string, any>();
+      currentMonthApprovedImports.forEach((imp) => {
+        imp.rows.forEach((r) => {
+          if (r.matched && r.employeeId) {
+            currentMonthPayoutMap.set(r.employeeId.trim().toLowerCase(), r);
+          }
+        });
+      });
+
+      // 3. Map strictly to the legacy WorkforceItem shape to keep the UI unharmed
+      const mappedItems: WorkforceItem[] = v2Records.map(v2 => {
+        const matchedPayout = currentMonthPayoutMap.get(v2.employeeId.trim().toLowerCase())
+                           || currentMonthPayoutMap.get(`wf-${v2.candidate.id}`.toLowerCase());
+
+        let isWorking = false;
+        if (matchedPayout && (Number(matchedPayout.orders) > 0 || Number(matchedPayout.earnings) > 0)) {
+          isWorking = true;
+        }
+
+        return {
+          id: v2.employeeId,
+          placementBusinessId: v2.placement.placementId || '',
+          placementDocId: v2.placement.id,
+          workforceType: v2.workforceType,
+
+          candidateId: v2.candidate.id,
+          candidateName: v2.candidate.name,
+          phone: v2.candidate.phone,
+          area: v2.candidate.area,
+          city: v2.candidate.city,
+          hasActivePlacement: true,
+          candidateLifecycleStatus: 'Active',
+
           clientId: v2.client.id,
           clientName: v2.client.name,
-          clientType: v2.workforceType,
-          status: v2.placement.status || 'Active',
-          activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          recruiterId: v2.placement.recruiterId || '',
-          recruiterName: v2.placement.recruiterName || ''
-        }] as any[]
-      }) as unknown as WorkforceItem);
 
-      // 3. Keep Payout Imports fetching for KPIs/History 
-      const imports = await workforceRepository.getPayoutImports();
-      
+          recruiterId: v2.placement.recruiterId || '',
+          recruiterName: v2.placement.recruiterName || '',
+          associatePartnerId: v2.associatePartner?.id,
+          associatePartnerName: v2.associatePartner?.name,
+
+          activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
+          workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
+          dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
+          lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
+
+          tenureDays: v2.ots?.tenureDays || 0,
+          tenureDisplay: `${v2.ots?.tenureDays || 0} Days`,
+
+          workingStatus: isWorking ? 'Working' : 'Not Working',
+
+          totalEarnings: v2.monthly?.totalEarnings || 0,
+          totalOrders: v2.monthly?.totalOrders || 0,
+          rank: v2.monthly?.rank,
+
+          eligibility: (v2.ots?.eligibility as OtsEligibility) || 'Not Eligible',
+          billingStatus: (v2.placement.billingStatus as OtsBillingStatus) || 'Pending',
+
+          activatedBy: '',
+          currentAssignee: '',
+
+          payrollEmployeeId: v2.workforceType === 'Payroll' ? v2.employeeId : undefined,
+          supportsOrders: v2.workforceType === 'Payroll',
+          placementHistory: [{
+            id: v2.placement.id,
+            clientId: v2.client.id,
+            clientName: v2.client.name,
+            clientType: v2.workforceType,
+            status: v2.placement.status || 'Active',
+            activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
+            recruiterId: v2.placement.recruiterId || '',
+            recruiterName: v2.placement.recruiterName || ''
+          }] as any[]
+        } as unknown as WorkforceItem;
+      });
+
       const sessionForCrm = { ...userSession, role: currentRole };
       const crmCandidates = await crmRepository.getCandidates(sessionForCrm);
       const activeIntake = crmCandidates.filter((c) => c.currentCrmStatus === 'Active');
@@ -252,23 +272,8 @@ export function useWorkforce() {
       (w) => w.eligibility === 'Eligible' && w.billingStatus === 'Pending'
     ).length;
 
-    // Calculate Last Month Working Candidates KPI
-    const lastMonthDate = new Date();
-    lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
-    const lastMonthString = lastMonthDate.toISOString().slice(0, 7);
-
-    const lastMonthWorkingCount = filteredWorkforce.filter((w) => {
-      // Find if candidate was in approved imports for lastMonthString
-      const relevantImports = payoutImports.filter(imp => imp.month === lastMonthString && imp.isApproved);
-      for (const imp of relevantImports) {
-        const match = imp.rows.find((r: any) => 
-          r.matched && 
-          (r.employeeId.trim().toLowerCase() === w.id.trim().toLowerCase() ||
-           r.employeeId.trim().toLowerCase() === (w.payrollEmployeeId || '').trim().toLowerCase())
-        );
-        if (match) return true;
-      }
-      return false;
+    const currentMonthWorkingCount = filteredWorkforce.filter((w) => {
+      return w.workforceType === 'Payroll' && w.workingStatus === 'Working';
     }).length;
 
     return {
@@ -283,7 +288,7 @@ export function useWorkforce() {
       topPerformerName,
       eligibleForBilling,
       pendingBilling,
-      lastMonthWorkingCount,
+      currentMonthWorkingCount,
     };
   }, [filteredWorkforce, payoutImports]);
 
@@ -366,7 +371,7 @@ export function useWorkforce() {
         newActiveDate: newActiveDate
       });
       // Optionally we could update Operational Data for KYC fields if they are provided, but for now we just run the transfer.
-      
+
       await fetchWorkforceData();
     } catch (err: unknown) {
       throw err;

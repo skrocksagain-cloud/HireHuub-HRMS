@@ -157,5 +157,5 @@ export interface WorkforceKpiSummary {
   topPerformerName?: string;
   eligibleForBilling: number;
   pendingBilling: number;
-  lastMonthWorkingCount: number;
+  currentMonthWorkingCount: number;
 }
