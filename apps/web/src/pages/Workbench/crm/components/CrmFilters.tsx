@@ -160,6 +160,17 @@ export default function CrmFilters({
             className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
+
+        {/* Last Update Date */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Last Update Date</label>
+          <input
+            type="date"
+            value={filters.lastUpdateDate || ''}
+            onChange={(e) => onFilterChange({ ...filters, lastUpdateDate: e.target.value || undefined })}
+            className="w-full text-xs p-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+        </div>
       </div>
 
       {/* Reset Filter Button */}

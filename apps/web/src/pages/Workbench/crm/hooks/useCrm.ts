@@ -86,16 +86,18 @@ export function useCrm() {
 
   useEffect(() => { void refreshData(); }, [refreshData]);
 
-  const activeEmployees = useMemo(() => employees.filter((employee) => employee.employmentStatus === 'Active' || employee.status === 'Active'), [employees]);
+  const activeEmployees = useMemo(() => employees.filter((employee) =>
+    (employee.employmentStatus === 'Active' || employee.status === 'Active') &&
+    (employee.department === 'Staffing' || employee.departmentId === 'staffing')
+  ), [employees]);
   const assignableEmployees = useMemo(() => {
     const scope = getAuthorizationScope(sessionUser.assignedRole || sessionUser.role);
-    // Authorization bypass mode - all employees are assignable when scope is GLOBAL
     if (scope === 'OWN') return [];
-    if (scope === 'DIRECT_REPORTS') {
-      return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.employeeId === sessionUser.id);
+    if (scope === 'TEAM') {
+      return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.teamId === sessionUser.teamId || e.employeeId === sessionUser.id);
     }
     if (scope === 'DEPARTMENT') {
-      return activeEmployees.filter(e => e.departmentId === sessionUser.departmentId);
+      return activeEmployees.filter(e => e.departmentId === sessionUser.departmentId || e.department === sessionUser.department);
     }
     return activeEmployees; // GLOBAL
   }, [activeEmployees, sessionUser]);

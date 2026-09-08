@@ -83,40 +83,70 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
 
   const handleUpdateAssignment = async (_wfId: string, employee: Employee) => {
     const placementId = (item as any)?.placementId;
-    if (placementId) {
-      const { updateDoc, doc } = await import('firebase/firestore');
+    const candidateId = item?.candidateId;
+
+    if (placementId && candidateId) {
+      const { writeBatch, doc } = await import('firebase/firestore');
       const { db } = await import('../../../../firebase/firebase');
-      await updateDoc(doc(db, 'placements', placementId), { recruiterId: employee.id, recruiterName: employee.fullName });
+
+      const newRecruiterId = employee.employeeId || employee.id;
+      const newRecruiterName = employee.fullName;
+
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'placements', placementId), {
+        recruiterId: newRecruiterId,
+        recruiterName: newRecruiterName
+      });
+
+      batch.update(doc(db, 'crm_candidates', candidateId), {
+        assignedRecruiterId: newRecruiterId,
+        assignedRecruiterName: newRecruiterName,
+        teamId: (employee as any).teamId || null,
+        teamName: (employee as any).teamName || null,
+        departmentId: employee.departmentId || null,
+        updatedAt: new Date().toISOString()
+      });
+
+      await batch.commit();
       onRefresh();
     }
   };
 
   const parseDateToIso = (dateStr: string) => {
     if (!dateStr) return undefined;
-    // convert DD-MM-YYYY to YYYY-MM-DD
     if (dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
       const [d, m, y] = dateStr.split('-');
       return `${y}-${m}-${d}`;
     }
-    return dateStr; // fallback if already YYYY-MM-DD
+    return dateStr;
   };
 
   const handleSaveProfile = async (updates: any) => {
     const placementId = (item as any)?.placementId;
-    if (placementId) {
-      const { updateDoc, doc } = await import('firebase/firestore');
+    const candidateId = item?.candidateId;
+
+    if (placementId && candidateId) {
+      const { writeBatch, doc, getDoc } = await import('firebase/firestore');
       const { db } = await import('../../../../firebase/firebase');
 
       const operationalDataUpdates: any = {};
-      
+      const candidateUpdates: any = {};
+
       if (item?.workforceType === 'Payroll') {
-        if (updates.dateOfBirth) operationalDataUpdates['operationalData.dateOfBirth'] = parseDateToIso(updates.dateOfBirth);
+        if (updates.dateOfBirth) {
+          operationalDataUpdates['operationalData.dateOfBirth'] = parseDateToIso(updates.dateOfBirth);
+          candidateUpdates.dateOfBirth = parseDateToIso(updates.dateOfBirth);
+        }
         if (updates.aadhaarNumber) operationalDataUpdates['operationalData.aadhaar'] = updates.aadhaarNumber;
         if (updates.panNumber) operationalDataUpdates['operationalData.pan'] = updates.panNumber;
         if (updates.bankAccountNumber) operationalDataUpdates['operationalData.bankAccountNumber'] = updates.bankAccountNumber;
         if (updates.ifscCode) operationalDataUpdates['operationalData.ifscCode'] = updates.ifscCode;
       } else {
-        if (updates.dateOfBirth) operationalDataUpdates['operationalData.dateOfBirth'] = parseDateToIso(updates.dateOfBirth);
+        if (updates.dateOfBirth) {
+          operationalDataUpdates['operationalData.dateOfBirth'] = parseDateToIso(updates.dateOfBirth);
+          candidateUpdates.dateOfBirth = parseDateToIso(updates.dateOfBirth);
+        }
         if (updates.lastWorkingDate) operationalDataUpdates.lastWorkingDate = parseDateToIso(updates.lastWorkingDate);
         if (updates.billingStatus) operationalDataUpdates.billingStatus = updates.billingStatus;
       }
@@ -125,7 +155,42 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
         operationalDataUpdates.activeDate = parseDateToIso(updates.activeDate);
       }
 
-      await updateDoc(doc(db, 'placements', placementId), operationalDataUpdates);
+      const candRef = doc(db, 'crm_candidates', candidateId);
+      const candSnap = await getDoc(candRef);
+      
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'placements', placementId), operationalDataUpdates);
+
+      if (candSnap.exists()) {
+        const candData = candSnap.data();
+        let shouldUpdateCandidate = Object.keys(candidateUpdates).length > 0;
+
+        if (Array.isArray(candData.placementHistory)) {
+           const updatedHistory = candData.placementHistory.map((p: any) => {
+             if (p.id === placementId || p.placementId === placementId || p.status === 'Active') {
+                shouldUpdateCandidate = true;
+                return {
+                  ...p,
+                  activeDate: updates.activeDate ? parseDateToIso(updates.activeDate) : p.activeDate,
+                  lastWorkingDate: updates.lastWorkingDate ? parseDateToIso(updates.lastWorkingDate) : p.lastWorkingDate
+                };
+             }
+             return p;
+           });
+
+           if (shouldUpdateCandidate) {
+             batch.update(candRef, {
+               ...candidateUpdates,
+               placementHistory: updatedHistory,
+               updatedAt: new Date().toISOString()
+             });
+           }
+        } else if (shouldUpdateCandidate) {
+           batch.update(candRef, { ...candidateUpdates, updatedAt: new Date().toISOString() });
+        }
+      }
+
+      await batch.commit();
       onRefresh();
     }
   };

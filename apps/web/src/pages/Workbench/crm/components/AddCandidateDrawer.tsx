@@ -6,6 +6,7 @@ import { crmService } from '../services/crmService';
 import type { Employee } from '../../../Employee/types/Employee';
 
 import { getAllIndianCities } from '../../../../core/location/indiaLocationMaster';
+import { getAuthorizationScope } from '../../../../core/authorization/authorizationResolver';
 
 interface AddCandidateDrawerProps {
   isOpen: boolean;
@@ -156,8 +157,8 @@ export default function AddCandidateDrawer({
     setFormError(null);
   };
 
-  // Default scope in bypass mode
-  const isTLOrAbove = false;
+  const scope = getAuthorizationScope(userSession.assignedRole || userSession.role);
+  const isTLOrAbove = scope !== 'OWN';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex justify-end">

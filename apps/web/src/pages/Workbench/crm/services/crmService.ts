@@ -12,6 +12,7 @@ export interface CrmFilterState {
   role?: string;
   followUpMonth?: string;
   interviewMonth?: string;
+  lastUpdateDate?: string;
 }
 
 export interface KpiSummary {
@@ -144,6 +145,25 @@ export class CrmService {
 
       if (filters.interviewMonth) {
         if (!c.interviewDate || !c.interviewDate.startsWith(filters.interviewMonth)) return false;
+      }
+
+      if (filters.lastUpdateDate) {
+        // Authoritative CRM interaction timestamp
+        let activityDate = c.lastCalledAt;
+
+        // Fallback exclusively for untouched, currently assigned leads
+        if (!activityDate) {
+          const qualifiesForFallback = Boolean(
+            c.assignedRecruiterId &&
+            (c.currentCrmStatus === null || c.currentCrmStatus === undefined)
+          );
+
+          if (qualifiesForFallback) {
+            activityDate = c.updatedAt;
+          }
+        }
+
+        if (!activityDate || !activityDate.startsWith(filters.lastUpdateDate)) return false;
       }
 
       return true;
