@@ -1,28 +1,40 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
-
+import { clientRepository } from '../../../Workbench/Network/clients/repositories/clientRepository';
+import type { Client } from '../../../../types/Client';
 export default function OtsBillingTab() {
   const { user } = useAuth();
   const [workforce, setWorkforce] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMode, setFilterMode] = useState<'All' | 'Billed' | 'Unbilled'>('All');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<string>('All');
 
   const fetchOts = async () => {
     setLoading(true);
     try {
       const { workforceService } = await import('../../../Workbench/workforce/v2/hooks/useWorkforceV2');
       const v2Records = await workforceService.getActiveWorkforce(
-        { id: user?.employeeId || 'admin', name: user?.name || 'Admin', role: (user?.role as any) || 'Super Admin' },
+        {
+          id: user?.employeeId || 'admin',
+          name: user?.name || 'Admin',
+          role: (user?.role as any) || 'Super Admin',
+          assignedRole: (user as any)?.assignedRole || user?.role,
+          departmentId: user?.departmentId,
+          teamId: user?.teamId,
+          department: (user as any)?.department
+        } as any,
         {}
       );
-      
+
       const otsRecords = v2Records.filter(r => r.workforceType === 'OTS' && r.ots?.eligibility === 'Eligible').map(r => ({
         id: r.employeeId,
         placementId: r.placement.id,
         candidateName: r.candidate.name,
+        clientId: r.client.id,
         clientName: r.client.name,
         recruiterName: r.placement.recruiterName,
-        joiningDate: r.placement.joiningDate || r.placement.activeDate,
+        activeDate: r.placement.activeDate,
         lastWorkingDate: r.placement.lastWorkingDate,
         tenureDays: r.ots?.tenureDays || 0,
         tenureDisplay: `${r.ots?.tenureDays || 0} Days`,
@@ -39,6 +51,9 @@ export default function OtsBillingTab() {
 
   useEffect(() => {
     fetchOts();
+    clientRepository.getClients().then((c) => {
+      setClients(c.filter(client => client.id !== 'all' && client.commercial?.type === 'OTS'));
+    });
   }, [user]);
 
   const eligibleOts = workforce;
@@ -47,10 +62,14 @@ export default function OtsBillingTab() {
   const unbilledCount = eligibleOts.filter(w => w.billingStatus === 'Pending').length;
 
   const displayRows = useMemo(() => {
-    if (filterMode === 'Billed') return eligibleOts.filter(w => w.billingStatus === 'Billed');
-    if (filterMode === 'Unbilled') return eligibleOts.filter(w => w.billingStatus === 'Pending');
-    return eligibleOts;
-  }, [eligibleOts, filterMode]);
+    let filtered = eligibleOts;
+    if (selectedClient !== 'All') {
+      filtered = filtered.filter(w => w.clientId === selectedClient);
+    }
+    if (filterMode === 'Billed') return filtered.filter(w => w.billingStatus === 'Billed');
+    if (filterMode === 'Unbilled') return filtered.filter(w => w.billingStatus === 'Pending');
+    return filtered;
+  }, [eligibleOts, filterMode, selectedClient]);
 
   const handleMarkBilled = async (item: any) => {
     if (!confirm(`Mark ${item.candidateName} as billed?`)) return;
@@ -86,7 +105,16 @@ export default function OtsBillingTab() {
           </div>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div className="flex space-x-4 items-center">
+          <select
+            value={selectedClient}
+            onChange={(e) => setSelectedClient(e.target.value)}
+            className="px-3 py-1.5 text-sm font-bold bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500"
+          >
+            <option value="All">All OTS Clients</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <div className="flex bg-slate-100 p-1 rounded-lg">
           <button
             onClick={() => setFilterMode('All')}
             className={`px-4 py-1.5 text-xs font-bold rounded-md ${filterMode === 'All' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
@@ -105,6 +133,7 @@ export default function OtsBillingTab() {
           >
             Unbilled
           </button>
+          </div>
         </div>
       </div>
 
@@ -116,7 +145,7 @@ export default function OtsBillingTab() {
               <th className="p-3">Candidate</th>
               <th className="p-3">Client</th>
               <th className="p-3">Recruiter</th>
-              <th className="p-3">Joining Date</th>
+              <th className="p-3">Active Date</th>
               <th className="p-3">LWD</th>
               <th className="p-3">Tenure</th>
               <th className="p-3">Eligibility</th>
@@ -133,7 +162,7 @@ export default function OtsBillingTab() {
                   <td className="p-3 font-medium text-slate-900">{item.candidateName}</td>
                   <td className="p-3 font-bold text-emerald-700">{item.clientName}</td>
                   <td className="p-3 text-slate-700">{item.recruiterName || 'N/A'}</td>
-                  <td className="p-3 text-slate-600">{item.joiningDate}</td>
+                  <td className="p-3 text-slate-600">{item.activeDate}</td>
                   <td className="p-3 text-slate-600">{item.lastWorkingDate || '-'}</td>
                   <td className="p-3 font-bold text-slate-700">{item.tenureDisplay || `${item.tenureDays} Days`}</td>
                   <td className="p-3">
