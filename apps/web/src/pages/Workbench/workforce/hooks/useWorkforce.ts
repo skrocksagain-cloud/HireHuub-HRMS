@@ -248,8 +248,8 @@ export function useWorkforce() {
     const workingCount = filteredWorkforce.filter((w) => w.workingStatus === 'Working').length;
     const notWorkingCount = filteredWorkforce.filter((w) => w.workingStatus === 'Not Working').length;
 
-    // Check if order data exists in filtered subset
-    const candidatesWithOrders = filteredWorkforce.filter(
+    // Check if order data exists in ALL active subset for Rank #1
+    const candidatesWithOrders = rawItems.filter(
       (w) => w.supportsOrders && (w.totalOrders || 0) > 0
     );
     const hasOrderData = candidatesWithOrders.length > 0;
@@ -272,7 +272,7 @@ export function useWorkforce() {
       (w) => w.eligibility === 'Eligible' && w.billingStatus === 'Pending'
     ).length;
 
-    const currentMonthWorkingCount = filteredWorkforce.filter((w) => {
+    const currentMonthWorkingCount = rawItems.filter((w) => {
       return w.workforceType === 'Payroll' && w.workingStatus === 'Working';
     }).length;
 
@@ -290,7 +290,7 @@ export function useWorkforce() {
       pendingBilling,
       currentMonthWorkingCount,
     };
-  }, [filteredWorkforce, payoutImports]);
+  }, [filteredWorkforce, payoutImports, rawItems]);
 
   const updateBillingStatus = async (id: string, billingStatus: OtsBillingStatus) => {
     try {

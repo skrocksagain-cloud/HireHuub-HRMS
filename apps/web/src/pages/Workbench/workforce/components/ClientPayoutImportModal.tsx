@@ -45,8 +45,8 @@ export default function ClientPayoutImportModal({
   onToggleLockImport,
 }: ClientPayoutImportModalProps) {
   const [step, setStep] = useState<Step>('upload');
-  const [selectedClientId, setSelectedClientId] = useState<string>('client-001');
-  const [selectedClientName, setSelectedClientName] = useState<string>('Elastic Run');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedClientName, setSelectedClientName] = useState<string>('');
   const [importPeriod, setImportPeriod] = useState<ImportPeriod>('Monthly');
   const [importMonth, setImportMonth] = useState<string>(() => {
     const d = new Date();
@@ -97,6 +97,10 @@ export default function ClientPayoutImportModal({
   };
 
   const handleProceedToValidation = async () => {
+    if (!selectedClientId || !selectedClientName) {
+      setModalError('Please select a client account before uploading.');
+      return;
+    }
     if (!fileUploaded || !selectedFile) {
       setModalError('Please select a valid Excel file first.');
       return;
@@ -297,9 +301,11 @@ export default function ClientPayoutImportModal({
                       setSelectedClientId(e.target.value);
                       const found = clientOptions.find((c) => c.id === e.target.value);
                       if (found) setSelectedClientName(found.name);
+                      else setSelectedClientName('');
                     }}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
                   >
+                    <option value="" disabled>Select a Client...</option>
                     {clientOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}

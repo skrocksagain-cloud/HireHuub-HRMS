@@ -139,25 +139,13 @@ export class PayoutService {
     return Array.from(uniqueMap.values());
   }
 
-  async exportToBlinkitFormat(rows: PayoutPayrollRow[]): Promise<void> {
+  async exportToBlinkitFormat(rows: PayoutPayrollRow[], selectedDebitAccount: string): Promise<void> {
     const validRows = rows.filter(r => r.isValid);
     if (validRows.length === 0) {
       throw new Error('No valid rows to export.');
     }
 
-    let debitAccountNumber = '000000000000';
-    try {
-      const { adminService } = await import('../../../../services/admin/adminService');
-      const adminCompany = await adminService.getCompanySettings();
-      if (adminCompany?.bankAccountsV2 && adminCompany.bankAccountsV2.length > 0) {
-        const activeBanks = adminCompany.bankAccountsV2.filter((b) => b.isActive);
-        if (activeBanks.length > 0) debitAccountNumber = activeBanks[0].accountNumber;
-      } else if (adminCompany?.bankDetails?.accountNumber) {
-        debitAccountNumber = adminCompany.bankDetails.accountNumber;
-      }
-    } catch (e) {
-      console.error('Failed to fetch company debit account', e);
-    }
+    let debitAccountNumber = selectedDebitAccount || '000000000000';
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Payout');
@@ -175,6 +163,12 @@ export class PayoutService {
       { header: 'Beneficiary Nickname/Code', key: 'nickname', width: 20 },
     ];
 
+    const today = new Date();
+    // E.g., '2026-09-10'
+    const generatedDateStr = today.toISOString().slice(0, 10);
+    // E.g., '20260910'
+    const generatedDateYYYYMMDD = generatedDateStr.replace(/-/g, '');
+
     validRows.forEach(row => {
       sheet.addRow({
         debitAccount: debitAccountNumber, 
@@ -183,9 +177,9 @@ export class PayoutService {
         benName: row.candidateName,
         benAccount: row.bankAccount,
         ifsc: row.ifsc,
-        txnDate: row.transactionDate,
+        txnDate: generatedDateStr,
         mode: 'IMPS',
-        crn: row.customerReferenceNumber,
+        crn: `blinkit${generatedDateYYYYMMDD}${row.employeeId}`,
         nickname: row.employeeId,
       });
     });

@@ -14,10 +14,21 @@ export default function PayrollPayoutTab() {
   const [rows, setRows] = useState<PayoutPayrollRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [companyAccounts, setCompanyAccounts] = useState<any[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState('');
 
   useEffect(() => {
     clientRepository.getClients().then((c: Client[]) => {
       setClients(c.filter(client => client.id !== 'all'));
+    });
+
+    // Fetch company accounts
+    import('../../../../services/admin/adminService').then(({ adminService }) => {
+      adminService.getCompanySettings().then((settings: any) => {
+        if (settings?.bankAccountsV2) {
+          setCompanyAccounts(settings.bankAccountsV2.filter((acc: any) => acc.isActive));
+        }
+      });
     });
   }, []);
 
@@ -31,10 +42,22 @@ export default function PayrollPayoutTab() {
     try {
       const client = clients.find(c => c.id === selectedClient);
       const clientName = client?.name || '';
-      
+      const selectedClientName = client?.name?.trim().toLowerCase();
+
       const { workforceRepository } = await import('../../../Workbench/workforce/repositories/workforceRepository');
       const allImports = await workforceRepository.getPayoutImports();
-      const applicableImports = allImports.filter(imp => imp.clientId === selectedClient);
+
+      console.debug('[PayrollPayout] Total imports:', allImports.length);
+      console.debug('[PayrollPayout] Selected client:', { selectedClient, selectedClientName });
+
+      const applicableImports = allImports.filter(imp => {
+        const importClientName = imp.clientName?.trim().toLowerCase();
+        const matchesClient = imp.clientId === selectedClient || (selectedClientName && importClientName === selectedClientName);
+        return matchesClient && imp.isApproved === true;
+      });
+
+      console.debug('[PayrollPayout] Matching approved imports:', applicableImports.length);
+      console.debug('[PayrollPayout] Selected period:', { fromDate, toDate });
 
       const { db } = await import('../../../../firebase/firebase');
       const { collection, getDocs } = await import('firebase/firestore');
@@ -43,128 +66,187 @@ export default function PayrollPayoutTab() {
         getDocs(collection(db, 'crm_candidates'))
       ]);
 
-      const activeCandidates: any[] = [];
-      const placementsMap = new Map<string, any>();
-      let duplicateConflicts = 0;
-
-      // Group by Candidate ID to detect duplicates
-      const placementsByCandidate = new Map<string, any[]>();
-      placementsSnap.docs.forEach(d => {
-        const data = d.data();
-        if (data.candidateId && data.status === 'Active') {
-          if (!placementsByCandidate.has(data.candidateId)) {
-            placementsByCandidate.set(data.candidateId, []);
-          }
-          placementsByCandidate.get(data.candidateId)!.push({ ...data, placementId: d.id });
-        }
-      });
-
-      // Filter out invalid candidates with > 1 active placement
-      for (const [candidateId, placements] of placementsByCandidate.entries()) {
-        if (placements.length > 1) {
-          console.error(`Data Integrity Conflict: Candidate ${candidateId} has ${placements.length} active placements. Only one is permitted. Skipped from payout result.`);
-          duplicateConflicts++;
-          continue;
-        }
-
-        const data = placements[0];
-        placementsMap.set(candidateId, data);
-        if (data.clientId === selectedClient && data.clientType === 'Payroll') {
-          activeCandidates.push(data);
-        }
-      }
-
-      if (duplicateConflicts > 0) {
-        setError(`${duplicateConflicts} candidates skipped due to duplicate Active Placement integrity conflicts.`);
-      }
-      
       const candidatesMap = new Map<string, any>();
       candidatesSnap.docs.forEach(d => {
-        candidatesMap.set(d.id, d.data());
+        candidatesMap.set(d.id, { ...d.data(), id: d.id });
       });
 
-      const newRows: PayoutPayrollRow[] = [];
+      const placementsByEmployeeId = new Map<string, any[]>();
+      const placementsByCandidateId = new Map<string, any[]>();
+      placementsSnap.docs.forEach(d => {
+        const data = d.data();
+        const placementData = { ...data, placementId: d.id };
+        if (data.candidateId) {
+          if (!placementsByCandidateId.has(data.candidateId)) {
+            placementsByCandidateId.set(data.candidateId, []);
+          }
+          placementsByCandidateId.get(data.candidateId)!.push(placementData);
+        }
+        if (data.payrollEmployeeId) {
+          if (!placementsByEmployeeId.has(data.payrollEmployeeId)) {
+            placementsByEmployeeId.set(data.payrollEmployeeId, []);
+          }
+          placementsByEmployeeId.get(data.payrollEmployeeId)!.push(placementData);
+        }
+      });
+
+      const aggregatedImports = new Map<string, any>();
+      const fromMs = new Date(fromDate).getTime();
+      const toMs = new Date(toDate).getTime();
+      const selectedStartMonth = fromDate.slice(0, 7);
+      const selectedEndMonth = toDate.slice(0, 7);
+
+      let totalRowsScanned = 0;
+      let rowsWithActivity = 0;
+      let rowsPassingPeriod = 0;
+
       for (const imp of applicableImports) {
-        if (!imp.isApproved) continue; // Only approved imports
-        const importDate = new Date(imp.importedAt);
-        const monthStr = imp.month || importDate.toLocaleString('default', { month: 'short' }).toUpperCase();
-        const year = importDate.getFullYear().toString();
-        const weekNumber = 'W' + Math.ceil(new Date(toDate).getDate() / 7);
-
         for (const processedRow of imp.rows) {
-          // Check if the row's date falls within the selected range
-          const rowDate = processedRow.date || imp.importedAt.slice(0, 10);
-          if (rowDate < fromDate || rowDate > toDate) continue;
+          totalRowsScanned++;
 
-          let match = activeCandidates.find(c => c.payrollEmployeeId && (c.payrollEmployeeId === processedRow.employeeId));
-          if (!match) {
-            // Find by name if employeeId match fails
-            const matchingCandidate = Array.from(candidatesMap.values()).find(cand => 
-               cand.name?.toLowerCase().trim() === processedRow.candidateName?.toLowerCase().trim()
-            );
-            if (matchingCandidate) {
-               match = activeCandidates.find(c => c.candidateId === matchingCandidate.id);
-            }
+          const amount = Number(processedRow.earnings) || 0;
+          const orders = Number(processedRow.orders) || 0;
+
+          if (amount <= 0 && orders <= 0) continue;
+          rowsWithActivity++;
+
+          let rowDateStr = processedRow.date;
+          let normalizedRowDate = '';
+
+          if (rowDateStr) {
+             if (rowDateStr.includes('-') && rowDateStr.split('-')[0].length === 2) {
+                const [d, m, y] = rowDateStr.split('-');
+                normalizedRowDate = `${y}-${m}-${d}`;
+             } else {
+                normalizedRowDate = rowDateStr.slice(0, 10);
+             }
           }
 
-          if (match) {
-            const placementData = placementsMap.get(match.candidateId);
-            const candidateData = candidatesMap.get(match.candidateId);
+          let passesPeriod = false;
 
-            const bankAccount = placementData?.operationalData?.bankAccountNumber || candidateData?.bankAccountNumber || '';
-            const ifsc = placementData?.operationalData?.ifscCode || candidateData?.ifscCode || '';
+          if (normalizedRowDate) {
+              const rowMs = new Date(normalizedRowDate).getTime();
+              if (rowMs >= fromMs && rowMs <= toMs) {
+                  passesPeriod = true;
+              }
+          } else {
+              // Month fallback for imports with missing row date
+              if (imp.month === selectedStartMonth || imp.month === selectedEndMonth) {
+                  passesPeriod = true;
+                  normalizedRowDate = imp.importedAt.slice(0, 10);
+              }
+          }
 
-            const exceptions: string[] = [];
-            if (!bankAccount) exceptions.push('Missing Bank Account');
-            if (!ifsc) exceptions.push('Missing IFSC');
-            
-            const amount = processedRow.earnings || 0;
-            const orders = processedRow.orders || 0;
+          if (!passesPeriod) continue;
+          rowsPassingPeriod++;
 
-            if (amount > 0 || exceptions.length > 0) {
-              const pId = placementData?.placementId || '';
-              const activationDt = placementData?.activeDate ? placementData.activeDate.slice(0, 10).split('-').reverse().join('/') : '';
-              const recTeamLead = match.recruiterName || 'N/A';
-              
-              // Working Status: Working if Orders > 0
-              const workingStatus = orders > 0 ? 'Working' : 'Not Working';
+          const empId = processedRow.employeeId || 'UNKNOWN';
+          if (!aggregatedImports.has(empId)) {
+             aggregatedImports.set(empId, {
+               employeeId: empId,
+               candidateName: processedRow.candidateName,
+               amount: 0,
+               orders: 0,
+               lastRowDateStr: normalizedRowDate,
+               monthStr: imp.month || new Date(imp.importedAt).toLocaleString('default', { month: 'short' }).toUpperCase(),
+               year: new Date(imp.importedAt).getFullYear().toString(),
+             });
+          }
+          const agg = aggregatedImports.get(empId)!;
+          agg.amount += amount;
+          agg.orders += orders;
+          if (new Date(normalizedRowDate).getTime() > new Date(agg.lastRowDateStr).getTime()) {
+            agg.lastRowDateStr = normalizedRowDate;
+          }
+        }
+      }
 
-              newRows.push({
-                candidateId: match.candidateId,
+      const weekNumber = 'W' + Math.ceil(new Date(toDate).getDate() / 7);
+      const newRows: PayoutPayrollRow[] = [];
+
+      for (const agg of aggregatedImports.values()) {
+         let matchPlacement = null;
+         let matchCandidate = null;
+
+         const emPlacements = placementsByEmployeeId.get(agg.employeeId);
+         if (emPlacements && emPlacements.length > 0) {
+             matchPlacement = emPlacements.find(p => p.clientId === selectedClient) || emPlacements[0];
+             matchCandidate = candidatesMap.get(matchPlacement.candidateId);
+         }
+
+         if (!matchCandidate && agg.candidateName) {
+             const cand = Array.from(candidatesMap.values()).find(c => c.name?.toLowerCase().trim() === agg.candidateName.toLowerCase().trim());
+             if (cand) {
+                 matchCandidate = cand;
+                 const cPlacements = placementsByCandidateId.get(cand.id);
+                 if (cPlacements && cPlacements.length > 0) {
+                     matchPlacement = cPlacements.find(p => p.clientId === selectedClient) || cPlacements[0];
+                 }
+             }
+         }
+
+         if (matchCandidate || matchPlacement) {
+             const bankAccount = matchPlacement?.operationalData?.bankAccountNumber || matchCandidate?.bankAccountNumber || '';
+             const ifsc = matchPlacement?.operationalData?.ifscCode || matchCandidate?.ifscCode || '';
+
+             const exceptions: string[] = [];
+             if (!bankAccount) exceptions.push('Missing Bank Account');
+             if (!ifsc) exceptions.push('Missing IFSC');
+
+             const workingStatus = agg.orders > 0 ? 'Working' : 'Not Working';
+
+             newRows.push({
+                candidateId: matchCandidate?.id || '',
                 clientId: selectedClient,
                 clientName,
-                employeeId: match.payrollEmployeeId || processedRow.employeeId || 'UNKNOWN',
-                candidateName: candidateData?.name || match.candidateName,
-                candidateSource: candidateData?.source || 'Unknown',
-                placementId: pId,
-                recruitmentTeamLead: recTeamLead,
-                activationDate: activationDt,
-                ordersCount: orders,
-                amount,
+                employeeId: agg.employeeId,
+                candidateName: matchCandidate?.name || agg.candidateName,
+                candidateSource: matchCandidate?.source || 'Unknown',
+                placementId: matchPlacement?.placementId || '',
+                recruitmentTeamLead: matchPlacement?.recruiterName || matchCandidate?.recruiterName || 'N/A',
+                activationDate: matchPlacement?.activeDate ? matchPlacement.activeDate.slice(0, 10).split('-').reverse().join('/') : '',
+                ordersCount: agg.orders,
+                amount: agg.amount,
                 bankAccount: bankAccount,
                 ifsc: ifsc,
-                month: monthStr,
-                year,
+                month: agg.monthStr,
+                year: agg.year,
                 weekNumber,
-                transactionDate: rowDate, 
-                customerReferenceNumber: `${clientName.replace(/\s+/g, '').toUpperCase()}${match.payrollEmployeeId || 'UNEMP'}${rowDate.replace(/-/g, '')}`,
+                transactionDate: agg.lastRowDateStr,
+                customerReferenceNumber: `${clientName.replace(/\s+/g, '').toUpperCase()}${agg.employeeId}${agg.lastRowDateStr.replace(/-/g, '')}`,
                 isValid: exceptions.length === 0,
                 exceptions,
-                workingStatus // Added for the UI
-              } as any);
-            }
-          }
-        }
+                workingStatus
+             } as any);
+         } else {
+             newRows.push({
+                candidateId: '',
+                clientId: selectedClient,
+                clientName,
+                employeeId: agg.employeeId,
+                candidateName: agg.candidateName || 'Unmatched',
+                candidateSource: 'Unknown',
+                placementId: '',
+                recruitmentTeamLead: 'N/A',
+                activationDate: '',
+                ordersCount: agg.orders,
+                amount: agg.amount,
+                bankAccount: '',
+                ifsc: '',
+                month: agg.monthStr,
+                year: agg.year,
+                weekNumber,
+                transactionDate: agg.lastRowDateStr,
+                customerReferenceNumber: `UNMATCHED_${Math.random().toString(36).substring(7)}`,
+                isValid: false,
+                exceptions: ['Candidate not matched to CRM'],
+                workingStatus: agg.orders > 0 ? 'Working' : 'Not Working'
+             } as any);
+         }
       }
 
-      const uniqueMap = new Map<string, PayoutPayrollRow>();
-      for (const r of newRows) {
-        if (!uniqueMap.has(r.customerReferenceNumber)) {
-          uniqueMap.set(r.customerReferenceNumber, r);
-        }
-      }
-
-      setRows(Array.from(uniqueMap.values()));
+      console.debug('[PayrollPayout] Final payout rows:', newRows.length);
+      setRows(newRows);
     } catch (err: any) {
       setError(err.message || 'Failed to generate preview');
     } finally {
@@ -173,8 +255,14 @@ export default function PayrollPayoutTab() {
   };
 
   const handleExport = async () => {
+    if (!selectedAccount) {
+      setError('Please select a company debit account first.');
+      return;
+    }
+
     try {
-      await payoutService.exportToBlinkitFormat(rows);
+      const accountInfo = companyAccounts.find(a => a.id === selectedAccount);
+      await payoutService.exportToBlinkitFormat(rows, accountInfo?.accountNumber || selectedAccount);
     } catch (err: any) {
       setError(err.message || 'Failed to export');
     }
@@ -191,8 +279,19 @@ export default function PayrollPayoutTab() {
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Debit Account</label>
+          <select
+            className="w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            value={selectedAccount}
+            onChange={e => setSelectedAccount(e.target.value)}
+          >
+            <option value="">Select Account</option>
+            {companyAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.accountNumber}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">Client</label>
-          <select 
+          <select
             className="w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm"
             value={selectedClient}
             onChange={e => setSelectedClient(e.target.value)}
@@ -203,8 +302,8 @@ export default function PayrollPayoutTab() {
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">From Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
             value={fromDate}
             onChange={e => setFromDate(e.target.value)}
@@ -212,14 +311,14 @@ export default function PayrollPayoutTab() {
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">To Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
             value={toDate}
             onChange={e => setToDate(e.target.value)}
           />
         </div>
-        <button 
+        <button
           onClick={handleGenerate}
           disabled={loading}
           className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 disabled:opacity-50"
@@ -247,7 +346,7 @@ export default function PayrollPayoutTab() {
                 <div className="text-xl font-bold text-emerald-600">₹{totalEarnings.toLocaleString('en-IN')}</div>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleExport}
               disabled={validRows.length === 0}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"

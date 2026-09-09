@@ -30,23 +30,40 @@ const repoPlacements: any = {
     if (scope === 'GLOBAL') {
       authorizedIds = null;
     } else if (scope === 'DEPARTMENT') {
-      if (!userSession?.departmentId) return [];
-      const empQ = query(collection(db, 'employees'), where('departmentId', '==', userSession.departmentId));
-      const empSnap = await getDocs(empQ);
+      const targetDeptId = userSession?.departmentId;
+      const targetDept = (userSession as any)?.department;
+      if (!targetDeptId && !targetDept) return [];
+
+      let empSnap;
+      if (targetDeptId) {
+        empSnap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', targetDeptId)));
+      } else {
+        empSnap = await getDocs(query(collection(db, 'employees'), where('department', '==', targetDept)));
+      }
+
       authorizedIds = [];
       empSnap.forEach(d => {
         const data = d.data();
         if (data.employeeId) authorizedIds!.push(data.employeeId);
       });
       if (authorizedIds.length === 0) return [];
-    } else if (scope === 'DIRECT_REPORTS') {
-      const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
-      const empSnap = await getDocs(empQ);
+    } else if (scope === 'TEAM' || scope === 'DIRECT_REPORTS') {
       authorizedIds = [userSession.id];
-      empSnap.forEach(d => {
-        const data = d.data();
-        if (data.employeeId) authorizedIds!.push(data.employeeId);
-      });
+      if (userSession.teamId) {
+        // Technically teamId OR reportingManagerId, but Firestore doesn't easily support OR across multiple fields in old SDKs without multiple queries.
+        // A single query for reportingManagerId and another for teamId is safest.
+        const empQ1 = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
+        const empQ2 = query(collection(db, 'employees'), where('teamId', '==', userSession.teamId));
+        const [snap1, snap2] = await Promise.all([getDocs(empQ1), getDocs(empQ2)]);
+        snap1.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
+        snap2.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
+      } else {
+        const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
+        const empSnap = await getDocs(empQ);
+        empSnap.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
+      }
+    } else if (scope === 'OWN' || scope === 'SELF') {
+      authorizedIds = [userSession.id];
     } else {
       authorizedIds = [userSession.id];
     }
@@ -67,7 +84,7 @@ const repoPlacements: any = {
       for (let i = 0; i < authorizedIds.length; i += 30) {
         chunks.push(authorizedIds.slice(i, i + 30));
       }
-      
+
       const allResults: any[] = [];
       for (const chunk of chunks) {
         const q = query(collection(db, 'placements'), ...baseConstraints, where('recruiterId', 'in', chunk));
@@ -76,7 +93,7 @@ const repoPlacements: any = {
           allResults.push({ id: d.id, ...d.data() });
         });
       }
-      
+
       // Deduplicate in case of any overlaps (unlikely but safe)
       const uniqueResults = new Map();
       allResults.forEach(r => uniqueResults.set(r.id, r));
@@ -88,17 +105,17 @@ const repoPlacements: any = {
     if (clientId) q = query(q, where('clientId', '==', clientId));
     const snap = await getDocs(q);
     const results: any[] = [];
-    
+
     for (const d of snap.docs) {
       const imp = d.data();
       for (const row of imp.rows || []) {
         if (!row.matched) continue;
-        
+
         const actualDate = row.date ? new Date(row.date) : new Date(imp.importedAt);
         const isValidDate = !isNaN(actualDate.getTime());
         const safeDate = isValidDate ? actualDate : new Date(imp.importedAt);
         const rowMonth = safeDate.toISOString().slice(0, 7);
-        
+
         if (month && rowMonth !== month) continue;
 
         results.push({
@@ -114,7 +131,7 @@ const repoPlacements: any = {
         });
       }
     }
-    
+
     const aggregated: Record<string, any> = {};
     for (const r of results) {
       const key = `${r.clientId}_${r.employeeId}_${r.month}`;
@@ -138,7 +155,7 @@ const integrationAp: any = {
         if (!snap.exists()) return null;
         cData = snap.data();
       }
-      
+
       if (!cData.source || cData.source !== 'Associate Partner' || !cData.associatePartnerId) {
         // If not AP sourced, we consider them "Joined" by default to bypass the AP gate
         return {
@@ -205,7 +222,7 @@ const integrationClient: any = {
         totalPoints: totalPoints,
       };
     }
-    return null; 
+    return null;
   }
 };
 
