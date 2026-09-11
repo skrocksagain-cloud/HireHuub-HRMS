@@ -21,7 +21,7 @@ export default function AdminDashboard({ dashboard }: WorkspaceDashboardProps) {
   return (
     <div className="space-y-6">
       <LiveStatusStrip metrics={dashboard.statusMetrics} />
-      <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Department Administration" designation="Department Administrator" />
+      <GreetingHeroCard serverTime={dashboard.serverTime} employeeName={dashboard.employeeName} />
       <FavoritesBar />
 
       <OrganizationHealthWidget />

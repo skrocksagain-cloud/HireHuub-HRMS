@@ -16,7 +16,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   const [attendance, setAttendance] = useState<DashboardAttendanceRecord | null>(null);
   const [leaveBalance, setLeaveBalance] = useState<{ remainingDays: number; label: string }>({ remainingDays: 0, label: '0 Days Remaining' });
   const [kpis, setKpis] = useState<DepartmentKpiSnapshot[]>([]);
-  const [ranking, setRanking] = useState<UserRankingInfo>(dashboardService.getUserRanking(roleName));
+  const [ranking, setRanking] = useState<UserRankingInfo>({ rank: 0, totalParticipants: 0, points: 0, target: 0, achievementPercent: 0, scopeLabel: '' });
   const [preferences, setPreferences] = useState<UserDashboardPreference | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<DashboardCalendarEvent[]>([]);
   const [announcements, setAnnouncements] = useState<DashboardAnnouncement[]>([]);
@@ -44,7 +44,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [todayAtt, pref, cal, ann, notifs, audit, liveMetrics] = await Promise.all([
+      const [todayAtt, pref, cal, ann, notifs, audit, liveMetrics, kpisData, rankingData] = await Promise.all([
         dashboardService.getTodayAttendance(effectiveUserId),
         dashboardService.getUserPreferences(effectiveUserId),
         dashboardRepository.getCalendarEvents(),
@@ -52,6 +52,8 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
         dashboardRepository.getNotifications(effectiveUserId),
         dashboardRepository.getRecentAuditLogs(10),
         dashboardService.getLiveStatusMetrics(),
+        dashboardService.getDepartmentKPIs(roleName, effectiveUserId),
+        dashboardService.getUserRanking(roleName),
       ]);
 
       setAttendance(todayAtt);
@@ -61,8 +63,8 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
       setNotifications(notifs);
       setRecentActivities(audit);
       setStatusMetrics(liveMetrics);
-      setKpis(dashboardService.getDepartmentKPIs(roleName));
-      setRanking(dashboardService.getUserRanking(roleName));
+      setKpis(kpisData);
+      setRanking(rankingData);
 
       const leave = await dashboardService.getRemainingLeaveBalance(effectiveUserId);
       setLeaveBalance(leave);
@@ -104,8 +106,8 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
 
   // Compute live duration timer if signed in
   const { isSuperAdmin } = usePermissions();
-  const isSignedIn = !!attendance && attendance.status === 'Present';
-  const isSignedOut = !!attendance && attendance.status === 'SignedOut';
+  const isSignedIn = !!attendance && !!attendance.signInTime && !attendance.signOutTime;
+  const isSignedOut = !!attendance && !!attendance.signOutTime;
 
   let workingDurationFormatted = '0h 0m';
   let expectedLogoutTime = '--:--';
@@ -136,6 +138,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
     recentActivities,
     statusMetrics,
     isLoading,
+    employeeName: effectiveUserName,
     refresh: loadDashboardData,
     signIn: handleSignIn,
     signOut: handleSignOut,

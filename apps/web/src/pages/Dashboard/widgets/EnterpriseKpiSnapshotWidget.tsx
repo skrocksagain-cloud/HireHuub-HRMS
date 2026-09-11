@@ -1,4 +1,4 @@
-import { Award, Target } from 'lucide-react';
+import { Award } from 'lucide-react';
 import type { DepartmentKpiSnapshot, UserRankingInfo } from '../../../services/dashboard/dashboardService';
 
 interface EnterpriseKpiSnapshotWidgetProps {
@@ -20,17 +20,8 @@ export default function EnterpriseKpiSnapshotWidget({ kpis, ranking }: Enterpris
               {ranking.scopeLabel}
             </div>
             <div className="font-black text-lg text-white mt-0.5">
-              Rank #{ranking.rank} <span className="text-xs text-amber-400 font-semibold">({ranking.points} points)</span>
+              Rank #{ranking.rank}{ranking.topPerformerName ? ` — ${ranking.topPerformerName}` : ''}
             </div>
-          </div>
-        </div>
-
-        <div className="text-right font-mono text-xs">
-          <div className="text-emerald-400 font-bold flex items-center gap-1 justify-end">
-            <Target size={14} /> {ranking.achievementPercent}%
-          </div>
-          <div className="text-slate-400 text-[10px] mt-0.5">
-            Target: {ranking.target} pts
           </div>
         </div>
       </div>

@@ -22,7 +22,7 @@ export default function FinanceDashboard({ dashboard }: WorkspaceDashboardProps)
   return (
     <div className="space-y-6">
       <LiveStatusStrip metrics={dashboard.statusMetrics} />
-      <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Finance & Corporate Accounts" designation="Finance Lead" />
+      <GreetingHeroCard serverTime={dashboard.serverTime} employeeName={dashboard.employeeName} />
       <FavoritesBar />
 
       <EnterpriseKpiSnapshotWidget kpis={dashboard.kpis} ranking={dashboard.ranking} />

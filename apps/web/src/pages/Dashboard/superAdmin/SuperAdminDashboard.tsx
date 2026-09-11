@@ -20,7 +20,7 @@ export default function SuperAdminDashboard({ dashboard }: WorkspaceDashboardPro
   return (
     <div className="space-y-6">
       <LiveStatusStrip metrics={dashboard.statusMetrics} />
-      <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Executive Management & Governance" designation="Super Admin" />
+      <GreetingHeroCard serverTime={dashboard.serverTime} employeeName={dashboard.employeeName} />
       <FavoritesBar />
 
       <OrganizationHealthWidget />

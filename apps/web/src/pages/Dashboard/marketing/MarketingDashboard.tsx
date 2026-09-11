@@ -20,7 +20,7 @@ export default function MarketingDashboard({ dashboard }: WorkspaceDashboardProp
   return (
     <div className="space-y-6">
       <LiveStatusStrip metrics={dashboard.statusMetrics} />
-      <GreetingHeroCard serverTime={dashboard.serverTime} departmentName="Marketing & Brand Partnerships" designation="Growth Specialist" />
+      <GreetingHeroCard serverTime={dashboard.serverTime} employeeName={dashboard.employeeName} />
       <FavoritesBar />
 
       <EnterpriseKpiSnapshotWidget kpis={dashboard.kpis} ranking={dashboard.ranking} />
