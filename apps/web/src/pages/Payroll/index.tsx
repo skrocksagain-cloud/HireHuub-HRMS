@@ -1,5 +1,5 @@
-import UniversalPayrollEnginePage from './UniversalPayrollEnginePage';
+import PayrollRegisterPage from './PayrollRegisterPage';
 
 export default function PayrollPage() {
-  return <UniversalPayrollEnginePage />;
+  return <PayrollRegisterPage />;
 }

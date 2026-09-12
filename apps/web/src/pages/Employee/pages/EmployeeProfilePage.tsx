@@ -560,13 +560,51 @@ function PerformanceTab({ performance }: { performance: PerformanceSummary | nul
 }
 
 function DocumentsTab({ documents }: { documents: Document[]; employee: Employee }) {
-  return (
-    <div className="p-6 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-xs">
-      <h3 className="font-bold text-slate-900 text-xs border-b border-slate-100 pb-3">Linked Documents</h3>
-      <p className="text-xs text-slate-600">Total Documents: {documents.length} Files</p>
-    </div>
-  );
-}
+    return (
+      <div className="p-6 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-xs">
+        <h3 className="font-bold text-slate-900 text-xs border-b border-slate-100 pb-3">Linked Documents</h3>
+        <p className="text-xs text-slate-600 mb-4">Total Documents: {documents.length} Files</p>
+
+        {documents.length > 0 && (
+          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="p-3">Document Name</th>
+                  <th className="p-3">Month/Details</th>
+                  <th className="p-3">Generated Date</th>
+                  <th className="p-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {documents.map((doc) => (
+                  <tr key={doc.id || doc.documentId} className="hover:bg-slate-50/80">
+                    <td className="p-3 font-bold text-slate-800">{doc.title || doc.documentType}</td>
+                    <td className="p-3 text-slate-600">{doc.documentType === 'Payslip' ? doc.title.replace('Payslip - ', '') : doc.category}</td>
+                    <td className="p-3 text-slate-600">{doc.generatedAt ? new Date(doc.generatedAt as string).toLocaleDateString() : (doc.createdAt ? new Date(doc.createdAt as string).toLocaleDateString() : 'N/A')}</td>
+                    <td className="p-3 text-center">
+                      {doc.downloadUrl || doc.fileUrl ? (
+                        <a
+                          href={doc.downloadUrl || doc.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-bold transition-colors inline-flex items-center gap-1 justify-center"
+                        >
+                          View/Download
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">No File</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
 
 function TimelineTab({ employee }: { employee: Employee }) {
   return (
