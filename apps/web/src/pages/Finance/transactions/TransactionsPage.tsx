@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   Plus,
+  Download,
   ShieldAlert,
   Paperclip,
   FileText,
@@ -100,7 +101,7 @@ export default function TransactionsPage() {
     ]);
 
     setCompanySettings(cSettings);
-    const mergedTypes = [...new Set(['Salary', 'Office Rent', 'Housekeeping', 'CA Fees', 'Office Internet', 'Corporate Mobile Connection', 'Miscellaneous', ...types])];
+    const mergedTypes = [...new Set(['Salary', 'Office Rent', 'Housekeeping', 'CA Fees', 'Office Internet', 'Corporate Mobile Connection', 'Miscellaneous', 'Electricity', ...types])];
     setExpenseTypesList(mergedTypes);
 
     // paidFromId defaults to 'Management', no need to set here
@@ -116,6 +117,88 @@ export default function TransactionsPage() {
     } catch (error) {
       setExpenses([]);
       setActionError(error instanceof Error ? error.message : 'Unable to load finance records.');
+    }
+  };
+
+    const handleExportExcel = async () => {
+    try {
+      const ExcelJS = (await import('exceljs')).default || await import('exceljs');
+      const workbook = new (ExcelJS.Workbook || (ExcelJS as any).default.Workbook)();
+      const worksheet = workbook.addWorksheet('Transactions');
+
+      worksheet.columns = [
+        { header: 'Transaction Number', key: 'transactionNumber', width: 25 },
+        { header: 'Expense Number', key: 'expenseNumber', width: 20 },
+        { header: 'Transaction Date', key: 'transactionDate', width: 15 },
+        { header: 'Expense Type', key: 'expenseType', width: 25 },
+        { header: 'Manual Expense Type', key: 'manualExpenseType', width: 25 },
+        { header: 'Paid From', key: 'paidFrom', width: 25 },
+        { header: 'Paid By Name', key: 'paidByName', width: 20 },
+        { header: 'Beneficiary', key: 'beneficiary', width: 25 },
+        { header: 'Amount', key: 'amount', width: 15 },
+        { header: 'Payment Method', key: 'paymentMethod', width: 20 },
+        { header: 'Description', key: 'description', width: 35 },
+        { header: 'Reference Number', key: 'referenceNumber', width: 20 },
+        { header: 'Notes', key: 'notes', width: 30 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Created By', key: 'createdBy', width: 20 },
+        { header: 'Created Date', key: 'createdAt', width: 25 },
+        { header: 'Associate Partner', key: 'associatePartnerName', width: 20 },
+        { header: 'Brand', key: 'brandName', width: 20 },
+        { header: 'Payroll Run ID', key: 'payrollRunId', width: 20 },
+        { header: 'Employee ID', key: 'employeeId', width: 20 },
+        { header: 'Salary Month', key: 'salaryMonth', width: 15 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      expenses.forEach(exp => {
+        let createdStr = '';
+        if (exp.createdAt) {
+           if (typeof (exp.createdAt as any).toDate === 'function') {
+             createdStr = (exp.createdAt as any).toDate().toISOString();
+           } else {
+             createdStr = new Date(exp.createdAt as any).toISOString();
+           }
+        }
+        worksheet.addRow({
+          transactionNumber: exp.transactionNumber || '',
+          expenseNumber: exp.expenseNumber || '',
+          transactionDate: exp.transactionDate || '',
+          expenseType: exp.expenseCategoryName || exp.expenseType || '',
+          manualExpenseType: exp.manualExpenseType || '',
+          paidFrom: exp.paidFromName || exp.paidFrom || '',
+          paidByName: exp.paidByName || '',
+          beneficiary: exp.beneficiary || '',
+          amount: exp.amount ? Number(exp.amount) : 0,
+          paymentMethod: exp.paymentMethod || '',
+          description: exp.description || '',
+          referenceNumber: exp.referenceNumber || '',
+          notes: exp.notes || '',
+          status: exp.status || '',
+          createdBy: exp.createdBy || '',
+          createdAt: createdStr,
+          associatePartnerName: exp.associatePartnerName || '',
+          brandName: exp.brandName || '',
+          payrollRunId: exp.payrollRunId || '',
+          employeeId: exp.employeeId || '',
+          salaryMonth: exp.salaryMonth || '',
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `HireHuub_Transactions_${dateStr}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Export failed.');
     }
   };
 
@@ -234,13 +317,19 @@ export default function TransactionsPage() {
 
           <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={() => setShowExpenseDrawer(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition shadow-sm"
-            >
-              <Plus size={14} />
-              <span>Record Operational Expense</span>
-            </button>
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm"
+              >
+                <Download size={14} />
+                <span>Export Excel</span>
+              </button>
+              <button
+                onClick={() => setShowExpenseDrawer(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition shadow-sm"
+              >
+                <Plus size={14} />
+                <span>Record Operational Expense</span>
+              </button>
           </div>
         </div>
 
@@ -305,7 +394,7 @@ export default function TransactionsPage() {
                 className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 <option value="All">All Types</option>
-                {['Salary', 'Office Rent', 'Housekeeping', 'CA Fees', 'Office Internet', 'Corporate Mobile Connection', 'Miscellaneous'].map((t) => (
+                {expenseTypesList.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
