@@ -35,24 +35,71 @@ export class WorkforceServiceImplV2 {
   }
 
   async getActiveWorkforce(_context: WorkforceContextV2, filters?: { clientId?: string; month?: string; }): Promise<WorkforceRecordV2[]> {
-    // 1. Fetch all active placements scoped by canonical authorization
-    const activePlacements = await this.placementRepo.queryPlacements({ status: 'Active', userSession: _context, ...filters });
+    // 1. Fetch all placements scoped by canonical authorization
+    const allPlacements = await this.placementRepo.queryPlacements({ userSession: _context, ...filters });
     const records: WorkforceRecordV2[] = [];
 
     // Group placements by candidateId
-    const placementsByCandidate: Record<string, typeof activePlacements> = {};
-    for (const p of activePlacements) {
-      if (!placementsByCandidate[p.candidateId]) {
-        placementsByCandidate[p.candidateId] = [];
+    const placementsByCandidate = new Map<string, typeof allPlacements>();
+    for (const p of allPlacements) {
+      if (!p.candidateId) continue;
+      const arr = placementsByCandidate.get(p.candidateId) || [];
+      arr.push(p);
+      placementsByCandidate.set(p.candidateId, arr);
+    }
+
+    // Resolve the canonical CURRENT placement for each candidate
+    const resolvedActivePlacements: typeof allPlacements = [];
+    const debugLogs: any[] = [];
+
+    const getTimestamp = (val: any): number => {
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      if (val.seconds) return val.seconds * 1000;
+      if (val.toDate && typeof val.toDate === 'function') return val.toDate().getTime();
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    for (const [candidateId, placements] of Array.from(placementsByCandidate.entries())) {
+      // Sort descending by createdAt to find the latest lifecycle placemen
+      placements.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
+
+      const currentPlacement = placements[0];
+
+      let exclusionReason = null;
+      if (!currentPlacement) {
+        exclusionReason = "No placement found";
+      } else if (currentPlacement.status !== 'Active') {
+        exclusionReason = `Status is ${currentPlacement.status}`;
+      } else {
+        resolvedActivePlacements.push(currentPlacement);
       }
-      placementsByCandidate[p.candidateId].push(p);
+
+      if (_context.name.toLowerCase().includes('ishika') || _context.role.includes('System')) {
+        debugLogs.push({
+          candidateId,
+          totalPlacements: placements.length,
+          placementIds: placements.map((p: any) => p.id),
+          canonicalId: currentPlacement?.id,
+          canonicalStatus: currentPlacement?.status,
+          exclusionReason
+        });
+      }
+    }
+
+    if (debugLogs.length > 0) {
+      console.log("=== WORKFORCE RESOLVER DIAGNOSTICS ===");
+      console.log("Total placements fetched:", allPlacements.length);
+      console.log("Total candidates/groups:", placementsByCandidate.size);
     }
 
     // Optional: fetch monthly payouts to resolve Working Status and Earnings/Orders
     const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month) : [];
 
-    const uniqueCandidateIds = Object.keys(placementsByCandidate);
-    const uniqueClientIds = Array.from(new Set(activePlacements.map(p => p.clientId)));
+    const uniqueCandidateIds = Array.from(placementsByCandidate.keys());
+    const uniqueClientIds = Array.from(new Set(resolvedActivePlacements.map(p => p.clientId)));
+
 
     const candidateMap = new Map<string, any>();
     const apInfoMap = new Map<string, any>();
@@ -86,13 +133,8 @@ export class WorkforceServiceImplV2 {
       }))
     ]);
 
-    for (const [candidateId, placements] of Object.entries(placementsByCandidate)) {
-      if (placements.length > 1) {
-        console.error(`Data Integrity Conflict: Candidate ${candidateId} has ${placements.length} active placements. Only one is permitted.`);
-        continue; // Exclude from active workforce view
-      }
+    for (const placement of resolvedActivePlacements) {
 
-      const placement = placements[0];
 
       // 2. Lookup candidate
       const candidate = candidateMap.get(placement.candidateId);
@@ -114,7 +156,7 @@ export class WorkforceServiceImplV2 {
       }
 
       // Operational Payout Resolving
-      const matchedPayout = monthlyPayouts.find(p => 
+      const matchedPayout = monthlyPayouts.find(p =>
         (p.clientId === placement.clientId || !filters?.clientId) &&
         (p.employeeId === employeeId || p.employeeId === `WF-${candidate.id}`)
       );
@@ -189,14 +231,27 @@ export class WorkforceServiceImplV2 {
       }
     }
 
+    const ishikaRecords = records.filter(r => (r.placement.recruiterName || '').toLowerCase().includes('ishika'));
+    if (ishikaRecords.length > 0) {
+      console.log("=== ISHIKA WORKFORCE ACTIVE ===");
+      console.log(JSON.stringify(ishikaRecords.map(r => ({
+        candidateId: r.candidate.id,
+        placementId: r.placement.id,
+        candidateName: r.candidate.name,
+        activeDate: r.placement.activeDate,
+        status: r.placement.status,
+        recruiterId: r.placement.recruiterId
+      })), null, 2));
+    }
+
     return records;
   }
 
   calculateOtsTenure(activeDate: string, lastWorkingDate?: string): number {
     const startDate = new Date(activeDate);
     const endDate = lastWorkingDate ? new Date(lastWorkingDate) : new Date();
-    
-    // reset times to midnight
+
+    // reset times to midnigh
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
 
@@ -222,8 +277,8 @@ export class WorkforceServiceImplV2 {
 
     for (const row of rows) {
       // MONTHLY PAYOUT MATCHING Rule 15:
-      // Resolve Placement by Employee ID + Client
-      const matchedPlacement = placements.find(p => 
+      // Resolve Placement by Employee ID + Clien
+      const matchedPlacement = placements.find(p =>
         (p.clientType === 'Payroll' && p.payrollEmployeeId === row.employeeId) ||
         (p.clientType === 'OTS' && p.otsEmployeeId === row.employeeId)
       );

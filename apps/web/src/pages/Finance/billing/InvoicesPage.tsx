@@ -5,7 +5,7 @@ import {
   Search,
   Eye,
   Building2,
-  Layers,
+
   ShieldAlert,
   Download,
   Filter,
@@ -48,6 +48,80 @@ export default function InvoicesPage() {
   const [clientFilter, setClientFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [monthFilter, setMonthFilter] = useState<string>('');
+
+  const handleExportExcel = async () => {
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Invoices');
+
+      worksheet.columns = [
+        { header: 'Invoice Number', key: 'invoiceNumber', width: 20 },
+        { header: 'Client', key: 'client', width: 30 },
+        { header: 'Invoice Date', key: 'invoiceDate', width: 15 },
+        { header: 'Received Date', key: 'receivedDate', width: 15 },
+        { header: 'Total', key: 'total', width: 15 },
+        { header: 'Received Amount', key: 'receivedAmount', width: 15 },
+        { header: 'GST', key: 'gst', width: 15 },
+        { header: 'TDS', key: 'tds', width: 15 },
+        { header: 'Candidate Pay', key: 'candidatePay', width: 15 },
+        { header: 'Income', key: 'income', width: 15 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      invoices.forEach(inv => {
+        let receivedDate = '';
+        if (inv.payments && inv.payments.length > 0) {
+          const sorted = [...inv.payments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+          receivedDate = sorted[0].paymentDate;
+        }
+
+        const taxable = Number(inv.taxableAmount || inv.snapshot?.taxableAmount || 0);
+        const gst = Number(inv.gstAmount || inv.snapshot?.gst?.totalGstAmount || 0);
+        const total = taxable + gst;
+
+        const received = Number(inv.totalAmountReceived || 0);
+        const tds = Number(inv.totalTdsAmount || 0);
+        const candidatePay = Number(inv.totalCandidatePay || 0);
+
+        const income = total - gst - tds - candidatePay;
+
+        const clientName = inv.clientName || inv.snapshot?.client?.clientName || inv.clientId || '';
+
+        worksheet.addRow({
+          invoiceNumber: inv.invoiceNumber || '',
+          client: clientName,
+          invoiceDate: inv.invoiceDate || '',
+          receivedDate: receivedDate,
+          total: total,
+          receivedAmount: received,
+          gst: gst,
+          tds: tds,
+          candidatePay: candidatePay,
+          income: income,
+        });
+      });
+
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const dateString = `${yyyy}-${mm}-${dd}`;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `HireHuub_Invoice_Details_${dateString}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export invoices:', err);
+      alert('Failed to generate Excel export.');
+    }
+  };
   const [startDateFilter, setStartDateFilter] = useState<string>('');
   const [endDateFilter, setEndDateFilter] = useState<string>('');
 
@@ -286,14 +360,16 @@ export default function InvoicesPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/finance/transactions')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-800 font-semibold transition"
-            >
-              <Layers size={14} />
-              <span>View Client Ledger</span>
-            </button>
+
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-800 font-semibold transition"
+              >
+                <Download size={14} />
+                <span>Export Excel</span>
+              </button>
 
             {hasWriteAccess && (
               <button

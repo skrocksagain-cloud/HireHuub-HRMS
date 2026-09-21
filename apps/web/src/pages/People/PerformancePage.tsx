@@ -85,6 +85,8 @@ export default function PerformancePage() {
         assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
         departmentId: user?.departmentId,
         employeeId: user?.employeeId || user?.id,
+        employeeName: (user as any)?.fullName || (user as any)?.name,
+        employeeRole: (user as any)?.role,
       };
       const res = await performanceService.getPerformanceForBrand(selectedBrandId, selectedMonth, actorContext);
       setSummaries(res.summaries);
@@ -144,7 +146,14 @@ export default function PerformancePage() {
         selectedMonth,
         totalMonthlyTarget,
         totalAchievedPoints,
-        totalActiveCandidates
+        totalActiveCandidates,
+        {
+          assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
+          departmentId: user?.departmentId,
+          employeeId: user?.employeeId || user?.id,
+          employeeName: (user as any)?.fullName || (user as any)?.name,
+          employeeRole: (user as any)?.role,
+        }
       )
       .then((items) => {
         // Enrich monthly register row with aggregate incentive for current month

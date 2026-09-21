@@ -34,13 +34,16 @@ export class PerformanceService {
   async getPerformanceForBrand(
     brandId: string,
     month: string,
-    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string }
+    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<{ summaries: PerformanceSummary[]; targets: PerformanceTarget[] }> {
     const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
     const allSummaries = await performanceRepository.getPerformanceSummaries({
       scope,
+      assignedRole: actorContext?.assignedRole,
       departmentId: actorContext?.departmentId,
       employeeId: actorContext?.employeeId,
+      employeeName: actorContext?.employeeName,
+      employeeRole: actorContext?.employeeRole,
       month,
     });
 
@@ -84,39 +87,59 @@ export class PerformanceService {
     currentMonth: string,
     currentMonthTarget: number,
     currentMonthPoints: number,
-    currentActiveCandidates: number
+    currentActiveCandidates: number,
+    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<MonthlyRegisterItem[]> {
-    const allTargets = await performanceTargetRepository.getAllTargetsForBrand(brandId);
+    const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
+    const [allTargets, historicalAggregates] = await Promise.all([
+      performanceTargetRepository.getAllTargetsForBrand(brandId),
+      performanceRepository.getMonthlyPerformanceAggregate({
+        brandId,
+        scope,
+        assignedRole: actorContext?.assignedRole,
+        departmentId: actorContext?.departmentId,
+        employeeId: actorContext?.employeeId,
+        employeeName: actorContext?.employeeName,
+        employeeRole: actorContext?.employeeRole,
+      })
+    ]);
 
-    const monthMap = new Map<string, number>();
-    allTargets.forEach((t) => {
-      const existing = monthMap.get(t.month) || 0;
-      monthMap.set(t.month, existing + (t.targetPoints || 0));
+    const monthMap = new Map<string, { target: number, achieved: number, totalActive: number }>();
+
+    historicalAggregates.forEach(agg => {
+      monthMap.set(agg.month, { target: 0, achieved: agg.totalPoints, totalActive: agg.activeCandidates });
     });
 
-    if (currentMonthTarget > 0 || currentMonthPoints > 0) {
-      monthMap.set(currentMonth, currentMonthTarget);
-    }
+    allTargets.forEach((t) => {
+      const existing = monthMap.get(t.month) || { target: 0, achieved: 0, totalActive: 0 };
+      existing.target += (t.targetPoints || 0);
+      monthMap.set(t.month, existing);
+    });
+
+    const currentData = monthMap.get(currentMonth) || { target: 0, achieved: 0, totalActive: 0 };
+    if (currentMonthTarget > 0) currentData.target = currentMonthTarget;
+    monthMap.set(currentMonth, currentData);
 
     if (monthMap.size === 0) return [];
 
-    const rows: MonthlyRegisterItem[] = Array.from(monthMap.entries()).map(([m, target]) => {
-      const achieved = m === currentMonth ? currentMonthPoints : 0;
-      const totalActive = m === currentMonth ? currentActiveCandidates : 0;
-      const achievementPercent = target > 0 ? Math.round((achieved / target) * 100) : 0;
-      const status = target > 0 && achievementPercent >= 100 ? 'Achieved' : 'In Progress';
+    const rows: MonthlyRegisterItem[] = Array.from(monthMap.entries()).map(([m, data]) => {
+      const achieved = m === currentMonth && currentMonthPoints > 0 ? currentMonthPoints : data.achieved;
+      const totalActive = m === currentMonth && currentActiveCandidates > 0 ? currentActiveCandidates : data.totalActive;
+      const achievementPercent = data.target > 0 ? Math.round((achieved / data.target) * 100) : 0;
+      const status = data.target > 0 && achievementPercent >= 100 ? 'Achieved' : 'In Progress';
 
       return {
         month: m,
-        target,
+        target: data.target,
         achieved,
         achievementPercent,
-        incentiveAmount: 0, // Computed dynamically from snapshots
+        incentiveAmount: 0,
         totalActive,
         status,
       };
     });
 
+    rows.sort((a, b) => new Date(b.month).getTime() - new Date(a.month).getTime());
     return rows;
   }
 

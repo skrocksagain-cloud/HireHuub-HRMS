@@ -128,6 +128,10 @@ export function useWorkforce() {
           activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
           workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
           dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
+          aadhaarNumber: v2.payroll?.aadhaar || v2.placement.operationalData?.aadhaar || '',
+          panNumber: v2.payroll?.pan || v2.placement.operationalData?.pan || '',
+          bankAccountNumber: v2.payroll?.bankAccountNumber || v2.placement.operationalData?.bankAccountNumber || '',
+          ifscCode: v2.payroll?.ifscCode || v2.placement.operationalData?.ifscCode || '',
           lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
 
           tenureDays: v2.ots?.tenureDays || 0,

@@ -68,7 +68,10 @@ const repoPlacements: any = {
       authorizedIds = [userSession.id];
     }
 
-    const baseConstraints: any[] = [where('status', '==', 'Active')];
+    const baseConstraints: any[] = [];
+    if (filters?.status) {
+      baseConstraints.push(where('status', '==', filters.status));
+    }
     if (filters?.clientId) {
       baseConstraints.push(where('clientId', '==', filters.clientId));
     }

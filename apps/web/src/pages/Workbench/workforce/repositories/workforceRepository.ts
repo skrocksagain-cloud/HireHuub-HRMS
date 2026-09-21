@@ -121,12 +121,13 @@ export class WorkforceRepository {
     userRole: string = 'Super Admin',
     userSession: { id: string; name: string; teamId?: string; departmentId?: string } = { id: 'user-admin', name: 'Super Admin' }
   ): Promise<WorkforceItem[]> {
-    const [wfSnapshot, payoutImports, crmCandidates, apPartners, clients] = await Promise.all([
+    const [wfSnapshot, payoutImports, crmCandidates, apPartners, clients, placementsSnap] = await Promise.all([
       getDocs(workforceCollection),
       this.getPayoutImports(),
       crmRepository.getCandidates(),
       associatePartnerRepository.getPartners(),
       clientRepository.getClients(),
+      getDocs(collection(db, 'placements')),
     ]);
 
     const clientMap = new Map<string, any>();
@@ -134,6 +135,14 @@ export class WorkforceRepository {
       if (c.id) clientMap.set(c.id, c);
       if (c.name) clientMap.set(c.name, c);
     }
+
+    const placementsMap = new Map<string, any>();
+    placementsSnap.docs.forEach(d => {
+      const p = { id: d.id, ...(d.data() as any) };
+      if (p.candidateId && p.status === 'Active') {
+        placementsMap.set(p.candidateId, p);
+      }
+    });
 
     // Map historical workforce data by candidate phone (since IDs might differ for AP)
     // We prioritize canonical candidateId if it exists.
@@ -160,6 +169,8 @@ export class WorkforceRepository {
         const clientRecord = clientMap.get(finalClientId) || clientMap.get(finalClientName);
         const finalWorkforceType = clientRecord?.commercial?.type || clientRecord?.clientType || (clientRecord ? 'Payroll' : '');
 
+        const pDoc = placementsMap.get(cand.id);
+
         const item: WorkforceItem = {
           id: h?.id || `WF-${cand.id}`,
           candidateId: cand.id,
@@ -179,7 +190,11 @@ export class WorkforceRepository {
           departmentId: cand.departmentId,
           activeDate: activePlacement?.activeDate || h?.activeDate || cand.updatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10),
           workingFrom: activePlacement?.activeDate || h?.workingFrom || cand.updatedAt.slice(0, 10) || new Date().toISOString().slice(0, 10),
-          dateOfBirth: cand.dateOfBirth,
+          dateOfBirth: pDoc?.operationalData?.dateOfBirth || cand.dateOfBirth || h?.dateOfBirth,
+          aadhaarNumber: pDoc?.operationalData?.aadhaar || (cand as any).aadhaarNumber || h?.aadhaarNumber,
+          panNumber: pDoc?.operationalData?.pan || (cand as any).panNumber || h?.panNumber,
+          bankAccountNumber: pDoc?.operationalData?.bankAccountNumber || (cand as any).bankAccountNumber || h?.bankAccountNumber,
+          ifscCode: pDoc?.operationalData?.ifscCode || (cand as any).ifscCode || h?.ifscCode,
 
           lastWorkingDate: h?.lastWorkingDate,
           tenureDays: 0,
@@ -235,6 +250,11 @@ export class WorkforceRepository {
             associatePartnerName: partner.subVendorName || partner.name,
             activeDate: sub.submissionDate,
             workingFrom: sub.submissionDate,
+            dateOfBirth: h?.dateOfBirth,
+            aadhaarNumber: h?.aadhaarNumber,
+            panNumber: h?.panNumber,
+            bankAccountNumber: h?.bankAccountNumber,
+            ifscCode: h?.ifscCode,
 
             lastWorkingDate: h?.lastWorkingDate,
             tenureDays: 0,

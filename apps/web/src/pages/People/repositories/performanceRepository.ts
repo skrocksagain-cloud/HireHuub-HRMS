@@ -1,6 +1,7 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase/firebase';
 import type { Employee } from '../../Employee/types/Employee';
+import { workforceService } from '../../Workbench/workforce/v2/hooks/useWorkforceV2';
 
 export interface PerformanceSummary {
   employeeId: string;
@@ -28,41 +29,99 @@ export interface PerformanceSummary {
   companyRank: number;
 }
 
+export interface MonthlyAggregate {
+  month: string;
+  totalPoints: number;
+  activeCandidates: number;
+}
+
 export interface PerformanceRepository {
   getPerformanceForEmployee(employeeId: string, month?: string): Promise<PerformanceSummary | null>;
   getAllPerformanceSummaries(month?: string): Promise<PerformanceSummary[]>;
   getPerformanceSummaries(input: PerformanceScopeQuery): Promise<PerformanceSummary[]>;
+  getMonthlyPerformanceAggregate(input: PerformanceScopeQuery & { brandId: string }): Promise<MonthlyAggregate[]>;
 }
 
 export interface PerformanceScopeQuery {
   scope: 'SELF' | 'DEPARTMENT' | 'GLOBAL' | 'OWN' | 'TEAM';
   employeeId?: string;
+  employeeName?: string;
+  employeeRole?: string;
+  assignedRole?: string;
   departmentId?: string;
   month?: string;
 }
 
-export class FirestorePerformanceRepository implements PerformanceRepository {
+function getMonthString(dateToParse: any): string | null {
+  if (!dateToParse) return null;
+  try {
+    let timestamp = 0;
+    if (typeof dateToParse === 'string') {
+      if (dateToParse.includes('T')) {
+        timestamp = new Date(dateToParse).getTime();
+      } else {
+        const parts = dateToParse.split(/[-/]/);
+        if (parts.length === 3) {
+          if (parts[0].length === 4) {
+             timestamp = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T12:00:00Z`).getTime();
+          } else {
+             timestamp = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00Z`).getTime();
+          }
+        } else {
+           timestamp = new Date(dateToParse).getTime();
+        }
+      }
+    } else if (typeof dateToParse === 'number') {
+      timestamp = dateToParse;
+    } else if (dateToParse.seconds) {
+      timestamp = dateToParse.seconds * 1000;
+    } else if (typeof dateToParse.toDate === 'function') {
+      timestamp = dateToParse.toDate().getTime();
+    }
+    if (!timestamp || isNaN(timestamp)) return null;
+    const d = new Date(timestamp);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return `${monthNames[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  } catch {
+    return null;
+  }
+}
 
+export class FirestorePerformanceRepository implements PerformanceRepository {
   private async fetchPlacements(input: PerformanceScopeQuery): Promise<any[]> {
-    if (input.scope === 'SELF') {
-      if (!input.employeeId?.trim()) return [];
-      const snap = await getDocs(query(collection(db, 'placements'), where('recruiterId', '==', input.employeeId)));
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
-    }
-    if (input.scope === 'DEPARTMENT') {
-      if (!input.departmentId?.trim()) return [];
-      const snap = await getDocs(query(collection(db, 'placements'), where('departmentId', '==', input.departmentId)));
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
-    }
-    const snap = await getDocs(collection(db, 'placements'));
-    return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) }));
+    const context = {
+      id: input.employeeId || 'unknown',
+      name: input.employeeName || 'Unknown',
+      role: input.employeeRole || 'Unknown',
+      assignedRole: input.assignedRole || input.scope,
+      departmentId: input.departmentId,
+    };
+    const activeWorkforce = await workforceService.getActiveWorkforce(context);
+    return activeWorkforce.map(v2 => {
+      return {
+        id: v2.employeeId,
+        candidateId: v2.candidate.id,
+        candidateName: v2.candidate.name,
+        clientId: v2.client.id,
+        clientName: v2.client.name,
+        recruiterId: v2.placement.recruiterId || '',
+        recruiterName: v2.placement.recruiterName || '',
+        rawActiveDate: v2.placement.activeDate,
+        status: v2.placement.status,
+      };
+    });
   }
 
   private async fetchEmployees(input: PerformanceScopeQuery): Promise<Employee[]> {
     if (input.scope === 'SELF') {
       if (!input.employeeId?.trim()) return [];
-      const snap = await getDocs(query(collection(db, 'employees'), where('employeeId', '==', input.employeeId)));
-      return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+      // input.employeeId is the Firestore document ID now! But in Employee table, is id == docId? Yes.
+      // Wait, in previous fetchEmployees: where('employeeId', '==', input.employeeId)
+      // Since input.employeeId is now the doc ID, querying by 'employeeId' field might fail if it stores HH0016.
+      // Let's just fetch the document directly or query both. Actually if input.employeeId is doc ID:
+      const snap = await getDocs(query(collection(db, 'employees')));
+      const all = snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+      return all.filter(e => e.id === input.employeeId || e.employeeId === input.employeeId);
     }
     if (input.scope === 'DEPARTMENT') {
       if (!input.departmentId?.trim()) return [];
@@ -71,6 +130,39 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
     }
     const snap = await getDocs(collection(db, 'employees'));
     return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+  }
+
+  async getMonthlyPerformanceAggregate(input: PerformanceScopeQuery & { brandId: string }): Promise<MonthlyAggregate[]> {
+    const allPlacements = await this.fetchPlacements(input);
+
+    const clientsSnap = await getDocs(collection(db, 'clients'));
+    const clientPointsMap = new Map<string, number>();
+    clientsSnap.forEach(d => {
+      const data = d.data();
+      const points = data.points ?? data.commercial?.points ?? 0;
+      clientPointsMap.set(d.id, points);
+      if (data.name) clientPointsMap.set(data.name, points);
+    });
+
+    const monthMap = new Map<string, { totalPoints: number, activeCandidates: number }>();
+
+    for (const p of allPlacements) {
+      const monthStr = getMonthString(p.rawActiveDate);
+      if (!monthStr) continue;
+
+      const pts = clientPointsMap.get(p.clientId) || clientPointsMap.get(p.clientName) || 0;
+
+      const existing = monthMap.get(monthStr) || { totalPoints: 0, activeCandidates: 0 };
+      existing.totalPoints += pts;
+      existing.activeCandidates += 1;
+      monthMap.set(monthStr, existing);
+    }
+
+    return Array.from(monthMap.entries()).map(([month, data]) => ({
+      month,
+      totalPoints: data.totalPoints,
+      activeCandidates: data.activeCandidates
+    }));
   }
 
   async getAllPerformanceSummaries(month?: string): Promise<PerformanceSummary[]> {
@@ -82,24 +174,13 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
       this.fetchPlacements(input),
       this.fetchEmployees(input)
     ]);
-
-    // Filter by activeDate matching the requested month
     let targetPlacements = allPlacements;
     if (input.month) {
       targetPlacements = allPlacements.filter((p) => {
-        if (!p.activeDate) return false;
-        try {
-          const d = new Date(p.activeDate);
-          if (isNaN(d.getTime())) return false;
-          const placementMonthStr = `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
-          return placementMonthStr.toLowerCase() === input.month!.toLowerCase();
-        } catch {
-          return false;
-        }
+        const placementMonthStr = getMonthString(p.rawActiveDate);
+        return placementMonthStr?.toLowerCase() === input.month!.toLowerCase();
       });
     }
-
-    // Group target placements by recruiterId / recruiterName
     const recruiterMap = new Map<string, any[]>();
     targetPlacements.forEach((placement) => {
       const key = placement.recruiterId || placement.recruiterName;
@@ -108,28 +189,34 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
       existing.push(placement);
       recruiterMap.set(key, existing);
     });
-
+    const clientsSnap = await getDocs(collection(db, 'clients'));
+    const clientPointsMap = new Map<string, number>();
+    clientsSnap.forEach(d => {
+      const data = d.data();
+      const points = data.points ?? data.commercial?.points ?? 0;
+      clientPointsMap.set(d.id, points);
+      if (data.name) clientPointsMap.set(data.name, points);
+    });
     const summaries: PerformanceSummary[] = employees.map((emp) => {
-      const key = emp.employeeId || emp.employeeCode || emp.id || emp.fullName;
-      const placementList = recruiterMap.get(key) || recruiterMap.get(emp.fullName) || [];
-
-      // Calculate Client-wise points using snapshot points from Placement
-      const clientGroup = new Map<
-        string,
-        { clientName: string; count: number; pointsPerCand: number; totalEarned: number }
-      >();
-
+      const keys = [emp.employeeId, emp.employeeCode, emp.id, emp.fullName].filter(Boolean);
+      let placementList: any[] = [];
+      for (const k of keys) {
+        if (k && recruiterMap.has(k)) {
+          placementList = placementList.concat(recruiterMap.get(k) || []);
+        }
+      }
+      const uniquePlacements = new Map();
+      placementList.forEach(p => uniquePlacements.set(p.candidateId, p));
+      placementList = Array.from(uniquePlacements.values());
+      const clientGroup = new Map<string, { clientName: string; count: number; pointsPerCand: number; totalEarned: number }>();
       placementList.forEach((placement) => {
-        const pts = Number(placement.totalPointAtActivation) || 0;
-        const basePts = Number(placement.pointAtActivation) || 0;
-        
+        const basePts = clientPointsMap.get(placement.clientId) || clientPointsMap.get(placement.clientName) || 0;
         const clientName = placement.clientName || 'Unknown Client';
         const existing = clientGroup.get(clientName) || { clientName, count: 0, pointsPerCand: basePts, totalEarned: 0 };
         existing.count += 1;
-        existing.totalEarned += pts;
+        existing.totalEarned += basePts;
         clientGroup.set(clientName, existing);
       });
-
       const clientPointsBreakdown = Array.from(clientGroup.values()).map((cg) => ({
         clientId: cg.clientName.toLowerCase().replace(/\s+/g, '-'),
         clientName: cg.clientName,
@@ -137,13 +224,10 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
         pointsPerCandidate: cg.pointsPerCand,
         totalEarned: cg.totalEarned,
       }));
-
       const totalPoints = clientPointsBreakdown.reduce((sum, item) => sum + item.totalEarned, 0);
       const activeCandidateCount = placementList.length;
-
       const brandIdVal = (emp as any).brandId || (emp as any).brand || undefined;
       const brandNameVal = (emp as any).brandName || undefined;
-
       return {
         employeeId: emp.employeeId ?? emp.employeeCode ?? emp.id ?? '',
         employeeCode: emp.employeeCode || emp.employeeId || '',
@@ -163,28 +247,18 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
         companyRank: 1,
       };
     });
-
-    // Compute Company Ranking
     summaries.sort((a, b) => b.totalPoints - a.totalPoints);
-    summaries.forEach((s, idx) => {
-      s.companyRank = idx + 1;
-    });
-
-    // Compute Department Ranking
+    summaries.forEach((s, idx) => { s.companyRank = idx + 1; });
     const deptGroups = new Map<string, PerformanceSummary[]>();
     summaries.forEach((s) => {
       const list = deptGroups.get(s.department) || [];
       list.push(s);
       deptGroups.set(s.department, list);
     });
-
     deptGroups.forEach((list) => {
       list.sort((a, b) => b.totalPoints - a.totalPoints);
-      list.forEach((s, idx) => {
-        s.departmentRank = idx + 1;
-      });
+      list.forEach((s, idx) => { s.departmentRank = idx + 1; });
     });
-
     return summaries;
   }
 
@@ -193,5 +267,4 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
     return all.find((s) => s.employeeId === employeeId) ?? null;
   }
 }
-
 export const performanceRepository: PerformanceRepository = new FirestorePerformanceRepository();
