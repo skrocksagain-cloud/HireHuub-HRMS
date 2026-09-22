@@ -177,8 +177,16 @@ export default function ClientPayoutImportModal({
     setModalError('');
 
     try {
-      const totalEarnings = processedRows.reduce((sum, r) => sum + r.earnings, 0);
-      const totalOrders = processedRows.reduce((sum, r) => sum + (r.orders || 0), 0);
+      // 4. Import/apply phase:
+      // - Import ONLY rows that are:
+      //   a) successfully matched to Workforce
+      //   b) valid
+      //   c) not duplicates according to the existing duplicate logic
+      // - Completely skip unmatched rows.
+      const rowsToImport = processedRows.filter(r => r.matched && r.validationStatus === 'Valid');
+
+      const totalEarnings = rowsToImport.reduce((sum, r) => sum + r.earnings, 0);
+      const totalOrders = rowsToImport.reduce((sum, r) => sum + (r.orders || 0), 0);
 
       const record: ClientPayoutImportRecord = {
         id: `IMP-${selectedClientId}-${Date.now()}`,
@@ -204,7 +212,7 @@ export default function ClientPayoutImportModal({
           'Earning': 'earnings',
           'Order': 'orders',
         },
-        rows: processedRows,
+        rows: rowsToImport,
       };
 
       await onImportSuccess(record);
