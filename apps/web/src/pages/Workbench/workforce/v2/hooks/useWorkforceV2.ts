@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import type { WorkforceRecordV2 } from '../types/workforce.v2.types';
 import type { WorkforceContextV2 } from '../services/workforce.v2.service';
 import { WorkforceServiceImplV2 } from '../services/workforce.v2.service';
@@ -49,19 +49,9 @@ const repoPlacements: any = {
       if (authorizedIds.length === 0) return [];
     } else if (scope === 'TEAM' || scope === 'DIRECT_REPORTS') {
       authorizedIds = [userSession.id];
-      if (userSession.teamId) {
-        // Technically teamId OR reportingManagerId, but Firestore doesn't easily support OR across multiple fields in old SDKs without multiple queries.
-        // A single query for reportingManagerId and another for teamId is safest.
-        const empQ1 = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
-        const empQ2 = query(collection(db, 'employees'), where('teamId', '==', userSession.teamId));
-        const [snap1, snap2] = await Promise.all([getDocs(empQ1), getDocs(empQ2)]);
-        snap1.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
-        snap2.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
-      } else {
-        const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
-        const empSnap = await getDocs(empQ);
-        empSnap.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
-      }
+      const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
+      const empSnap = await getDocs(empQ);
+      empSnap.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
     } else if (scope === 'OWN' || scope === 'SELF') {
       authorizedIds = [userSession.id];
     } else {

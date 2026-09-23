@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   WorkforceItem,
@@ -34,13 +34,13 @@ export function useWorkforce() {
   const currentRole = (user?.role as string) || 'Super Admin';
   const userSession = useMemo(
     () => ({
-      id: user?.employeeId || user?.id || 'user-admin',
+      id: user?.employeeId || '',
       name: user?.name || 'Super Admin',
-      teamId: user?.teamId,
+
       departmentId: user?.departmentId,
       assignedRole: user?.assignedRole || (user as any)?.authorization?.role,
     }),
-    [user?.employeeId, user?.id, user?.name, user?.teamId, user?.departmentId, user?.assignedRole, (user as any)?.authorization?.role]
+    [user?.employeeId, user?.id, user?.name, user?.departmentId, user?.assignedRole, (user as any)?.authorization?.role]
   );
 
 

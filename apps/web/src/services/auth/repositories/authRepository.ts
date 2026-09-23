@@ -75,7 +75,7 @@ export class FirestoreAuthRepository implements AuthRepository {
 
     return {
       id: docId,
-      employeeId: typeof data.employeeId === 'string' ? data.employeeId : docId,
+      employeeId: typeof data.employeeId === 'string' ? data.employeeId : '',
       employeeCode: typeof data.employeeCode === 'string' ? data.employeeCode : undefined,
       name,
       firstName,

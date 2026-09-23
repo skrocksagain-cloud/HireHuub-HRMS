@@ -1,14 +1,10 @@
+﻿import { canEditEmployee } from '../../../../../core/authorization/authorizationResolver';
 import type { PlacementV2 } from '../types/placement.v2.types';
 import type { ClientIntegrationV2 } from './placement.v2.integration';
 import { runTransaction, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../../../firebase/firebase';
 
-export interface RecruiterContextV2 {
-  id: string;
-  name: string;
-  role: string;
-  teamId?: string;
-}
+export interface RecruiterContextV2 { id: string; name: string; role: string; assignedRole?: string; departmentId?: string; }
 
 export interface CandidateRepositoryV2 {
   getCandidateById(id: string, transaction?: any): Promise<any | null>;
@@ -103,7 +99,7 @@ export class PlacementServiceImplV2 {
 
       // Create Placement
       const placementRef = doc(collection(db, 'placements'));
-      
+
       const newPlacement: any = {
         id: placementRef.id,
         placementId: placementBusinessId,
@@ -217,7 +213,7 @@ export class PlacementServiceImplV2 {
       transaction.set(placementRef, newPlacement as PlacementV2);
 
       // Lock candidate from being sourced (already Active, but maybe we mark placement ID somewhere? No, CRM shouldn't know about placement ID explicitly as per rule 2, it just queries Active placements)
-      
+
       return newPlacement;
     });
   }
@@ -322,6 +318,10 @@ export class PlacementServiceImplV2 {
       const placementRef = doc(db, 'placements', placementId);
       const placementSnap = await transaction.get(placementRef);
       if (!placementSnap.exists()) throw new Error('Placement not found.');
+      const data = placementSnap.data() as PlacementV2;
+      const targetContext = { employeeId: data.recruiterId };
+      const actorContext = { employeeId: _recruiterContext.id, assignedRole: _recruiterContext.assignedRole || _recruiterContext.role, departmentId: _recruiterContext.departmentId };
+      if (!canEditEmployee(actorContext, targetContext)) throw new Error('Not authorized to modify this placement.');
 
       transaction.update(placementRef, {
         status: 'Terminated',
@@ -340,6 +340,10 @@ export class PlacementServiceImplV2 {
       const placementRef = doc(db, 'placements', placementId);
       const placementSnap = await transaction.get(placementRef);
       if (!placementSnap.exists()) throw new Error('Placement not found.');
+      const data = placementSnap.data() as PlacementV2;
+      const targetContext = { employeeId: data.recruiterId };
+      const actorContext = { employeeId: _recruiterContext.id, assignedRole: _recruiterContext.assignedRole || _recruiterContext.role, departmentId: _recruiterContext.departmentId };
+      if (!canEditEmployee(actorContext, targetContext)) throw new Error('Not authorized to modify this placement.');
       const placement = placementSnap.data() as PlacementV2;
 
       const updatePayload: Partial<PlacementV2> = {
@@ -352,7 +356,7 @@ export class PlacementServiceImplV2 {
           updatePayload.joiningDate = updates.activeDate;
         }
       }
-      
+
       if (placement.clientType === 'OTS') {
         if (updates.joiningDate) updatePayload.joiningDate = updates.joiningDate;
         if (updates.lastWorkingDate) updatePayload.lastWorkingDate = updates.lastWorkingDate;
@@ -384,6 +388,10 @@ export class PlacementServiceImplV2 {
       const placementRef = doc(db, 'placements', placementId);
       const placementSnap = await transaction.get(placementRef);
       if (!placementSnap.exists()) throw new Error('Placement not found.');
+      const data = placementSnap.data() as PlacementV2;
+      const targetContext = { employeeId: data.recruiterId };
+      const actorContext = { employeeId: _recruiterContext.id, assignedRole: _recruiterContext.assignedRole || _recruiterContext.role, departmentId: _recruiterContext.departmentId };
+      if (!canEditEmployee(actorContext, targetContext)) throw new Error('Not authorized to modify this placement.');
       const current = placementSnap.data() as PlacementV2;
 
       transaction.update(placementRef, {

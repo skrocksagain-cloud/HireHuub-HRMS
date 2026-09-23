@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { FileText, ShieldCheck, AlertCircle, Edit2, Check, X } from 'lucide-react';
 import type { Candidate, CandidateDocument } from '../../types/crm';
 import { crmRepository } from '../../repositories/crmRepository';
@@ -20,7 +20,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
 
   const currentClient = clients.find(c => c.id === candidate.currentClientId || c.name === candidate.currentClientName);
   const resolvedClientType = (currentClient as any)?.type || (currentClient as any)?.clientType || candidate.currentPlacement?.clientType;
-  
+
   const isPayroll = resolvedClientType === 'Payroll';
   const isOts = resolvedClientType === 'OTS';
   const docs = candidate.documents || [];
@@ -54,7 +54,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
 
   const [editingProfileField, setEditingProfileField] = useState<'dob' | 'empId' | 'activeDate' | 'joiningDate' | null>(null);
   const [profileFormData, setProfileFormData] = useState<{ dateOfBirth?: string; payrollEmployeeId?: string; activeDate?: string; joiningDate?: string }>({});
-  
+
   const handleEditProfileField = (field: 'dob' | 'empId' | 'activeDate' | 'joiningDate') => {
     setProfileFormData({
       dateOfBirth: candidate.dateOfBirth,
@@ -74,7 +74,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
         ...(editingProfileField === 'empId' ? { payrollEmployeeId: profileFormData.payrollEmployeeId } : {}),
         ...(editingProfileField === 'activeDate' ? { activeDate: profileFormData.activeDate } : {}),
         ...(editingProfileField === 'joiningDate' ? { joiningDate: profileFormData.joiningDate } : {})
-      }, { name: user.name });
+      }, { id: user.employeeId || user.id || '', name: user.name, role: user.assignedRole || user.role });
       setEditingProfileField(null);
       // We assume candidate object might not update instantly in props, so we could optimistically update if needed,
       // but typical React flow will re-render when parent state updates.
@@ -88,11 +88,11 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
   const handleSave = async (docType: DocType) => {
     if (!user) return;
     setIsSaving(true);
-    
+
     try {
       const updatedDocs = [...docs];
       const existingIdx = updatedDocs.findIndex(d => d.documentType === docType);
-      
+
       const newDoc: CandidateDocument = {
         id: formData.id || `doc-${Date.now()}`,
         documentType: docType,
@@ -111,7 +111,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
         updatedDocs.push(newDoc);
       }
 
-      await crmRepository.updateCandidateProfile(candidate.id, { documents: updatedDocs }, { name: user.name });
+      await crmRepository.updateCandidateProfile(candidate.id, { documents: updatedDocs }, { id: user.employeeId || user.id || '', name: user.name, role: user.assignedRole || user.role });
       setEditingType(null);
       setFormData({});
     } catch (err) {
@@ -165,7 +165,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
             />
           </div>
         )}
-        
+
         <div className="flex items-center gap-2 pt-2">
           <button
             type="button"
@@ -194,7 +194,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
         <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
           <FileText size={16} className="text-emerald-600" /> Lifetime Profile Documents ({docs.length})
         </h4>
-        <span className="text-[11px] text-slate-400 font-medium">Belongs to Candidate Profile — Reusable across placements</span>
+        <span className="text-[11px] text-slate-400 font-medium">Belongs to Candidate Profile â€” Reusable across placements</span>
       </div>
 
       {!isPayroll && (
@@ -258,7 +258,7 @@ export default function DocumentsTab({ candidate }: DocumentsTabProps) {
                           {existing.documentDetails}
                         </p>
                       )}
-                      
+
                       <div className="pt-2 flex items-center justify-between border-t border-emerald-200/60 mt-2">
                         <span className="text-[10px] text-slate-400 block font-mono">
                           Saved {existing.uploadedAt ? new Date(existing.uploadedAt).toLocaleDateString() : 'recently'}

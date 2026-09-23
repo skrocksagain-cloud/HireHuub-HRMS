@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import { clientRepository } from '../../../Workbench/Network/clients/repositories/clientRepository';
 import type { Client } from '../../../../types/Client';
@@ -16,7 +16,7 @@ export default function OtsBillingTab() {
       const { workforceService } = await import('../../../Workbench/workforce/v2/hooks/useWorkforceV2');
       const v2Records = await workforceService.getActiveWorkforce(
         {
-          id: user?.employeeId || 'admin',
+          id: user?.employeeId || '',
           name: user?.name || 'Admin',
           role: (user?.role as any) || 'Super Admin',
           assignedRole: (user as any)?.assignedRole || user?.role,

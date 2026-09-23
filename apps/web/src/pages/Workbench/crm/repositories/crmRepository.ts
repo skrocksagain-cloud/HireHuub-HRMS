@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, query, updateDoc, where, runTransaction, collectionGroup, arrayUnion } from 'firebase/firestore';
+﻿import { addDoc, collection, doc, getDoc, getDocs, query, updateDoc, where, runTransaction, collectionGroup, arrayUnion } from 'firebase/firestore';
 import { db } from '../../../../firebase/firebase';
 import type { Candidate, CreateCandidateInput, ImportHistoryItem, QuickUpdateInput } from '../types/crm';
 import { statusRuleEngine } from '../services/statusRuleEngine';
@@ -21,7 +21,7 @@ const candidateFrom = (id: string, value: Record<string, unknown>): Candidate =>
 export class CrmRepository {
   async getCandidates(userSession?: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<Candidate[]> {
     let q = query(candidates);
-    
+
     if (userSession) {
       const scope = getAuthorizationScope(userSession.assignedRole || userSession.role);
 
@@ -30,12 +30,12 @@ export class CrmRepository {
       } else if (scope === 'DEPARTMENT') {
         if (!userSession.departmentId) return []; // Fail safely
         q = query(candidates, where('departmentId', '==', userSession.departmentId));
-      } else if (scope === 'DIRECT_REPORTS') {
+      } else if (scope === 'TEAM') {
         // Fetch direct reports
         const employeesRef = collection(db, 'employees');
         const reportsQuery = query(employeesRef, where('reportingManagerId', '==', userSession.id));
         const reportsSnap = await getDocs(reportsQuery);
-        
+
         const authorizedIds = [userSession.id];
         reportsSnap.docs.forEach(d => {
           const emp = d.data();
@@ -54,16 +54,37 @@ export class CrmRepository {
         q = query(candidates, where('assignedRecruiterId', '==', userSession.id));
       }
     }
-    
-    const result = await getDocs(q); 
-    return result.docs.map((item) => candidateFrom(item.id, item.data())); 
+
+    const result = await getDocs(q);
+    return result.docs.map((item) => candidateFrom(item.id, item.data()));
   }
-  async getCandidateById(id: string): Promise<Candidate | null> { const result = await getDoc(doc(db, 'crm_candidates', id)); return result.exists() ? candidateFrom(result.id, result.data()) : null; }
+    async getCandidateById(id: string, actorContext?: { id: string; role: string; assignedRole?: string; departmentId?: string }): Promise<Candidate | null> {
+    const result = await getDoc(doc(db, 'crm_candidates', id));
+    if (!result.exists()) return null;
+    const candidate = candidateFrom(result.id, result.data());
+
+    if (actorContext) {
+      const { canViewEmployee } = await import('../../../../core/authorization/authorizationResolver');
+      const actor = {
+        employeeId: actorContext.id,
+        assignedRole: actorContext.assignedRole || actorContext.role,
+        departmentId: actorContext.departmentId
+      };
+      const target = {
+        employeeId: candidate.assignedRecruiterId,
+        departmentId: candidate.departmentId
+      };
+      if (!canViewEmployee(actor, target)) {
+        throw new Error('Not authorized to view this candidate.');
+      }
+    }
+    return candidate;
+  }
   async findDuplicateByPhone(phone: string): Promise<Candidate | null> {
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length === 10) cleanPhone = '+91' + cleanPhone;
     else if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = '+' + cleanPhone;
-    else return null; 
+    else return null;
 
     try {
       const phoneDoc = await getDoc(doc(db, 'crm_phone_registry', cleanPhone));
@@ -79,19 +100,19 @@ export class CrmRepository {
   }
   private async activity(candidateId: string, action: string, actor: { id?: string; name: string }, details: string): Promise<void> { await addDoc(activities, { candidateId, action, actorId: actor.id ?? '', actorName: actor.name, details, createdAt: new Date().toISOString() }); }
   async createCandidate(input: CreateCandidateInput, actor: { id: string; name: string; role?: string; teamId?: string; departmentId?: string }): Promise<Candidate> {
-    if (!actor.teamId && !actor.departmentId && actor.role !== 'Super Admin') {
+    if (!actor.departmentId && actor.role !== 'Super Admin') {
       throw new Error('Your employee profile is missing team or department information. Please contact Admin.');
     }
 
     let targetRecruiterId = actor.id;
     let targetRecruiterName = actor.name;
-    let targetTeamId = actor.teamId ?? null;
+
     let targetDepartmentId = actor.departmentId ?? null;
 
     if (input.assignedRecruiterId && input.assignedRecruiterName) {
       targetRecruiterId = input.assignedRecruiterId;
       targetRecruiterName = input.assignedRecruiterName;
-      targetTeamId = input.targetTeamId ?? null;
+
       targetDepartmentId = input.targetDepartmentId ?? null;
     }
 
@@ -99,50 +120,60 @@ export class CrmRepository {
     if (cleanPhone.length === 10) cleanPhone = '+91' + cleanPhone;
     else if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) cleanPhone = '+' + cleanPhone;
     else throw new Error('Invalid mobile number. Only valid 10-digit Indian mobile numbers are permitted.');
-    
-    const now = new Date().toISOString(); 
-    
+
+    const now = new Date().toISOString();
+
     const candidateId = await runTransaction(db, async (transaction) => {
       const phoneRef = doc(db, 'crm_phone_registry', cleanPhone);
       const phoneDoc = await transaction.get(phoneRef);
       if (phoneDoc.exists()) throw new Error(`Candidate with phone ${input.phone} already exists.`);
-      
-      const candidateRef = doc(candidates); 
+
+      const candidateRef = doc(candidates);
       transaction.set(phoneRef, { candidateId: candidateRef.id, createdAt: now, createdBy: actor.id });
-      
+
       const safeSource = {
         category: input.source.category,
         detailOption: input.source.detailOption ?? null,
         detailText: input.source.detailText ?? null,
       };
 
-      transaction.set(candidateRef, { 
-        name: input.name.trim(), 
-        phone: input.phone.trim(), 
+      transaction.set(candidateRef, {
+        name: input.name.trim(),
+        phone: input.phone.trim(),
         normalizedPhone: cleanPhone,
-        area: input.area.trim(), 
-        city: input.city.trim(), 
-        role: input.role.trim(), 
+        area: input.area.trim(),
+        city: input.city.trim(),
+        role: input.role.trim(),
         currentCrmStatus: null, // Phase 2: Blank status for new candidates
-        assignedRecruiterId: targetRecruiterId, 
-        assignedRecruiterName: targetRecruiterName, 
-        teamId: targetTeamId,
+        assignedRecruiterId: targetRecruiterId,
+        assignedRecruiterName: targetRecruiterName,
+
         departmentId: targetDepartmentId,
-        source: safeSource, 
-        sourceHistory: [{ source: safeSource, date: now.slice(0, 10) }], 
-        phoneHistory: [{ phone: input.phone.trim(), changedAt: now }], 
-        placementHistory: [], documents: [], attachments: [], systemAudit: [], isBlacklisted: false, callsCount: 0, createdAt: now, updatedAt: now 
+        source: safeSource,
+        sourceHistory: [{ source: safeSource, date: now.slice(0, 10) }],
+        phoneHistory: [{ phone: input.phone.trim(), changedAt: now }],
+        placementHistory: [], documents: [], attachments: [], systemAudit: [], isBlacklisted: false, callsCount: 0, createdAt: now, updatedAt: now
       });
       return candidateRef.id;
     });
 
     return (await this.getCandidateById(candidateId))!;
   }
-  async quickUpdate(
+    async quickUpdate(
     input: QuickUpdateInput,
     client: { name?: string; type?: 'Payroll' | 'OTS' },
-    actor: { id: string; name: string; teamId?: string; departmentId?: string }
+    actor: { id: string; name: string; role?: string; assignedRole?: string; departmentId?: string }
   ): Promise<Candidate> {
+    const { canEditEmployee } = await import('../../../../core/authorization/authorizationResolver');
+    const existingForAuth = await getDoc(doc(db, 'crm_candidates', input.candidateId));
+    if (existingForAuth.exists()) {
+      const data = existingForAuth.data();
+      const actorContext = { employeeId: actor.id, assignedRole: actor.assignedRole || actor.role, departmentId: actor.departmentId };
+      const targetContext = { employeeId: data.assignedRecruiterId, departmentId: data.departmentId };
+      if (!canEditEmployee(actorContext, targetContext)) {
+         throw new Error('Not authorized to edit this candidate.');
+      }
+    }
     const validation = statusRuleEngine.validateUpdateInput(input, client.type);
     if (!validation.isValid) throw new Error(validation.errors.join(' '));
     const now = new Date().toISOString();
@@ -166,7 +197,7 @@ export class CrmRepository {
         timestamp: now,
         recruiterId: actor.id,
         recruiterName: actor.name,
-        teamId: actor.teamId ?? null,
+        teamId: null,
         departmentId: actor.departmentId ?? null,
         previousStatus,
         selectedStatus: input.status,
@@ -225,14 +256,39 @@ export class CrmRepository {
     return (await this.getCandidateById(input.candidateId))!;
   }
 
-  async updateCandidateProfile(id: string, updates: Partial<Candidate>, _actor: { name: string }): Promise<Candidate> {
+    async updateCandidateProfile(id: string, updates: Partial<Candidate>, _actor: { id: string; name: string; role?: string; assignedRole?: string; departmentId?: string }): Promise<Candidate> {
+    const { canEditEmployee } = await import('../../../../core/authorization/authorizationResolver');
+    const existingForAuth = await getDoc(doc(db, 'crm_candidates', id));
+    if (existingForAuth.exists()) {
+      const data = existingForAuth.data();
+      const actorContext = { employeeId: _actor.id, assignedRole: _actor.assignedRole || _actor.role, departmentId: _actor.departmentId };
+      const targetContext = { employeeId: data.assignedRecruiterId, departmentId: data.departmentId };
+      if (!canEditEmployee(actorContext, targetContext)) {
+         throw new Error('Not authorized to edit this candidate.');
+      }
+    }
     const existing = await this.getCandidateById(id);
     if (!existing) throw new Error('Candidate was not found.');
     await updateDoc(doc(db, 'crm_candidates', id), { ...updates, id, updatedAt: new Date().toISOString() });
     return (await this.getCandidateById(id))!;
   }
 
-  async reassignCandidate(id: string, recruiterId: string, recruiterName: string, actor: { id: string; name: string }, reason = ''): Promise<Candidate> {
+    async reassignCandidate(id: string, recruiterId: string, recruiterName: string, actor: { id: string; name: string; role?: string; assignedRole?: string; departmentId?: string }, reason = ''): Promise<Candidate> {
+    const { canReassignBetweenEmployees } = await import('../../../../core/authorization/authorizationResolver');
+    const existingForAuth = await getDoc(doc(db, 'crm_candidates', id));
+    if (existingForAuth.exists()) {
+      const data = existingForAuth.data();
+      const actorContext = { employeeId: actor.id, assignedRole: actor.assignedRole || actor.role, departmentId: actor.departmentId };
+      const sourceContext = { employeeId: data.assignedRecruiterId, departmentId: data.departmentId };
+
+      const targetEmpSnap = await getDocs(query(collection(db, 'employees'), where('employeeId', '==', recruiterId)));
+      const targetDoc = targetEmpSnap.docs[0]?.data();
+      const targetContext = { employeeId: recruiterId, departmentId: targetDoc?.departmentId, reportingManagerId: targetDoc?.reportingManagerId };
+
+      if (!canReassignBetweenEmployees(actorContext, sourceContext, targetContext)) {
+         throw new Error('Not authorized to reassign this candidate.');
+      }
+    }
     if (!recruiterId || !recruiterName) throw new Error('Recruiter selection is required.');
     const existing = await this.getCandidateById(id);
     if (!existing) throw new Error('Candidate was not found.');
@@ -263,11 +319,30 @@ export class CrmRepository {
 
     return (await this.getCandidateById(id))!;
   }
-  async bulkAssignCandidates(ids: string[], recruiterId: string, recruiterName: string, actor: { id: string; name: string }): Promise<number> { await Promise.all(ids.map((id) => this.reassignCandidate(id, recruiterId, recruiterName, actor, 'Bulk assignment'))); return ids.length; }
-  async bulkRecruiterTransfer(fromId: string, recruiterId: string, recruiterName: string, actor: { id: string; name: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<number> { 
-    // Authorization enforcement is disabled - bypass mode
-    let q = query(candidates, where('assignedRecruiterId', '==', fromId));
+  async bulkAssignCandidates(ids: string[], recruiterId: string, recruiterName: string, actor: { id: string; name: string; role?: string; assignedRole?: string; departmentId?: string }): Promise<number> {
+    const { canReassignBetweenEmployees } = await import('../../../../core/authorization/authorizationResolver');
+    const actorContext = { employeeId: actor.id, assignedRole: actor.assignedRole || actor.role, departmentId: actor.departmentId };
+    const targetEmpSnap = await getDocs(query(collection(db, 'employees'), where('employeeId', '==', recruiterId)));
+    const targetDoc = targetEmpSnap.docs[0]?.data();
+    const targetContext = { employeeId: recruiterId, departmentId: targetDoc?.departmentId, reportingManagerId: targetDoc?.reportingManagerId };
 
+    // PRE-CHECK ALL
+    for (const id of ids) {
+      const existing = await getDoc(doc(db, 'crm_candidates', id));
+      if (existing.exists()) {
+        const data = existing.data();
+        const sourceContext = { employeeId: data.assignedRecruiterId, departmentId: data.departmentId };
+        if (!canReassignBetweenEmployees(actorContext, sourceContext, targetContext)) {
+          throw new Error('Not authorized to reassign candidate. Bulk assignment aborted.');
+        }
+      }
+    }
+
+    await Promise.all(ids.map((id) => this.reassignCandidate(id, recruiterId, recruiterName, actor, 'Bulk assignment')));
+    return ids.length;
+  }
+      async bulkRecruiterTransfer(fromId: string, recruiterId: string, recruiterName: string, actor: { id: string; name: string; role: string; assignedRole?: string; departmentId?: string }): Promise<number> {
+    let q = query(candidates, where('assignedRecruiterId', '==', fromId));
     const result = await getDocs(q);
     return this.bulkAssignCandidates(result.docs.map((item) => item.id), recruiterId, recruiterName, actor);
   }
@@ -275,13 +350,36 @@ export class CrmRepository {
   async getImportHistory(): Promise<ImportHistoryItem[]> { const result = await getDocs(imports); return result.docs.map((item) => ({ id: item.id, ...item.data() } as ImportHistoryItem)); }
   async addImportHistory(item: Omit<ImportHistoryItem, 'id' | 'importedAt'>): Promise<ImportHistoryItem> { const importedAt = new Date().toISOString(); const result = await addDoc(imports, { ...item, importedAt }); return { id: result.id, ...item, importedAt }; }
 
-  async getCallsTodayForUser(_userSession: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<number> {
+      async getCallsTodayForUser(userSession: { id: string; role: string; assignedRole?: string; departmentId?: string }): Promise<number> {
     const today = new Date().toISOString().split('T')[0];
-    // Authorization enforcement is disabled - bypass mode
+    const { getAuthorizationScope } = await import('../../../../core/authorization/authorizationResolver');
+    const scope = getAuthorizationScope(userSession.assignedRole || userSession.role);
+
+    let authorizedIds: string[] = [];
+    if (scope === 'GLOBAL') {
+      // Global
+    } else if (scope === 'DEPARTMENT') {
+      const targetDept = userSession.departmentId;
+      if (!targetDept) return 0;
+      const empSnap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', targetDept)));
+      empSnap.forEach(d => { if (d.data().employeeId) authorizedIds.push(d.data().employeeId); });
+    } else if (scope === 'TEAM') {
+      authorizedIds = [userSession.id];
+      const empSnap = await getDocs(query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id)));
+      empSnap.forEach(d => { if (d.data().employeeId) authorizedIds.push(d.data().employeeId); });
+    } else {
+      authorizedIds = [userSession.id];
+    }
+
     const q = query(collectionGroup(db, 'interactions'), where('timestamp', '>=', today));
-    
     const result = await getDocs(q);
-    return result.docs.length;
+
+    if (scope === 'GLOBAL') {
+      return result.docs.length;
+    }
+
+    const allowed = result.docs.filter((doc) => authorizedIds.includes(doc.data().recruiterId));
+    return allowed.length;
   }
 
   appendPlacementToHistory(candidateId: string, placementRecord: any, batch: any): void {
@@ -311,7 +409,7 @@ export class CrmRepository {
       if (!candidateSnap.exists()) {
         throw new Error('Candidate not found');
       }
-      
+
       const candidateData = candidateSnap.data();
       if (candidateData.payrollEmployeeId && candidateData.payrollEmployeeId.startsWith('HH/CAN/OTS/')) {
         return candidateData.payrollEmployeeId; // Already generated
@@ -320,7 +418,7 @@ export class CrmRepository {
       // 2. Get Sequence
       const sequenceRef = doc(db, 'system_sequences', 'ots_employee_id');
       const sequenceSnap = await transaction.get(sequenceRef);
-      
+
       let nextNumber = 1;
       if (sequenceSnap.exists()) {
         nextNumber = (sequenceSnap.data().current || 0) + 1;

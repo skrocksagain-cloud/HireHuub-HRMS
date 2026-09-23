@@ -1,4 +1,4 @@
-import type { MonthlyPayoutV2, WorkforceRecordV2 } from '../types/workforce.v2.types';
+﻿import type { MonthlyPayoutV2, WorkforceRecordV2 } from '../types/workforce.v2.types';
 import type { PlacementRepositoryV2 } from '../../../placement/v2/repositories/placement.v2.repository';
 import type { AssociatePartnerIntegrationV2 } from '../../../placement/v2/services/placement.v2.integration';
 import type { ClientIntegrationV2 } from '../../../placement/v2/services/placement.v2.integration';
@@ -12,7 +12,6 @@ export interface WorkforceContextV2 {
   name: string;
   role: string;
   assignedRole?: string;
-  teamId?: string;
   departmentId?: string;
 }
 

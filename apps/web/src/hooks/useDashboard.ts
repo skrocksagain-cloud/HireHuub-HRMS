@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { dashboardService, type ServerTimeInfo, type DepartmentKpiSnapshot, type UserRankingInfo } from '../services/dashboard/dashboardService';
 import { dashboardRepository, type DashboardAttendanceRecord, type UserDashboardPreference, type DashboardCalendarEvent, type DashboardAnnouncement, type DashboardNotificationItem } from '../services/dashboard/repositories/dashboardRepository';
 import { usePermissions } from './usePermissions';
@@ -8,7 +8,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
   const { user } = useAuth();
   const { activeRole } = usePermissions();
 
-  const effectiveUserId = currentUserId || user?.employeeId || user?.id || '';
+  const effectiveUserId = currentUserId || user?.employeeId || '';
   const effectiveUserName = currentUserName || user?.name || 'Somnath';
   const roleName = activeRole?.name || 'User';
 

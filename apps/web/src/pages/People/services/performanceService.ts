@@ -1,4 +1,4 @@
-import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
+﻿import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
 import {
   performanceRepository,
   type PerformanceSummary,
@@ -143,9 +143,30 @@ export class PerformanceService {
     return rows;
   }
 
-  async assignTarget(input: PerformanceTargetInput): Promise<void> {
+  async assignTarget(
+    input: PerformanceTargetInput,
+    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+  ): Promise<void> {
     if (!input.employeeId || !input.brandId || !input.month || input.targetPoints < 0) {
       throw new Error('Valid employee, brand, month, and non-negative target points are required.');
+    }
+    const { canAssignToEmployee } = await import('../../../core/authorization/authorizationResolver');
+    if (actorContext && actorContext.employeeId) {
+      // Need to fetch target employee to get their reportingManagerId and departmentId
+      const { getDocs, collection, query, where } = await import('firebase/firestore');
+      const { db } = await import('../../../firebase/firebase');
+      const snap = await getDocs(query(collection(db, 'employees'), where('employeeId', '==', input.employeeId)));
+      const targetDoc = snap.docs[0]?.data();
+
+      const targetContext = {
+        employeeId: input.employeeId,
+        departmentId: targetDoc?.departmentId,
+        reportingManagerId: targetDoc?.reportingManagerId
+      };
+
+      if (!canAssignToEmployee(actorContext, targetContext)) {
+        throw new Error('Not authorized to assign target to this employee.');
+      }
     }
     await performanceTargetRepository.saveTarget(input);
   }

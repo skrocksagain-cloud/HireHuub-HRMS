@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import { useState, useEffect } from 'react';
 import {
   RefreshCw,
@@ -39,7 +39,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
   const { user } = useAuth();
   const currentRole = (user?.role as string) || 'Super Admin';
   const userSession = {
-    id: user?.employeeId || user?.id || 'user-admin',
+    id: user?.employeeId || '',
     name: user?.name || 'Super Admin',
     departmentId: user?.departmentId,
     assignedRole: user?.assignedRole || (user as any)?.authorization?.role,
@@ -157,7 +157,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
 
       const candRef = doc(db, 'crm_candidates', candidateId);
       const candSnap = await getDoc(candRef);
-      
+
       const batch = writeBatch(db);
       batch.update(doc(db, 'placements', placementId), operationalDataUpdates);
 
@@ -243,7 +243,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
   if (loading) {
     return (
       <Drawer isOpen={true} onClose={onClose} title="Workforce Profile" width="xl">
-        <div className="p-12 text-center text-slate-500 text-xs">Loading Workforce Profile…</div>
+        <div className="p-12 text-center text-slate-500 text-xs">Loading Workforce Profileâ€¦</div>
       </Drawer>
     );
   }
@@ -287,21 +287,21 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
               </div>
               <div className="flex flex-wrap items-center gap-3 text-slate-500 font-mono text-xs mt-1">
                 <span>Placement ID: {(item as any).placementBusinessId ? <strong className="text-blue-800">{(item as any).placementBusinessId}</strong> : <span className="text-rose-600 bg-rose-50 px-1 rounded border border-rose-200">Missing ID</span>}</span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>Employee ID: <strong className="text-slate-900">{item.id}</strong></span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>Mobile: {item.phone}</span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>Area: {item.area}</span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>City: {item.city}</span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>Client: <strong className="text-emerald-800">{item.clientName}</strong></span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>Recruiter: {item.recruiterName || 'Unassigned'}</span>
                 {item.associatePartnerName && (
                   <>
-                    <span>•</span>
+                    <span>â€¢</span>
                     <span>AP: {item.associatePartnerName}</span>
                   </>
                 )}
@@ -388,7 +388,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
               Total Earnings
             </span>
             <span className="font-bold text-emerald-700 text-sm mt-1 block">
-              ₹{item.totalEarnings.toLocaleString('en-IN')}
+              â‚¹{item.totalEarnings.toLocaleString('en-IN')}
             </span>
           </div>
 
@@ -397,7 +397,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
               Total Orders
             </span>
             <span className="font-bold text-blue-700 text-sm mt-1 block">
-              {item.supportsOrders && item.totalOrders !== undefined ? item.totalOrders : '—'}
+              {item.supportsOrders && item.totalOrders !== undefined ? item.totalOrders : 'â€”'}
             </span>
           </div>
         </div>
@@ -491,19 +491,19 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
                       <div className="p-3 bg-white rounded-xl border">
                         <span className="text-[10px] text-slate-500 font-semibold block">Monthly Earnings</span>
                         <span className="font-bold text-slate-900 text-xs">
-                          ₹{item.totalEarnings.toLocaleString('en-IN')}
+                          â‚¹{item.totalEarnings.toLocaleString('en-IN')}
                         </span>
                       </div>
                       <div className="p-3 bg-white rounded-xl border">
                         <span className="text-[10px] text-slate-500 font-semibold block">Monthly Orders</span>
                         <span className="font-bold text-blue-700 text-xs">
-                          {item.supportsOrders && item.totalOrders !== undefined ? item.totalOrders : '—'}
+                          {item.supportsOrders && item.totalOrders !== undefined ? item.totalOrders : 'â€”'}
                         </span>
                       </div>
                       <div className="p-3 bg-white rounded-xl border">
                         <span className="text-[10px] text-slate-500 font-semibold block">Performance Rank</span>
                         <span className="font-bold text-amber-700 text-xs">
-                          {item.supportsOrders && item.rank !== undefined ? `#${item.rank}` : '—'}
+                          {item.supportsOrders && item.rank !== undefined ? `#${item.rank}` : 'â€”'}
                         </span>
                       </div>
                     </div>
@@ -563,7 +563,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
                   <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
                     <div className="flex justify-between font-bold text-slate-900 text-xs">
                       <span>July 2026 Aggregated Client Import</span>
-                      <span className="text-emerald-700">₹{item.totalEarnings.toLocaleString('en-IN')}</span>
+                      <span className="text-emerald-700">â‚¹{item.totalEarnings.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="text-[11px] text-slate-500">
                       Verified working status via Client Payout Import V1.
@@ -657,7 +657,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
                       <div>
                         <div className="font-bold text-slate-900">{p.clientName}</div>
                         <div className="text-[10px] text-slate-500">
-                          Active Date: {p.activeDate} • Type: {p.clientType}
+                          Active Date: {p.activeDate} â€¢ Type: {p.clientType}
                         </div>
                       </div>
                       <span

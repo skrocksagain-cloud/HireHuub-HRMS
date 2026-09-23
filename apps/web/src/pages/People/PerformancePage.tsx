@@ -1,4 +1,4 @@
-/* eslint-disable */
+﻿/* eslint-disable */
 import { useState, useEffect, useMemo } from 'react';
 import { Award, CheckCircle2, Target, Percent, Plus, Layers, X, DollarSign } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -21,7 +21,7 @@ export default function PerformancePage() {
     const start = new Date(2026, 5); // June 2026
     const current = new Date();
     const months: string[] = [];
-    
+
     let d = new Date(current.getFullYear(), current.getMonth(), 1);
     const minDate = new Date(start.getFullYear(), start.getMonth(), 1);
 
@@ -30,7 +30,7 @@ export default function PerformancePage() {
       months.push(`${monthName} ${d.getFullYear()}`);
       d.setMonth(d.getMonth() - 1);
     }
-    
+
     return months.length > 0 ? months : ['August 2026', 'July 2026', 'June 2026'];
   }, []);
 
@@ -50,7 +50,7 @@ export default function PerformancePage() {
   const [targetPointsInput, setTargetPointsInput] = useState<number>(500);
 
   const activeRole: any = null;  // Placeholder for future authorization implementation
-  const userEmpId = user?.employeeId || user?.id || '';
+  const userEmpId = user?.employeeId || '';
   const canManage = true; // Authorization is in bypass mode
   const viewScope = 'GLOBAL'; // Authorization is in bypass mode, always GLOBAL scope
 
@@ -84,7 +84,7 @@ export default function PerformancePage() {
       const actorContext = {
         assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
         departmentId: user?.departmentId,
-        employeeId: user?.employeeId || user?.id,
+        employeeId: user?.employeeId || '',
         employeeName: (user as any)?.fullName || (user as any)?.name,
         employeeRole: (user as any)?.role,
       };
@@ -150,7 +150,7 @@ export default function PerformancePage() {
         {
           assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
           departmentId: user?.departmentId,
-          employeeId: user?.employeeId || user?.id,
+          employeeId: user?.employeeId || '',
           employeeName: (user as any)?.fullName || (user as any)?.name,
           employeeRole: (user as any)?.role,
         }
@@ -195,6 +195,12 @@ export default function PerformancePage() {
         brandName: brandObj?.brandName || 'Brand',
         month: selectedMonth,
         targetPoints: Number(targetPointsInput),
+      }, {
+        assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
+        departmentId: user?.departmentId,
+        employeeId: user?.employeeId,
+        employeeName: (user as any)?.fullName || (user as any)?.name,
+        employeeRole: (user as any)?.role,
       });
 
       setShowTargetModal(false);
@@ -255,7 +261,7 @@ export default function PerformancePage() {
               id: 'achievement-pct',
               title: 'Achievement (%)',
               value: `${achievementPercent}%`,
-              subtext: '(Achieved ÷ Target) × 100',
+              subtext: '(Achieved Ã· Target) Ã— 100',
               change: `${achievementPercent}%`,
               trend: 'neutral',
               category: 'people',
@@ -267,7 +273,7 @@ export default function PerformancePage() {
             metric={{
               id: 'incentive-amount',
               title: 'Incentive Amount',
-              value: `₹${totalIncentive.toLocaleString('en-IN')}`,
+              value: `â‚¹${totalIncentive.toLocaleString('en-IN')}`,
               subtext: 'Authoritative Slab Engine',
               change: 'Incentive',
               trend: 'neutral',
@@ -334,7 +340,7 @@ export default function PerformancePage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-900 text-sm">
-              Employee Performance — {selectedBrandObj?.brandName || 'Brand'}
+              Employee Performance â€” {selectedBrandObj?.brandName || 'Brand'}
             </h3>
             <span className="text-xs text-slate-500 font-medium">
               {filteredSummaries.length} Active Employees
@@ -342,7 +348,7 @@ export default function PerformancePage() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs text-slate-500">Loading brand performance data…</div>
+            <div className="p-8 text-center text-xs text-slate-500">Loading brand performance dataâ€¦</div>
           ) : brands.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500 font-medium text-slate-400">
               No active brands configured.
@@ -385,10 +391,10 @@ export default function PerformancePage() {
                         </td>
                         <td className="py-3 px-3 font-bold text-emerald-600">+{emp.totalPoints} Pts</td>
                         <td className="py-3 px-3 font-bold text-slate-900">
-                          {emp.targetPoints > 0 ? `${emp.achievementPercent}%` : '—'}
+                          {emp.targetPoints > 0 ? `${emp.achievementPercent}%` : 'â€”'}
                         </td>
                         <td className="py-3 px-3 font-bold text-purple-700">
-                          ₹{incAmt.toLocaleString('en-IN')}
+                          â‚¹{incAmt.toLocaleString('en-IN')}
                         </td>
                         <td className="py-3 px-3 font-semibold text-slate-600">
                           {emp.activeCandidateCount} Candidates
@@ -427,7 +433,7 @@ export default function PerformancePage() {
         {/* Monthly Register Table */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
           <h3 className="font-bold text-slate-900 text-sm">
-            Monthly Register — {selectedBrandObj?.brandName || 'Brand'}
+            Monthly Register â€” {selectedBrandObj?.brandName || 'Brand'}
           </h3>
 
           {monthlyRegister.length === 0 ? (
@@ -458,7 +464,7 @@ export default function PerformancePage() {
                       <td className="py-3 px-3 font-bold text-emerald-600">+{row.achieved} Pts</td>
                       <td className="py-3 px-3 font-bold text-slate-900">{row.achievementPercent}%</td>
                       <td className="py-3 px-3 font-bold text-purple-700">
-                        ₹{row.incentiveAmount.toLocaleString('en-IN')}
+                        â‚¹{row.incentiveAmount.toLocaleString('en-IN')}
                       </td>
                       <td className="py-3 px-3 font-semibold text-slate-600">
                         {row.totalActive} Candidates
@@ -512,7 +518,7 @@ export default function PerformancePage() {
                 >
                   {filteredSummaries.map((emp) => (
                     <option key={emp.employeeId} value={emp.employeeId}>
-                      {emp.employeeName} ({emp.employeeCode}) — {emp.designation}
+                      {emp.employeeName} ({emp.employeeCode}) â€” {emp.designation}
                     </option>
                   ))}
                 </select>
@@ -575,7 +581,7 @@ export default function PerformancePage() {
                   disabled={savingTarget}
                   className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
                 >
-                  {savingTarget ? 'Saving…' : 'Save Target'}
+                  {savingTarget ? 'Savingâ€¦' : 'Save Target'}
                 </button>
               </div>
             </form>

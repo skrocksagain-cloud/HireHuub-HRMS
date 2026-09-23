@@ -115,13 +115,23 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
   private async fetchEmployees(input: PerformanceScopeQuery): Promise<Employee[]> {
     if (input.scope === 'SELF') {
       if (!input.employeeId?.trim()) return [];
-      // input.employeeId is the Firestore document ID now! But in Employee table, is id == docId? Yes.
-      // Wait, in previous fetchEmployees: where('employeeId', '==', input.employeeId)
-      // Since input.employeeId is now the doc ID, querying by 'employeeId' field might fail if it stores HH0016.
-      // Let's just fetch the document directly or query both. Actually if input.employeeId is doc ID:
       const snap = await getDocs(query(collection(db, 'employees')));
       const all = snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
       return all.filter(e => e.id === input.employeeId || e.employeeId === input.employeeId);
+    }
+    if (input.scope === 'TEAM') {
+      if (!input.employeeId?.trim()) return [];
+      const snap = await getDocs(query(collection(db, 'employees'), where('reportingManagerId', '==', input.employeeId)));
+      const reports = snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+
+      const allSnap = await getDocs(query(collection(db, 'employees')));
+      const all = allSnap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
+      const self = all.filter(e => e.id === input.employeeId || e.employeeId === input.employeeId);
+
+      const combined = [...reports, ...self];
+      const unique = new Map();
+      combined.forEach(e => unique.set(e.id, e));
+      return Array.from(unique.values());
     }
     if (input.scope === 'DEPARTMENT') {
       if (!input.departmentId?.trim()) return [];

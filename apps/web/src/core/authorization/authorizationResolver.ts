@@ -1,4 +1,4 @@
-export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
+﻿export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
 
 export type AuthorizationScope = 'OWN' | 'TEAM' | 'DEPARTMENT' | 'GLOBAL' | 'SELF' | 'DIRECT_REPORTS';
 export type SimplifiedModuleScope = 'SELF' | 'DEPARTMENT' | 'GLOBAL' | 'OWN' | 'TEAM';
@@ -23,8 +23,6 @@ export interface CanonicalAuthorizationIdentity {
   reportingManagerId: string | null;
 }
 
-export const AUTHORIZATION_ENABLED = true;
-
 export const ROLE_RANK: Record<CanonicalRole, number> = {
   'User': 1,
   'Admin': 2,
@@ -45,8 +43,19 @@ export function resolveAuthorizationIdentity(
   employeeData: any,
   firebaseUid: string
 ): CanonicalAuthorizationIdentity {
+  const employeeId = employeeData?.employeeId;
+  if (!employeeId) {
+    return {
+      employeeId: '',
+      firebaseUid,
+      departmentId: null,
+      department: null,
+      role: 'User',
+      reportingManagerId: null,
+    };
+  }
   return {
-    employeeId: employeeData?.employeeId || employeeData?.id || firebaseUid,
+    employeeId,
     firebaseUid,
     departmentId: employeeData?.departmentId || null,
     department: employeeData?.department || null,
@@ -56,7 +65,6 @@ export function resolveAuthorizationIdentity(
 }
 
 export function getAuthorizationScope(role?: string | null): AuthorizationScope {
-  if (!AUTHORIZATION_ENABLED) return 'GLOBAL';
   const canonicalRole = getCanonicalRole(role || undefined);
   switch (canonicalRole) {
     case 'Super Admin': return 'GLOBAL';
@@ -76,18 +84,15 @@ export function getSimplifiedModuleScope(role?: string | null): SimplifiedModule
 }
 
 export function isSuperAdmin(actor?: AuthorizationContext): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
   return getCanonicalRole(actor?.assignedRole) === 'Super Admin';
 }
 
 export function canAccessModule(actor: AuthorizationContext, moduleKey: string): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
   const dept = (actor.department || '').trim().toLowerCase();
   if (dept === 'management') return true;
 
   const m = (moduleKey || '').toLowerCase();
 
-  // General / All
   if (['attendance', 'leave', 'performance', 'profile'].includes(m)) return true;
 
   if (dept === 'hr') {
@@ -110,7 +115,6 @@ export function canAccessModule(actor: AuthorizationContext, moduleKey: string):
     if (['administration', 'managementcontrol', 'management', 'calendar', 'announcements', 'settings', 'organization'].includes(m)) return true;
   }
 
-  // Dashboard is accessible to all
   if (m === 'dashboard') return true;
 
   return false;
@@ -128,18 +132,40 @@ export function isDirectReportingManager(actorEmployeeId?: string | null, target
 }
 
 export function isDirectReport(actor: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
+  if (!actor.employeeId) return false;
   return target.reportingManagerId === actor.employeeId;
 }
 
 export function isSameDepartment(actor: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
+  if (actor.departmentId && target.departmentId) {
+    return actor.departmentId === target.departmentId;
+  }
   return !!actor.department && actor.department === target.department;
 }
 
 export function canAccessEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
+  if (!actor.employeeId) return false;
 
+  const scope = getAuthorizationScope(actor.assignedRole);
+
+  if (scope === 'GLOBAL') return true;
+  if (scope === 'DEPARTMENT') return isSameDepartment(actor, target) || actor.employeeId === target.employeeId;
+  if (scope === 'TEAM') {
+    return actor.employeeId === target.employeeId || isDirectReport(actor, target);
+  }
+  return actor.employeeId === target.employeeId;
+}
+
+export function canViewEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
+  return canAccessEmployee(actor, target);
+}
+
+export function canEditEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
+  return canAccessEmployee(actor, target);
+}
+
+export function canAssignToEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
+  if (!actor.employeeId) return false;
   const scope = getAuthorizationScope(actor.assignedRole);
 
   if (scope === 'GLOBAL') return true;
@@ -150,11 +176,33 @@ export function canAccessEmployee(actor: AuthorizationContext, target: Authoriza
   return actor.employeeId === target.employeeId;
 }
 
+export function canReassignBetweenEmployees(actor: AuthorizationContext, source: AuthorizationContext, target: AuthorizationContext): boolean {
+  if (!actor.employeeId) return false;
+  const scope = getAuthorizationScope(actor.assignedRole);
+
+  if (scope === 'GLOBAL') return true;
+
+  let canAccessSource = false;
+  let canAccessTarget = false;
+
+  if (scope === 'DEPARTMENT') {
+    canAccessSource = isSameDepartment(actor, source) || actor.employeeId === source.employeeId;
+    canAccessTarget = isSameDepartment(actor, target) || actor.employeeId === target.employeeId;
+  } else if (scope === 'TEAM') {
+    canAccessSource = actor.employeeId === source.employeeId || isDirectReport(actor, source);
+    canAccessTarget = actor.employeeId === target.employeeId || isDirectReport(actor, target);
+  } else {
+    canAccessSource = actor.employeeId === source.employeeId;
+    canAccessTarget = actor.employeeId === target.employeeId;
+  }
+
+  return canAccessSource && canAccessTarget;
+}
+
 export function canAccessErpArea(
   actor: AuthorizationContext,
   area: ErpArea
 ): boolean {
-  if (!AUTHORIZATION_ENABLED) return true;
   const dept = (actor.department || '').trim().toLowerCase();
   if (dept === 'management') return true;
 
