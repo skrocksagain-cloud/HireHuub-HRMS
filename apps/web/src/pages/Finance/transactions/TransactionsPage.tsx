@@ -17,6 +17,7 @@ import { payslipService } from '../../../services/payroll/payslipService';
 import { adminService } from '../../../services/admin/adminService';
 import { getFinanceScope } from '../../../core/authorization/financeAuthorization';
 import { useAuth } from '../../../context/AuthContext';
+import { employeeService } from '../../../pages/Employee/services/employeeService';
 import type { CompanySettings, BrandProfile } from '../../../types/Admin';
 import type {
   ExpenseTransaction,
@@ -48,6 +49,8 @@ export default function TransactionsPage() {
   const [expenseTypesList, setExpenseTypesList] = useState<string[]>([]);
 
   const [superAdminEmployees, setSuperAdminEmployees] = useState<ActiveSuperAdminEmployee[]>([]);
+  const [managementEmployees, setManagementEmployees] = useState<{id: string, name: string}[]>([]);
+  const [capitalEmployeeId, setCapitalEmployeeId] = useState<string>('');
 
   // Modals & Drawers
   const [showExpenseDrawer, setShowExpenseDrawer] = useState<boolean>(false);
@@ -95,19 +98,22 @@ export default function TransactionsPage() {
   }, [showExpenseDrawer]);
 
   const loadMasters = async () => {
-    const [cSettings, types] = await Promise.all([
+    const [cSettings, types, emps] = await Promise.all([
       adminService.getCompanySettings(),
       transactionService.getExpenseCategoriesList(),
+      employeeService.getEmployees()
     ]);
 
     setCompanySettings(cSettings);
-    const mergedTypes = [...new Set(['Salary', 'Office Rent', 'Housekeeping', 'CA Fees', 'Office Internet', 'Corporate Mobile Connection', 'Miscellaneous', 'Electricity', ...types])];
+    const mergedTypes = [...new Set(['Capital', 'Salary', 'Office Rent', 'Housekeeping', 'CA Fees', 'Office Internet', 'Corporate Mobile Connection', 'Miscellaneous', 'Electricity', ...types])];
     setExpenseTypesList(mergedTypes);
 
     // paidFromId defaults to 'Management', no need to set here
     if (mergedTypes.length > 0) setExpenseType(mergedTypes[0]);
 
     setSuperAdminEmployees([]);
+    const mgmt = emps.filter(e => (e.employmentStatus === 'Active' || e.status === 'Active') && (e.department === 'Management' || e.departmentId === 'management'));
+    setManagementEmployees(mgmt.map(e => ({ id: e.employeeId, name: e.fullName || e.firstName + ' ' + e.lastName })));
   };
 
   const loadAllData = async () => {
@@ -237,6 +243,7 @@ export default function TransactionsPage() {
         paidById: isManagement ? selectedAdmin?.id : undefined,
         paidByName: isManagement ? selectedAdmin?.name : undefined,
         beneficiary,
+        employeeId: expenseType === 'Capital' ? capitalEmployeeId : undefined,
         paymentMethod: paymentMethod as PaymentMethodType,
         amount,
         description,
@@ -334,7 +341,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
               Total Transactions
@@ -349,9 +356,18 @@ export default function TransactionsPage() {
               TOTAL EXPENSE
             </span>
             <span className="text-xl font-bold text-emerald-600 mt-1 block">
-              ₹{filteredExpenses.reduce((s, e) => s + e.amount, 0).toLocaleString('en-IN')}
+              ₹{filteredExpenses.filter(e => e.expenseType !== 'Capital' && e.expenseCategoryName !== 'Capital').reduce((s, e) => s + (e.amount || 0), 0).toLocaleString('en-IN')}
             </span>
           </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Transaction
+              </span>
+              <span className="text-xl font-bold text-blue-600 mt-1 block">
+                ₹{filteredExpenses.filter(e => e.expenseType === 'Capital' || e.expenseCategoryName === 'Capital').reduce((s, e) => s + (e.amount||0), 0).toLocaleString('en-IN')}
+              </span>
+            </div>
 
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
@@ -551,7 +567,14 @@ export default function TransactionsPage() {
               <label className="font-bold text-slate-800 block">Expense Type * (Finance Settings Master)</label>
               <select
                 value={expenseType}
-                onChange={(e) => setExpenseType(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setExpenseType(val);
+                  if (val === 'Capital') {
+                    setBeneficiary('');
+                    setCapitalEmployeeId('');
+                  }
+                }}
                 className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
                 {expenseTypesList.map((t) => (
@@ -638,14 +661,33 @@ export default function TransactionsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-800 block">Beneficiary / Vendor *</label>
-              <input
-                type="text"
-                placeholder="e.g. Landlord, Recruiter Name, Vendor, Software Company..."
-                value={beneficiary}
-                onChange={(e) => setBeneficiary(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-              />
+              <label className="font-bold text-slate-800 block">{expenseType === 'Capital' ? 'Employee *' : 'Beneficiary / Vendor *'}</label>
+                {expenseType === 'Capital' ? (
+                  <select
+                    value={capitalEmployeeId}
+                    onChange={(e) => {
+                      setCapitalEmployeeId(e.target.value);
+                      const emp = managementEmployees.find(m => m.id === e.target.value);
+                      setBeneficiary(emp ? emp.name : '');
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+                    required
+                  >
+                    <option value="">Select Employee...</option>
+                    {managementEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="e.g. Landlord, Recruiter Name, Vendor, Software Company..."
+                    value={beneficiary}
+                    onChange={(e) => setBeneficiary(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium"
+                    required
+                  />
+                )}
             </div>
 
             <div className="space-y-1">
