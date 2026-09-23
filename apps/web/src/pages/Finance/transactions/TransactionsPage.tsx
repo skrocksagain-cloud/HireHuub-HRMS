@@ -50,9 +50,7 @@ export default function TransactionsPage() {
 
   const [superAdminEmployees, setSuperAdminEmployees] = useState<ActiveSuperAdminEmployee[]>([]);
   const [managementEmployees, setManagementEmployees] = useState<{id: string, name: string}[]>([]);
-  const [capitalEmployeeId, setCapitalEmployeeId] = useState<string>('');
-
-  // Modals & Drawers
+    // Modals & Drawers
   const [showExpenseDrawer, setShowExpenseDrawer] = useState<boolean>(false);
   const [selectedExpenseForDetail, setSelectedExpenseForDetail] = useState<ExpenseTransaction | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string>('');
@@ -223,10 +221,14 @@ export default function TransactionsPage() {
       }
 
       const selectedAdmin = superAdminEmployees.find((emp) => emp.id === paidById) || superAdminEmployees[0];
-      const isManagement = paidFromId === 'Management';
+      const isCapital = expenseType === 'Capital';
+      const isManagement = !isCapital && paidFromId === 'Management';
 
       let resolvedPaidFrom = 'Management';
-      if (!isManagement) {
+      if (isCapital) {
+        const emp = managementEmployees.find(m => m.id === paidFromId);
+        resolvedPaidFrom = emp ? emp.name : 'Unknown Employee';
+      } else if (!isManagement) {
         const acc = companySettings?.bankAccountsV2?.find(a => a.id === paidFromId);
         if (acc) {
           resolvedPaidFrom = `${acc.bankName} — XXXX${acc.accountNumber.slice(-4)}`;
@@ -242,8 +244,8 @@ export default function TransactionsPage() {
         paidFromId,
         paidById: isManagement ? selectedAdmin?.id : undefined,
         paidByName: isManagement ? selectedAdmin?.name : undefined,
-        beneficiary,
-        employeeId: expenseType === 'Capital' ? capitalEmployeeId : undefined,
+        beneficiary: isCapital ? resolvedPaidFrom : beneficiary,
+        employeeId: isCapital ? paidFromId : undefined,
         paymentMethod: paymentMethod as PaymentMethodType,
         amount,
         description,
@@ -362,7 +364,7 @@ export default function TransactionsPage() {
 
             <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                Transaction
+                Capital
               </span>
               <span className="text-xl font-bold text-blue-600 mt-1 block">
                 ₹{filteredExpenses.filter(e => e.expenseType === 'Capital' || e.expenseCategoryName === 'Capital').reduce((s, e) => s + (e.amount||0), 0).toLocaleString('en-IN')}
@@ -571,8 +573,10 @@ export default function TransactionsPage() {
                   const val = e.target.value;
                   setExpenseType(val);
                   if (val === 'Capital') {
+                    setPaidFromId('');
                     setBeneficiary('');
-                    setCapitalEmployeeId('');
+                  } else {
+                    setPaidFromId('Management');
                   }
                 }}
                 className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -637,58 +641,54 @@ export default function TransactionsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-800 block">Paid From * (Finance Account Master / Management)</label>
-              <select
-                value={paidFromId}
-                onChange={(e) => setPaidFromId(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <optgroup label="MANAGEMENT">
-                  <option value="Management">Management</option>
-                </optgroup>
-                <optgroup label="COMPANY ACCOUNTS (Finance Account Master)">
-                  {!companySettings?.bankAccountsV2 || companySettings.bankAccountsV2.length === 0 ? (
-                    <option disabled value="">No company bank account configured</option>
+              <label className="font-bold text-slate-800 block">{expenseType === 'Capital' ? 'Paid From (Active Management Employee) *' : 'Paid From * (Finance Account Master / Management)'}</label>
+                <select
+                  value={paidFromId}
+                  onChange={(e) => setPaidFromId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  required
+                >
+                  {expenseType === 'Capital' ? (
+                    <>
+                      <option value="">Select Employee...</option>
+                      {managementEmployees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))}
+                    </>
                   ) : (
-                    companySettings.bankAccountsV2.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.bankName} — XXXX{acc.accountNumber.slice(-4)}
-                      </option>
-                    ))
+                    <>
+                      <optgroup label="MANAGEMENT">
+                        <option value="Management">Management</option>
+                      </optgroup>
+                      <optgroup label="COMPANY ACCOUNTS (Finance Account Master)">
+                        {!companySettings?.bankAccountsV2 || companySettings.bankAccountsV2.length === 0 ? (
+                          <option disabled value="">No company bank account configured</option>
+                        ) : (
+                          companySettings.bankAccountsV2.map((acc) => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.bankName} — XXXX{acc.accountNumber.slice(-4)}
+                            </option>
+                          ))
+                        )}
+                      </optgroup>
+                    </>
                   )}
-                </optgroup>
-              </select>
+                </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="font-bold text-slate-800 block">{expenseType === 'Capital' ? 'Employee *' : 'Beneficiary / Vendor *'}</label>
-                {expenseType === 'Capital' ? (
-                  <select
-                    value={capitalEmployeeId}
-                    onChange={(e) => {
-                      setCapitalEmployeeId(e.target.value);
-                      const emp = managementEmployees.find(m => m.id === e.target.value);
-                      setBeneficiary(emp ? emp.name : '');
-                    }}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
-                    required
-                  >
-                    <option value="">Select Employee...</option>
-                    {managementEmployees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>{emp.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="e.g. Landlord, Recruiter Name, Vendor, Software Company..."
-                    value={beneficiary}
-                    onChange={(e) => setBeneficiary(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                    required
-                  />
-                )}
-            </div>
+            {expenseType !== 'Capital' && (
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800 block">Beneficiary / Vendor *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Landlord, Recruiter Name, Vendor, Software Company..."
+                  value={beneficiary}
+                  onChange={(e) => setBeneficiary(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium"
+                  required
+                />
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="font-bold text-slate-800 block">Payment Method *</label>
