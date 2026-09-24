@@ -161,29 +161,22 @@ export class AuthService {
       throw new Error('Please enter your Employee ID or Mobile Number.');
     }
 
-    const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
-    if (!employee) {
-      // Security: Do not expose existence. Return generic success.
-      return { 
-        success: true, 
-        message: 'If the Employee ID exists, a recovery code has been sent to the registered profile email.',
-        employee: { id: 'generic', employeeId: cleanId, name: 'Employee' }
-      };
-    }
-
     const { httpsCallable } = await import('firebase/functions');
     const { functions } = await import('../../firebase/firebase');
     const requestResetFn = httpsCallable(functions, 'requestPasswordReset');
-    
-    await requestResetFn({ employeeId: employee.employeeId });
+
+    // Delegate the lookup to the secure backend function
+    // The backend will return a generic success message even if the employee is not found for security
+    const result = await requestResetFn({ employeeId: cleanId });
+    const responseData = result.data as any;
 
     return {
       success: true,
       message: 'If the Employee ID exists, a recovery code has been sent to the registered profile email.',
       employee: {
-        id: employee.id,
-        employeeId: employee.employeeId,
-        name: employee.name,
+        id: responseData?.employeeId || 'generic',
+        employeeId: cleanId,
+        name: 'Employee',
       },
     };
   }
@@ -197,13 +190,42 @@ export class AuthService {
     otpCode: string,
     newPasswordInput: string
   ): Promise<AuthResponse> {
-    const employee = await authRepository.getEmployeeByIdOrMobile(employeeId);
+    const cleanId = employeeId.trim();
+
+    // Validate Password Policy
+    const policyResult = validatePasswordPolicy(newPasswordInput);
+    if (!policyResult.isValid) {
+      throw new Error(policyResult.errors.join(' '));
+    }
+
+    const canonicalEmail = `${cleanId.toLowerCase()}@hirehuub.local`;
+    const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
+    const { auth } = await import('../../firebase/firebase');
+
+    let currentUser = auth.currentUser;
+
+    // If not signed in (because login() signed them out), sign in with temporary password
+    if (!currentUser) {
+      try {
+        let signCred;
+        try {
+          signCred = await signInWithEmailAndPassword(auth, canonicalEmail, 'Password@123');
+        } catch (fallbackError) {
+          signCred = await signInWithEmailAndPassword(auth, canonicalEmail, `${cleanId}@123`);
+        }
+        currentUser = signCred.user;
+      } catch (e: any) {
+        throw new Error('Failed to authenticate with temporary password for setup. If your temporary password was customized, you must sign in normally. ' + (e.message || ''));
+      }
+    }
+
+    // Now authenticated, query Firestore
+    const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
     if (!employee) {
       throw new Error('Employee record not found.');
     }
 
     // Skip OTP verification in first login (OTP removed per earlier steps)
-    // If confirmationResult is passed, it means we are in a flow that still requires it
     if (confirmationResult) {
       const isOtpValid = await firebasePhoneAuthProvider.verifyOtp(confirmationResult, otpCode);
       if (!isOtpValid) {
@@ -212,26 +234,8 @@ export class AuthService {
       await authLogService.logEvent(employee.employeeId, 'OTP Verification', 'success', { flow: 'activation' });
     }
 
-    // Validate Password Policy
-    const policyResult = validatePasswordPolicy(newPasswordInput);
-    if (!policyResult.isValid) {
-      throw new Error(policyResult.errors.join(' '));
-    }
-
-    const canonicalEmail = `${employee.employeeId.toLowerCase()}@hirehuub.local`;
-
-    const { updatePassword } = await import('firebase/auth');
-    const { auth } = await import('../../firebase/firebase');
-
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('Please sign in again before changing your password.');
-    }
-
     if (employee.firebaseUid && currentUser.uid !== employee.firebaseUid) {
       throw new Error('Authenticated user does not match the requested employee record.');
-    } else if (!employee.firebaseUid && currentUser.email !== canonicalEmail) {
-      throw new Error('Authenticated email does not match the canonical identity.');
     }
 
     try {
@@ -266,10 +270,10 @@ export class AuthService {
 
     // Create Single Session & Log Login
     const { sessionId } = await sessionService.createSingleUserSession(employee.employeeId);
-    
+
     // Inject Custom Claims & Refresh Token
     await this.injectCustomClaims(sessionId);
-    
+
     await authLogService.logEvent(employee.employeeId, 'Login', 'success', { flow: 'first_time_activation', sessionId });
 
     return {
@@ -299,10 +303,7 @@ export class AuthService {
     otpCode: string,
     newPasswordInput: string
   ): Promise<AuthResponse> {
-    const employee = await authRepository.getEmployeeByIdOrMobile(employeeId);
-    if (!employee) {
-      throw new Error('Employee record not found.');
-    }
+    const cleanId = employeeId.trim();
 
     // Validate Password Policy
     const policyResult = validatePasswordPolicy(newPasswordInput);
@@ -315,19 +316,32 @@ export class AuthService {
     const completeResetFn = httpsCallable(functions, 'completePasswordReset');
 
     try {
-      await completeResetFn({ employeeId: employee.employeeId, otp: otpCode, newPassword: newPasswordInput });
+      await completeResetFn({ employeeId: cleanId, otp: otpCode, newPassword: newPasswordInput });
     } catch (e: any) {
       throw new Error('Password reset failed: ' + (e.message || 'Invalid code or expired.'));
+    }
+
+    // Now sign in with the new password
+    const canonicalEmail = `${cleanId.toLowerCase()}@hirehuub.local`;
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const { auth } = await import('../../firebase/firebase');
+
+    await signInWithEmailAndPassword(auth, canonicalEmail, newPasswordInput);
+
+    // Now authenticated, we can fetch employee
+    const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
+    if (!employee) {
+      throw new Error('Employee record not found after reset.');
     }
 
     await authLogService.logEvent(employee.employeeId, 'Password Reset', 'success');
 
     // Create new single session
     const { sessionId } = await sessionService.createSingleUserSession(employee.employeeId);
-    
+
     // Inject Custom Claims & Refresh Token
     await this.injectCustomClaims(sessionId);
-    
+
     await authLogService.logEvent(employee.employeeId, 'Login', 'success', { flow: 'forgot_password_reset', sessionId });
 
     return {
@@ -358,15 +372,15 @@ export class AuthService {
       await authLogService.logEvent(employeeId, 'Logout', 'success');
     }
   }
-  
+
   private async injectCustomClaims(sessionId: string): Promise<void> {
     const { httpsCallable } = await import('firebase/functions');
     const { functions, auth } = await import('../../firebase/firebase');
     const createErpFirebaseTokenFn = httpsCallable(functions, 'createErpFirebaseToken');
-    
+
     // Cloud function assigns claims to the native Firebase UID securely
     await createErpFirebaseTokenFn({ sessionId });
-    
+
     // Force refresh token to apply the new claims to the current session immediately
     if (auth.currentUser) {
       await auth.currentUser.getIdToken(true);
