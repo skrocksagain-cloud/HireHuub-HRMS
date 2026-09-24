@@ -9,6 +9,7 @@ import {
   query,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 
 import { db } from '../../../firebase/firebase';
@@ -98,6 +99,7 @@ export interface AdminRepository {
   updateSecuritySettings(settings: SecuritySettings): Promise<void>;
 
   getPasswordResetRequests(): Promise<PasswordResetRequest[]>;
+  getLockedAccounts(): Promise<any[]>;
   createPasswordResetRequest(req: PasswordResetRequest): Promise<void>;
   updatePasswordResetRequest(id: string, updates: Partial<PasswordResetRequest>): Promise<void>;
 
@@ -318,6 +320,22 @@ class FirestoreAdminRepository implements AdminRepository {
   async updateSecuritySettings(settings: SecuritySettings): Promise<void> {
     const docRef = doc(db, 'admin_security_settings', SECURITY_SETTINGS_DOC_ID);
     await setDoc(docRef, { ...settings, updatedAt: new Date().toISOString() }, { merge: true });
+  }
+
+  async getLockedAccounts(): Promise<any[]> {
+    const snap = await getDocs(query(collection(db, 'employees'), where('accountStatus', '==', 'Locked')));
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        employeeId: data.employeeId,
+        name: data.name || data.fullName || 'Unknown',
+        department: data.department,
+        role: data.assignedRole || data.role,
+        lockedAt: data.lockedUntil || data.updatedAt || 'Unknown',
+        failedAttempts: data.failedLoginAttempts || 0,
+        status: data.accountStatus,
+      };
+    });
   }
 
   async getPasswordResetRequests(): Promise<PasswordResetRequest[]> {

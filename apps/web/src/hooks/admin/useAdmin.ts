@@ -406,20 +406,24 @@ export function useAdminNotificationSettings() {
 export function useAdminSecurity() {
   const [security, setSecurity] = useState<SecuritySettings | null>(null);
   const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
+  const [lockedAccounts, setLockedAccounts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [secData, reqData] = await Promise.all([
+      const [secData, reqData, lockedData] = await Promise.all([
         adminService.getSecuritySettings(),
         adminService.getPasswordResetRequests(),
+        adminService.getLockedAccounts(),
       ]);
       setSecurity(secData);
       setResetRequests(reqData);
+      setLockedAccounts(lockedData);
     } catch {
       setSecurity(null);
       setResetRequests([]);
+      setLockedAccounts([]);
     } finally {
       setIsLoading(false);
     }
@@ -449,14 +453,21 @@ export function useAdminSecurity() {
     await fetchSecurityData();
   };
 
+  const unlockAccount = async (employeeId: string, actorId = 'admin', actorName = 'Super Admin') => {
+    await adminService.unlockAccount(employeeId, actorId, actorName);
+    await fetchSecurityData();
+  };
+
   return {
     security,
     resetRequests,
+    lockedAccounts,
     isLoading,
     refresh: fetchSecurityData,
     updateSecurity,
     approveReset,
     rejectReset,
+    unlockAccount,
   };
 }
 

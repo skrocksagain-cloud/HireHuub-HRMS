@@ -4,7 +4,7 @@ import { useAdminSecurity } from '../../../hooks/admin/useAdmin';
 import type { SecuritySettings } from '../../../types/Admin';
 
 export default function SecurityManagementTab() {
-  const { security, resetRequests, isLoading, updateSecurity, approveReset, rejectReset } = useAdminSecurity();
+  const { security, resetRequests, lockedAccounts, isLoading, updateSecurity, approveReset, rejectReset, unlockAccount } = useAdminSecurity();
   const [statusMsg, setStatusMsg] = useState('');
   const [tempPassword, setTempPassword] = useState('HireHuub@2026');
 
@@ -38,6 +38,16 @@ export default function SecurityManagementTab() {
   const handleReject = async (reqId: string) => {
     await rejectReset(reqId);
     setStatusMsg('Password reset request rejected.');
+    setTimeout(() => setStatusMsg(''), 3000);
+  };
+
+  const handleUnlock = async (employeeId: string) => {
+    try {
+      await unlockAccount(employeeId);
+      setStatusMsg('Account unlocked successfully.');
+    } catch (err: any) {
+      setStatusMsg(err.message || 'Failed to unlock account.');
+    }
     setTimeout(() => setStatusMsg(''), 3000);
   };
 
@@ -129,6 +139,45 @@ export default function SecurityManagementTab() {
                 ) : (
                   <span className="font-semibold text-slate-400 text-xs">Resolved by {req.resolvedBy || 'Super Admin'}</span>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Locked Accounts */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b pb-2">
+          <div className="font-bold text-slate-900 text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <Lock size={16} className="text-rose-500" />
+            Locked Accounts ({lockedAccounts?.length || 0})
+          </div>
+        </div>
+
+        {(!lockedAccounts || lockedAccounts.length === 0) ? (
+          <div className="p-6 text-center text-slate-400 font-medium">No accounts are currently locked.</div>
+        ) : (
+          <div className="space-y-3">
+            {lockedAccounts.map((acc, idx) => (
+              <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900">
+                    {acc.employeeId} | {acc.name}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Dept: {acc.department || 'N/A'} | Role: {acc.role || 'N/A'}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Locked At: {acc.lockedAt} | Failed Attempts: {acc.failedAttempts} | Status: <span className="font-bold text-rose-600">{acc.status}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleUnlock(acc.employeeId)}
+                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-xs"
+                >
+                  <Unlock size={14} className="inline mr-1" /> Unlock Account
+                </button>
               </div>
             ))}
           </div>

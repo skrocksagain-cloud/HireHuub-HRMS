@@ -1218,3 +1218,13 @@ export interface GeneratedPayslipRecord {
   releasedAt?: string;
   releasedBy?: string;
 }
+
+export interface LockedAccount {
+  employeeId: string;
+  name: string;
+  department?: string;
+  role: string;
+  lockedAt: string;
+  failedAttempts: number;
+  status: string;
+}

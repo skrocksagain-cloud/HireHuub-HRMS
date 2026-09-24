@@ -611,6 +611,22 @@ class AdminService {
     });
   }
 
+  async getLockedAccounts(): Promise<any[]> {
+    return adminRepository.getLockedAccounts();
+  }
+
+  async unlockAccount(
+    employeeId: string,
+    _actorId: string,
+    _actorName: string
+  ): Promise<void> {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../firebase/firebase');
+    const unlockEmployeeAccountFn = httpsCallable(functions, 'unlockEmployeeAccount');
+
+    await unlockEmployeeAccountFn({ employeeId });
+  }
+
   async getPasswordResetRequests(): Promise<PasswordResetRequest[]> {
     return adminRepository.getPasswordResetRequests();
   }
