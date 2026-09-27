@@ -297,7 +297,7 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
             {otpStep === 'input' && (
               <form onSubmit={onSendForgotOtp} className="space-y-5">
                 <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                  Enter your Employee ID to receive a Phone OTP verification code for password reset on your registered mobile.
+                  Enter your Employee ID to submit a password reset request to the Super Admin.
                 </div>
 
                 <div>

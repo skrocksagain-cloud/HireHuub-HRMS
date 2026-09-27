@@ -646,24 +646,17 @@ class AdminService {
 
   async approvePasswordReset(
     requestId: string,
-    temporaryPassword: string,
     actorId: string,
     actorName: string
   ): Promise<void> {
-    await adminRepository.updatePasswordResetRequest(requestId, {
-      status: 'Approved',
-      newTemporaryPassword: temporaryPassword,
-      resolvedBy: actorName,
-    });
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../firebase/firebase');
+    const resetFn = httpsCallable(functions, 'resetEmployeePasswordByAdmin');
 
-    await this.logAudit({
-      whoId: actorId,
-      whoName: actorName,
-      whatAction: 'APPROVE_PASSWORD_RESET',
-      entityName: 'PasswordResetRequest',
-      entityId: requestId,
-      oldValue: 'Pending',
-      newValue: 'Approved',
+    await resetFn({
+      requestId,
+      actorId,
+      actorName
     });
   }
 

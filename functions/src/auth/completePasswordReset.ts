@@ -87,15 +87,20 @@ export const completePasswordReset = functions.https.onCall(async (request) => {
     await admin.auth().updateUser(uid, { password: newPassword });
 
     // 5. Clear Lockout and Login fields
-    await db.collection('employees').doc(employeeDocId).update({
+    const updates: any = {
       passwordHash: null,
       tempPasswordHash: null,
       failedLoginAttempts: 0,
       lockedUntil: null,
-      lockReason: null,
-      accountStatus: 'Active',
       lastPasswordChangedAt: new Date().toISOString()
-    });
+    };
+
+    if (employeeData.accountStatus === 'Locked' && employeeData.lockReason === 'Too many failed login attempts') {
+      updates.accountStatus = 'Active';
+      updates.lockReason = null;
+    }
+
+    await db.collection('employees').doc(employeeDocId).update(updates);
 
     return { success: true };
 

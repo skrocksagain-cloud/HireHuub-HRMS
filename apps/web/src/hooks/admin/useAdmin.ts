@@ -411,22 +411,32 @@ export function useAdminSecurity() {
 
   const fetchSecurityData = useCallback(async () => {
     setIsLoading(true);
+    // Fetch individually so a missing collection/index on one doesn't kill the others
+    let secData: SecuritySettings | null = null;
     try {
-      const [secData, reqData, lockedData] = await Promise.all([
-        adminService.getSecuritySettings(),
-        adminService.getPasswordResetRequests(),
-        adminService.getLockedAccounts(),
-      ]);
-      setSecurity(secData);
-      setResetRequests(reqData);
-      setLockedAccounts(lockedData);
-    } catch {
-      setSecurity(null);
-      setResetRequests([]);
-      setLockedAccounts([]);
-    } finally {
-      setIsLoading(false);
+      secData = await adminService.getSecuritySettings();
+    } catch (err) {
+      console.error('Failed to fetch security settings:', err);
     }
+
+    let reqData: PasswordResetRequest[] = [];
+    try {
+      reqData = await adminService.getPasswordResetRequests();
+    } catch (err) {
+      console.error('Failed to fetch reset requests (missing index/collection?):', err);
+    }
+
+    let lockedData: any[] = [];
+    try {
+      lockedData = await adminService.getLockedAccounts();
+    } catch (err) {
+      console.error('Failed to fetch locked accounts:', err);
+    }
+
+    setSecurity(secData);
+    setResetRequests(reqData);
+    setLockedAccounts(lockedData);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -440,11 +450,10 @@ export function useAdminSecurity() {
 
   const approveReset = async (
     requestId: string,
-    tempPassword: string,
     actorId = 'admin',
     actorName = 'Super Admin'
   ) => {
-    await adminService.approvePasswordReset(requestId, tempPassword, actorId, actorName);
+    await adminService.approvePasswordReset(requestId, actorId, actorName);
     await fetchSecurityData();
   };
 

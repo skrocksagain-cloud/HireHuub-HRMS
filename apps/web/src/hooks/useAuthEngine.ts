@@ -140,17 +140,13 @@ export function useAuthEngine(): UseAuthEngineReturn {
     clearMessages();
     setIsLoading(true);
     try {
-      const { message, employee } = await authService.requestPasswordResetToken(identifier);
-      setTargetEmployeeId(employee.employeeId);
-      setTargetMobileNumber(employee.employeeId); // generic tracking
-      setOtpStep('verify');
-      setTimerSeconds(60);
+      const { message } = await authService.requestPasswordResetToken(identifier);
       setSuccessMessage(message);
       setIsLoading(false);
       return true;
     } catch (caught) {
       setIsLoading(false);
-      const msg = caught instanceof Error ? caught.message : 'Unable to request reset code. Please try again.';
+      const msg = caught instanceof Error ? caught.message : 'Unable to request reset. Please try again.';
       setError(msg);
       return false;
     }

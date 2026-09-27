@@ -3,10 +3,27 @@ import { ShieldAlert, KeyRound, Lock, Unlock, CheckCircle2, XCircle } from 'luci
 import { useAdminSecurity } from '../../../hooks/admin/useAdmin';
 import type { SecuritySettings } from '../../../types/Admin';
 
+const formatDate = (value: any) => {
+  if (!value) return '—';
+  if (typeof value?.toDate === 'function') {
+    return value.toDate().toLocaleString();
+  }
+  if (value instanceof Date) {
+    return value.toLocaleString();
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+  }
+  if (typeof value === 'object' && typeof value.seconds === 'number') {
+    return new Date(value.seconds * 1000).toLocaleString();
+  }
+  return String(value);
+};
+
 export default function SecurityManagementTab() {
   const { security, resetRequests, lockedAccounts, isLoading, updateSecurity, approveReset, rejectReset, unlockAccount } = useAdminSecurity();
   const [statusMsg, setStatusMsg] = useState('');
-  const [tempPassword, setTempPassword] = useState('HireHuub@2026');
 
   const [form, setForm] = useState<SecuritySettings>(
     security || {
@@ -30,7 +47,7 @@ export default function SecurityManagementTab() {
   };
 
   const handleApprove = async (reqId: string) => {
-    await approveReset(reqId, tempPassword);
+    await approveReset(reqId);
     setStatusMsg('Password reset request approved!');
     setTimeout(() => setStatusMsg(''), 3000);
   };
@@ -85,15 +102,6 @@ export default function SecurityManagementTab() {
             <KeyRound size={16} className="text-amber-500" />
             Pending Password Reset Requests ({pendingRequests.length})
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-600">Temp Password to Assign:</span>
-            <input
-              type="text"
-              value={tempPassword}
-              onChange={(e) => setTempPassword(e.target.value)}
-              className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono font-bold text-slate-900"
-            />
-          </div>
         </div>
 
         {resetRequests.length === 0 ? (
@@ -110,13 +118,9 @@ export default function SecurityManagementTab() {
                     Employee: {req.employeeName} ({req.employeeId})
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Requested At: {req.requestedAt} | Status: <span className="font-bold text-amber-700">{req.status}</span>
+                    Requested At: {formatDate(req.requestedAt)} | Status: <span className="font-bold text-amber-700">{req.status}</span>
                   </div>
-                  {req.newTemporaryPassword && (
-                    <div className="font-mono text-[11px] text-emerald-700 font-bold mt-1">
-                      Assigned Temp Password: {req.newTemporaryPassword}
-                    </div>
-                  )}
+
                 </div>
 
                 {req.status === 'Pending' ? (
@@ -168,7 +172,7 @@ export default function SecurityManagementTab() {
                     Dept: {acc.department || 'N/A'} | Role: {acc.role || 'N/A'}
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Locked At: {acc.lockedAt} | Failed Attempts: {acc.failedAttempts} | Status: <span className="font-bold text-rose-600">{acc.status}</span>
+                    Locked At: {formatDate(acc.lockedAt)} | Failed Attempts: {acc.failedAttempts} | Status: <span className="font-bold text-rose-600">{acc.status}</span>
                   </div>
                 </div>
                 <button
