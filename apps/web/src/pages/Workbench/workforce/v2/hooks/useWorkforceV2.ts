@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { WorkforceRecordV2 } from '../types/workforce.v2.types';
 import type { WorkforceContextV2 } from '../services/workforce.v2.service';
 import { WorkforceServiceImplV2 } from '../services/workforce.v2.service';
@@ -26,6 +26,7 @@ const repoPlacements: any = {
     const scope = userSession ? getAuthorizationScope(userSession.assignedRole) : 'SELF';
 
     let authorizedIds: string[] | null = null; // null means GLOBAL
+    let filterField = 'recruiterId';
 
     if (scope === 'GLOBAL') {
       authorizedIds = null;
@@ -47,6 +48,7 @@ const repoPlacements: any = {
         if (data.employeeId) authorizedIds!.push(data.employeeId);
       });
       if (authorizedIds.length === 0) return [];
+      filterField = 'recruiterId';
     } else if (scope === 'TEAM' || scope === 'DIRECT_REPORTS') {
       authorizedIds = [userSession.id];
       const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
@@ -80,7 +82,7 @@ const repoPlacements: any = {
 
       const allResults: any[] = [];
       for (const chunk of chunks) {
-        const q = query(collection(db, 'placements'), ...baseConstraints, where('recruiterId', 'in', chunk));
+        const q = query(collection(db, 'placements'), ...baseConstraints, where(filterField, 'in', chunk));
         const snap = await getDocs(q);
         snap.forEach(d => {
           allResults.push({ id: d.id, ...d.data() });

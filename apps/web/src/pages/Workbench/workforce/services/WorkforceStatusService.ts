@@ -62,7 +62,14 @@ export class WorkforceStatusService {
 
     if (role === 'Master Admin') {
       return items.filter(
-        (item) => userSession.departmentId && item.departmentId === userSession.departmentId
+        (item) => {
+          const uDeptId = userSession.departmentId;
+          const uDept = (userSession as any).department;
+          if (!uDeptId && !uDept) return false;
+          if (uDeptId && item.departmentId === uDeptId) return true;
+          if (uDept && item.department === uDept) return true;
+          return false;
+        }
       );
     }
 

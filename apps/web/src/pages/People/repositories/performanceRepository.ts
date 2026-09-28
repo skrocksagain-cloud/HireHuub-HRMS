@@ -49,6 +49,7 @@ export interface PerformanceScopeQuery {
   employeeRole?: string;
   assignedRole?: string;
   departmentId?: string;
+  department?: string;
   month?: string;
 }
 
@@ -95,6 +96,7 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
       role: input.employeeRole || 'Unknown',
       assignedRole: input.assignedRole || input.scope,
       departmentId: input.departmentId,
+      department: input.department,
     };
     const activeWorkforce = await workforceService.getActiveWorkforce(context);
     return activeWorkforce.map(v2 => {
@@ -134,8 +136,13 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
       return Array.from(unique.values());
     }
     if (input.scope === 'DEPARTMENT') {
-      if (!input.departmentId?.trim()) return [];
-      const snap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', input.departmentId)));
+      if (!input.departmentId?.trim() && !input.department?.trim()) return [];
+      let snap;
+      if (input.departmentId?.trim()) {
+        snap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', input.departmentId)));
+      } else {
+        snap = await getDocs(query(collection(db, 'employees'), where('department', '==', input.department)));
+      }
       return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
     }
     const snap = await getDocs(collection(db, 'employees'));

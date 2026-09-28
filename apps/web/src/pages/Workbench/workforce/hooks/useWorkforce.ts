@@ -1,4 +1,4 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   WorkforceItem,
@@ -38,9 +38,10 @@ export function useWorkforce() {
       name: user?.name || 'Super Admin',
 
       departmentId: user?.departmentId,
+      department: (user as any)?.department,
       assignedRole: user?.assignedRole || (user as any)?.authorization?.role,
     }),
-    [user?.employeeId, user?.id, user?.name, user?.departmentId, user?.assignedRole, (user as any)?.authorization?.role]
+    [user?.employeeId, user?.id, user?.name, user?.departmentId, user?.assignedRole, (user as any)?.authorization?.role, (user as any)?.department]
   );
 
 
@@ -65,7 +66,8 @@ export function useWorkforce() {
           name: userSession.name,
           role: currentRole,
           assignedRole: (userSession as any).assignedRole,
-          departmentId: (userSession as any).departmentId
+          departmentId: (userSession as any).departmentId,
+          department: (userSession as any).department
         },
         { month: filters.activeMonth }
       );
@@ -184,7 +186,7 @@ export function useWorkforce() {
     } finally {
       setLoading(false);
     }
-  }, [filters.activeMonth, currentRole, userSession.id, userSession.name]);
+  }, [filters.activeMonth, currentRole, userSession.id, userSession.name, (userSession as any).department]);
 
   useEffect(() => {
     fetchWorkforceData();

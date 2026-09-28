@@ -1,4 +1,4 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 import { useState, useEffect, useMemo } from 'react';
 import { Award, CheckCircle2, Target, Percent, Plus, Layers, X, DollarSign } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -84,6 +84,7 @@ export default function PerformancePage() {
       const actorContext = {
         assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
         departmentId: user?.departmentId,
+        department: (user as any)?.department,
         employeeId: user?.employeeId || '',
         employeeName: (user as any)?.fullName || (user as any)?.name,
         employeeRole: (user as any)?.role,
@@ -150,6 +151,7 @@ export default function PerformancePage() {
         {
           assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
           departmentId: user?.departmentId,
+        department: (user as any)?.department,
           employeeId: user?.employeeId || '',
           employeeName: (user as any)?.fullName || (user as any)?.name,
           employeeRole: (user as any)?.role,
@@ -198,6 +200,7 @@ export default function PerformancePage() {
       }, {
         assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
         departmentId: user?.departmentId,
+        department: (user as any)?.department,
         employeeId: user?.employeeId,
         employeeName: (user as any)?.fullName || (user as any)?.name,
         employeeRole: (user as any)?.role,

@@ -1,4 +1,4 @@
-﻿import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
+import { getSimplifiedModuleScope } from '../../../core/authorization/authorizationResolver';
 import {
   performanceRepository,
   type PerformanceSummary,
@@ -34,13 +34,14 @@ export class PerformanceService {
   async getPerformanceForBrand(
     brandId: string,
     month: string,
-    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+    actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<{ summaries: PerformanceSummary[]; targets: PerformanceTarget[] }> {
     const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
     const allSummaries = await performanceRepository.getPerformanceSummaries({
       scope,
       assignedRole: actorContext?.assignedRole,
       departmentId: actorContext?.departmentId,
+      department: actorContext?.department,
       employeeId: actorContext?.employeeId,
       employeeName: actorContext?.employeeName,
       employeeRole: actorContext?.employeeRole,
@@ -88,7 +89,7 @@ export class PerformanceService {
     currentMonthTarget: number,
     currentMonthPoints: number,
     currentActiveCandidates: number,
-    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+    actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<MonthlyRegisterItem[]> {
     const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
     const [allTargets, historicalAggregates] = await Promise.all([
@@ -98,6 +99,7 @@ export class PerformanceService {
         scope,
         assignedRole: actorContext?.assignedRole,
         departmentId: actorContext?.departmentId,
+      department: actorContext?.department,
         employeeId: actorContext?.employeeId,
         employeeName: actorContext?.employeeName,
         employeeRole: actorContext?.employeeRole,
@@ -145,7 +147,7 @@ export class PerformanceService {
 
   async assignTarget(
     input: PerformanceTargetInput,
-    actorContext?: { assignedRole?: string; departmentId?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+    actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<void> {
     if (!input.employeeId || !input.brandId || !input.month || input.targetPoints < 0) {
       throw new Error('Valid employee, brand, month, and non-negative target points are required.');
