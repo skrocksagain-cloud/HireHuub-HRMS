@@ -18,8 +18,6 @@ export interface ResolvedClientBilling {
 const validateClientInput = (input: CreateClientInput): void => {
   if (!input.name.trim()) throw new Error('Client Name (Short/Common Name) is required.');
   if (!input.billingName.trim()) throw new Error('Billing Name (Legal Entity Name) is required.');
-  if (!input.gstin.trim()) throw new Error('GSTIN is required.');
-  if (!input.state.trim()) throw new Error('State is required.');
   if (!input.invoiceConfig.templateReference.trim()) throw new Error('Invoice Template Reference is required.');
 
   if (input.commercial?.type === 'OTS') {
@@ -111,3 +109,4 @@ class ClientService {
 }
 
 export const clientService = new ClientService();
+

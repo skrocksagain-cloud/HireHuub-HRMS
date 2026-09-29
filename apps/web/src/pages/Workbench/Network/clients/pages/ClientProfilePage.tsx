@@ -268,7 +268,7 @@ export default function ClientProfilePage() {
   };
 
   const handleSaveBilling = async () => {
-    if (!editedBillingName.trim() || !editedGstin.trim()) return;
+    if (!editedBillingName.trim()) return;
     await updateProfile({ billingName: editedBillingName.trim(), gstin: editedGstin.trim() });
     setIsEditingBilling(false);
     setActionSuccess('Billing details updated successfully by Finance.');
@@ -1197,15 +1197,14 @@ export default function ClientProfilePage() {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">State GSTIN Number *</label>
+            <label className="block font-semibold text-slate-700 mb-1">State GSTIN Number (Optional)</label>
             <input
               type="text"
               value={newStateGstin}
               onChange={(e) => setNewStateGstin(e.target.value)}
               placeholder="e.g. 29AABCN1234F2Z8"
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
-              required
-            />
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+              />
           </div>
 
           <div>
@@ -1418,3 +1417,4 @@ export default function ClientProfilePage() {
     </DashboardLayout>
   );
 }
+

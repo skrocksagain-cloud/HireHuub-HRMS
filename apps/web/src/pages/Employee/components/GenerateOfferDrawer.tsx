@@ -59,6 +59,7 @@ export default function GenerateOfferDrawer({
   const [monthlyGrossInput, setMonthlyGrossInput] = useState<string>("");
   const [pfApplicable, setPfApplicable] = useState<boolean>(true);
   const [esiApplicable, setEsiApplicable] = useState<boolean>(true);
+  const [ptApplicable, setPtApplicable] = useState<boolean>(false);
 
   // Workflow & Status States
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -104,8 +105,9 @@ export default function GenerateOfferDrawer({
     return SalaryCalculator.calculateSalaryStructure(monthlyGrossNum, {
       isPfApplicable: pfApplicable,
       isEsicApplicable: esiApplicable,
+      isPtApplicable: ptApplicable,
     });
-  }, [monthlyGrossNum, pfApplicable, esiApplicable]);
+  }, [monthlyGrossNum, pfApplicable, esiApplicable, ptApplicable]);
 
   // Currency Formatter
   const formatCurrency = (val: number) =>
@@ -283,6 +285,7 @@ export default function GenerateOfferDrawer({
 
         pfApplicable,
         esiApplicable,
+        ptApplicable,
 
         brandId: selectedBrandId,
         employeePf: salaryBreakup.employeePf,
@@ -373,6 +376,7 @@ export default function GenerateOfferDrawer({
           annualCtc: salaryBreakup.annualCtc,
           pfApplicable,
           esiApplicable,
+          ptApplicable,
         },
         editableData: {
           offerDate,
@@ -747,6 +751,16 @@ export default function GenerateOfferDrawer({
                     />
                     <span>ESI Applicable</span>
                   </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={ptApplicable}
+                      onChange={(e) => setPtApplicable(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>P.Tax Applicable</span>
+                  </label>
                 </div>
               </div>
 
@@ -785,8 +799,8 @@ export default function GenerateOfferDrawer({
                     <div className="px-3 py-1.5 flex justify-between text-slate-500">
                       <span>Professional Tax</span>
                       <div className="flex gap-8">
-                        <span className="w-20 text-right">{formatCurrency(salaryBreakup.professionalTax)}</span>
-                        <span className="w-24 text-right">{formatCurrency(salaryBreakup.professionalTax * 12)}</span>
+                        <span className="w-20 text-right">{ptApplicable ? formatCurrency(salaryBreakup.professionalTax) : "Not Applicable"}</span>
+                        <span className="w-24 text-right">{ptApplicable ? formatCurrency(salaryBreakup.professionalTax * 12) : "Not Applicable"}</span>
                       </div>
                     </div>
                     <div className="px-3 py-1.5 flex justify-between text-slate-500">
@@ -870,4 +884,3 @@ export default function GenerateOfferDrawer({
     </Drawer>
   );
 }
-

@@ -144,9 +144,6 @@ export class IncentiveEngineService {
       totalSlabContribution: number;
     }> = [];
 
-    if (achievementPercent < 100) {
-      return { totalIncentive: 0, slabBreakdown: [] };
-    }
 
     for (const slab of sortedSlabs) {
       // Fixed Cumulative Rule: If employee achievement % meets or exceeds min threshold of slab, accumulate increment
@@ -255,3 +252,4 @@ export class IncentiveEngineService {
 }
 
 export const incentiveEngineService = new IncentiveEngineService();
+

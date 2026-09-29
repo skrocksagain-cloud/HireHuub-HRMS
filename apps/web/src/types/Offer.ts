@@ -122,6 +122,8 @@ export interface Offer {
   pfApplicable: boolean;
 
   esiApplicable: boolean;
+  
+  ptApplicable?: boolean;
 
   // ============================================================
   // Brand

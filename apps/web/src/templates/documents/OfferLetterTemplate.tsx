@@ -26,16 +26,16 @@ const DEFAULT_RESPONSIBILITIES = [
 const formatCurrency = (amount: number) => currencyFormatter.format(amount);
 
 export default function OfferLetterTemplate({ offer }: OfferLetterTemplateProps) {
-  const salaryRows = [
+  const salaryRows: Array<[string, number | string]> = [
     ['Basic', offer.basicSalary],
     ['HRA', offer.hra],
     ['Conveyance', offer.conveyanceAllowance],
     ['Mobile', offer.mobileAllowance],
     ['Special Allowance', offer.specialAllowance],
     ['Monthly Gross', offer.monthlyGrossSalary],
-    ['Professional Tax', offer.professionalTax],
+    ['Professional Tax', offer.ptApplicable !== false ? offer.professionalTax : 'Not Applicable'],
     ['Net Take Home', offer.netTakeHome],
-  ] as const;
+  ];
 
   return (
     <DocumentLayout>
@@ -201,11 +201,13 @@ export default function OfferLetterTemplate({ offer }: OfferLetterTemplateProps)
               </thead>
               <tbody>
                 {salaryRows.map(([label, monthlyAmount]) => (
-                  <tr key={label} className="border-t border-slate-200">
-                    <td className="px-3 py-2 font-medium text-slate-800">{label}</td>
-                    <td className="px-3 py-2 text-right">{formatCurrency(monthlyAmount)}</td>
+                  <tr key={label as string} className="border-t border-slate-200">
+                    <td className="px-3 py-2 font-medium text-slate-800">{label as string}</td>
                     <td className="px-3 py-2 text-right">
-                      {formatCurrency(monthlyAmount * 12)}
+                      {typeof monthlyAmount === 'number' ? formatCurrency(monthlyAmount) : monthlyAmount}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {typeof monthlyAmount === 'number' ? formatCurrency(monthlyAmount * 12) : monthlyAmount}
                     </td>
                   </tr>
                 ))}

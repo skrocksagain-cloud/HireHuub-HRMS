@@ -80,7 +80,7 @@ export default function SalaryCard({
 
           <BooleanField
             label="Professional Tax"
-            value={offer.professionalTax > 0}
+            value={offer.ptApplicable ?? (offer.professionalTax > 0)}
           />
         </div>
       </div>

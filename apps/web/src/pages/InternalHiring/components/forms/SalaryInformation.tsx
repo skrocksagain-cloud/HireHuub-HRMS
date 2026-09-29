@@ -193,6 +193,22 @@ export default function SalaryInformation({
 
           </label>
 
+          <label className="flex items-center gap-3 rounded-xl border border-slate-300 p-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.ptApplicable ?? false}
+              onChange={(e) =>
+                onChange(
+                  "ptApplicable",
+                  e.target.checked
+                )
+              }
+            />
+            <span className="font-medium">
+              P.Tax Applicable
+            </span>
+          </label>
+
         </div>
 
       </div>

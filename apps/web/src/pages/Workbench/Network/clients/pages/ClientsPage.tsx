@@ -550,18 +550,17 @@ export default function ClientsPage() {
 
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Primary GSTIN Number *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Primary GSTIN Number (Optional)</label>
                 <input
                   type="text"
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value)}
                   placeholder="27AABCN1234F1Z9"
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:border-emerald-500 focus:outline-none"
-                  required
-                />
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:border-emerald-500 focus:outline-none"
+                  />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">State / Union Territory *</label>
+                <label className="block font-semibold text-slate-700 mb-1">State / Union Territory (Optional)</label>
                 <select
                   value={state}
                   onChange={(e) => {
@@ -569,8 +568,7 @@ export default function ClientsPage() {
                     setCity('');
                   }}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
-                  required
-                >
+                  >
                   <option value="">Select State / UT</option>
                   {getIndianStates().map((s) => (
                     <option key={s.stateCode} value={s.stateName}>
@@ -593,14 +591,13 @@ export default function ClientsPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">City *</label>
+                <label className="block font-semibold text-slate-700 mb-1">City (Optional)</label>
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   disabled={!state}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
-                  required
-                >
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                  >
                   <option value="">{state ? 'Select City' : 'Select State First'}</option>
                   {state &&
                     getCitiesForState(state).map((c) => (
@@ -823,3 +820,4 @@ export default function ClientsPage() {
     </DashboardLayout>
   );
 }
+

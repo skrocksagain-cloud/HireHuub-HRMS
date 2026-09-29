@@ -1,6 +1,7 @@
 export interface SalaryBreakupOptions {
   isPfApplicable: boolean;
   isEsicApplicable: boolean;
+  isPtApplicable?: boolean;
   state?: string;
 }
 
@@ -146,7 +147,7 @@ export class SalaryCalculator {
 
     const pf = this.calculatePF(basicPay, options.isPfApplicable);
     const esic = this.calculateESIC(monthlyGross, options.isEsicApplicable);
-    const professionalTax = this.calculateProfessionalTax(monthlyGross, options.state);
+    const professionalTax = options.isPtApplicable !== false ? this.calculateProfessionalTax(monthlyGross, options.state) : 0;
 
     const totalEmployeeDeductions = pf.employeePF + esic.employeeESIC + professionalTax;
     const employerContribution = this.calculateEmployerContribution(pf.employerPF, esic.employerESIC);

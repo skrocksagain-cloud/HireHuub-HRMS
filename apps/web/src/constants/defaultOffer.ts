@@ -83,6 +83,8 @@ export const DEFAULT_OFFER: Offer = {
 
   esiApplicable: false,
 
+  ptApplicable: false,
+
   // ============================================================
   // Offer Details
   // ============================================================
