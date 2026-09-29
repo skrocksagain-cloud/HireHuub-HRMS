@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Half Day' | 'Holiday' | 'Week Off' | 'Leave' | 'WFH' | 'Regularization Pending';
+export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Half Day' | 'Holiday' | 'Week Off' | 'Leave' | 'WFH' | 'Regularization Pending' | 'Incomplete';
 export type AttendanceRequestType = 'Regularization' | 'WFH';
 export type ApprovalStatus = 'Pending' | 'Approved' | 'Rejected';
 

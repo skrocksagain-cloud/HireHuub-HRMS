@@ -40,7 +40,6 @@ export default function AdminDashboard({ dashboard }: WorkspaceDashboardProps) {
             attendance={dashboard.attendance}
             isSignedIn={dashboard.isSignedIn}
             isSignedOut={dashboard.isSignedOut}
-            isSuperAdmin={dashboard.isSuperAdmin}
             workingDurationFormatted={dashboard.workingDurationFormatted}
             expectedLogoutTime={dashboard.expectedLogoutTime}
             onSignIn={dashboard.signIn}

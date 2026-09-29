@@ -30,9 +30,9 @@ class AttendanceService {
     const bounds = getMonthBounds(month);
     const scope = getSimplifiedModuleScope(actor.assignedRole);
 
-    const requestsPromise = scope === 'GLOBAL' 
-      ? attendanceRepository.getPendingRequests() 
-      : scope === 'DEPARTMENT' 
+    const requestsPromise = scope === 'GLOBAL'
+      ? attendanceRepository.getPendingRequests()
+      : scope === 'DEPARTMENT'
       ? attendanceRepository.getPendingRequestsForDepartment(actor.department)
       : attendanceRepository.getRequestsForEmployee(actor.employeeId);
 
@@ -64,7 +64,7 @@ class AttendanceService {
       employeeName: actor.name,
       department: actor.department,
       attendanceDate,
-      status: getAttendanceStatusForLogin(now),
+      status: 'Incomplete',
       loginTime: null,
       logoutTime: null,
       totalWorkMinutes: 0,
@@ -99,12 +99,16 @@ class AttendanceService {
     if (daily.logoutTime || daily.isLocked) throw new Error('Attendance for today is already closed.');
 
     const workMinutes = Math.max(0, Math.floor((Date.now() - daily.loginTime.toMillis()) / 60_000));
+
+    // Re-evaluate initial status because login now sets status to 'Incomplete'
+    const initialStatus = daily.status === 'Incomplete' ? getAttendanceStatusForLogin(daily.loginTime.toDate()) : daily.status;
+
     const status =
-      daily.status === 'Late'
+      initialStatus === 'Late'
         ? 'Late'
         : workMinutes < MINIMUM_HALF_DAY_WORK_MINUTES
         ? 'Half Day'
-        : daily.status;
+        : initialStatus;
 
     await attendanceRepository.closeDaily(daily.id, status, workMinutes);
 

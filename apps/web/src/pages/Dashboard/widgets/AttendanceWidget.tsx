@@ -6,7 +6,6 @@ interface AttendanceWidgetProps {
   attendance: DashboardAttendanceRecord | null;
   isSignedIn: boolean;
   isSignedOut: boolean;
-  isSuperAdmin: boolean;
   workingDurationFormatted: string;
   expectedLogoutTime: string;
   onSignIn: () => Promise<void>;
@@ -17,7 +16,6 @@ export default function AttendanceWidget({
   attendance,
   isSignedIn,
   isSignedOut,
-  isSuperAdmin,
   workingDurationFormatted,
   expectedLogoutTime,
   onSignIn,
@@ -26,10 +24,7 @@ export default function AttendanceWidget({
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Hidden for Super Admin
-  if (isSuperAdmin) {
-    return null;
-  }
+
 
   const handleConfirmSignOut = async () => {
     setIsSubmitting(true);

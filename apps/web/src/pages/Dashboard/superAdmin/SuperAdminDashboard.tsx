@@ -1,6 +1,7 @@
 import GreetingHeroCard from '../common/GreetingHeroCard';
 import LiveStatusStrip from '../common/LiveStatusStrip';
 import FavoritesBar from '../common/FavoritesBar';
+import AttendanceWidget from '../widgets/AttendanceWidget';
 import LeaveBalanceWidget from '../widgets/LeaveBalanceWidget';
 import EnterpriseKpiSnapshotWidget from '../widgets/EnterpriseKpiSnapshotWidget';
 import OrganizationHealthWidget from '../widgets/OrganizationHealthWidget';
@@ -35,7 +36,15 @@ export default function SuperAdminDashboard({ dashboard }: WorkspaceDashboardPro
         </div>
 
         <div className="space-y-6">
-          {/* Note: Super Admin explicitly does NOT see AttendanceWidget */}
+          <AttendanceWidget
+            attendance={dashboard.attendance}
+            isSignedIn={dashboard.isSignedIn}
+            isSignedOut={dashboard.isSignedOut}
+            workingDurationFormatted={dashboard.workingDurationFormatted}
+            expectedLogoutTime={dashboard.expectedLogoutTime}
+            onSignIn={dashboard.signIn}
+            onSignOut={dashboard.signOut}
+          />
           <LeaveBalanceWidget leaveBalance={dashboard.leaveBalance} />
           <EventsWidget />
           <MiniCalendarWidget events={dashboard.calendarEvents} />

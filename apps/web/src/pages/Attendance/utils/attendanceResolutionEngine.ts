@@ -12,7 +12,8 @@ export type ResolvedStatus =
   | 'Week Off'
   | 'Regularized'
   | 'Absent'
-  | 'Upcoming';
+  | 'Upcoming'
+  | 'Incomplete';
 
 export interface ResolvedDayDetails {
   holidayName?: string;
@@ -119,7 +120,7 @@ export const resolveSingleDay = (
   const daily = dailyRecords.find((r) => r.attendanceDate === dateStr);
 
   const hasActualAttendance = Boolean(
-    daily && (daily.loginTime || daily.status === 'Present' || daily.status === 'Late' || daily.status === 'Half Day')
+    daily && (daily.loginTime || daily.status === 'Present' || daily.status === 'Late' || daily.status === 'Half Day' || daily.status === 'Incomplete')
   );
 
   // CONFLICT & PRECEDENCE RESOLUTION ENGINE
@@ -128,7 +129,8 @@ export const resolveSingleDay = (
   if (hasActualAttendance && daily) {
     const isLate = daily.status === 'Late';
     const isHalfDay = daily.status === 'Half Day';
-    const status: ResolvedStatus = isHalfDay ? 'Half Day' : isLate ? 'Late' : 'Present';
+    const isIncomplete = daily.status === 'Incomplete';
+    const status: ResolvedStatus = isIncomplete ? 'Incomplete' : isHalfDay ? 'Half Day' : isLate ? 'Late' : 'Present';
     return {
       date: dateStr,
       dayNumber: dayNum,
