@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
 
-export const completePasswordReset = functions.https.onCall(async (request) => {
+export const completePasswordReset = functions.https.onCall({ invoker: 'public' }, async (request) => {
   const { employeeId, otp, newPassword } = request.data;
 
   if (!employeeId || !otp || !newPassword) {

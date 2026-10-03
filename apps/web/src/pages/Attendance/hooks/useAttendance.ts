@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { attendanceService } from '../services/attendanceService';
 import { calendarService } from '../../../services/calendar/calendarService';
-import { leaveRepository } from '../../Leave/repositories/leaveRepository';
-import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { detectDevice, getCurrentLocation, getLocalAttendanceDate } from '../utils/attendance';
 import {
   computeAttendanceSummary,
@@ -28,6 +26,7 @@ const emptyDashboard: AttendanceDashboardData = {
   monthRecords: [],
   requests: [],
   organizationRecords: [],
+  approvedLeaves: [],
 };
 
 const defaultFilters: AttendanceFilters = {
@@ -65,19 +64,23 @@ export const useAttendance = (actor: AttendanceActor | null) => {
     void (async () => {
       try {
         const [emps, hols] = await Promise.all([
-          employeeRepository.getEmployees().catch(() => []),
+          (async () => {
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions } = await import('../../../firebase/firebase');
+            const result = await httpsCallable(functions, 'getScopedAttendanceEmployees')({});
+            const payload = result.data as { employees?: Employee[] };
+            return payload.employees || [];
+          })(),
           calendarService.getHolidays().catch(() => []),
         ]);
-        const activeEmps = emps.filter(
-          (e) => (e.employmentStatus === 'Active' || e.status === 'Active') && e.employmentStatus !== 'Terminated'
-        );
+        const activeEmps = emps.filter((employee) => employee.employmentStatus === 'Active' || employee.employmentStatus === 'Notice Period');
         setEmployeesList(activeEmps);
         setHolidaysList(hols);
       } catch {
         // Safe fallback
       }
     })();
-  }, []);
+  }, [actor?.employeeId, actor?.assignedRole, actor?.role]);
 
   const currentTargetEmployeeId = selectedEmployeeId || actor?.employeeId || '';
 
@@ -96,13 +99,10 @@ export const useAttendance = (actor: AttendanceActor | null) => {
         employeeId: currentTargetEmployeeId,
       };
 
-      const [dashData, leaves] = await Promise.all([
-        attendanceService.getDashboard(targetActor, filters.month),
-        leaveRepository.getRequestsForEmployee(currentTargetEmployeeId).catch(() => []),
-      ]);
+      const dashData = await attendanceService.getDashboard(targetActor, filters.month);
 
       setData(dashData);
-      setApprovedLeaves(leaves.filter((l) => l.status === 'Approved'));
+      setApprovedLeaves(dashData.approvedLeaves);
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {

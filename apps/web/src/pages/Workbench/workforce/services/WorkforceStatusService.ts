@@ -52,7 +52,7 @@ export class WorkforceStatusService {
   static filterWorkforceByRole(
     items: WorkforceItem[],
     userRole: string,
-    userSession: { id: string; name: string; teamId?: string; departmentId?: string }
+    userSession: { id: string; name: string; departmentId?: string }
   ): WorkforceItem[] {
     const role = userRole || 'Employee';
 
@@ -77,8 +77,7 @@ export class WorkforceStatusService {
       return items.filter(
         (item) =>
           item.recruiterId === userSession.id ||
-          item.teamLeadId === userSession.id ||
-          (userSession.teamId && item.teamId === userSession.teamId)
+          item.teamLeadId === userSession.id
       );
     }
 

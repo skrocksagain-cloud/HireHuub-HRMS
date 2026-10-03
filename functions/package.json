@@ -20,11 +20,13 @@
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
+    "firebase": "^12.19.0",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.3.0",
     "googleapis": "^174.0.1",
     "nodemailer": "^9.1.0",
-    "puppeteer-core": "^25.7.0"
+    "puppeteer-core": "^25.7.0",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

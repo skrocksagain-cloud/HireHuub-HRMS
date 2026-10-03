@@ -47,6 +47,14 @@ const STATUS_CONFIG: Record<
     badgeText: 'text-white',
     dotColor: 'bg-amber-600',
   },
+  Incomplete: {
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    text: 'text-amber-700',
+    badgeBg: 'bg-amber-100',
+    badgeText: 'text-amber-700',
+    dotColor: 'bg-amber-500',
+  },
   WFH: {
     bg: 'bg-sky-50/60 hover:bg-sky-100/80',
     border: 'border-sky-200',

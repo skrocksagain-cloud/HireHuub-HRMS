@@ -2,11 +2,14 @@ export type PayrollRunStatus = 'Draft' | 'Calculated' | 'Finalized';
 
 export interface PayrollAttendance {
   present: number;
+  late: number;
+  halfDay: number;
   leave: number;
   weekOff: number;
   holiday: number;
   absent: number;
-  totalWorkingDays: number; // Present + Leave + WeekOff + Holiday
+  /** Present + Late + half of Half Day + Holiday + Week Off. Leave and Absent are zero. */
+  totalWorkingDays: number;
 }
 
 export interface EmployeePayrollRecord {
@@ -29,6 +32,7 @@ export interface EmployeePayrollRecord {
   carryForwardPayableDays: number;
   totalPayableDays: number; // current + carryForward
   daysInMonth: number;
+  carryForwardDaysInMonth?: number;
 
   // Calculated Earnings (Prorated)
   earnedBasic: number;
@@ -64,6 +68,8 @@ export interface PayrollRegisterRun {
 export interface AttendanceOverride {
   employeeId: string;
   present: number;
+  late: number;
+  halfDay: number;
   leave: number;
   weekOff: number;
   holiday: number;

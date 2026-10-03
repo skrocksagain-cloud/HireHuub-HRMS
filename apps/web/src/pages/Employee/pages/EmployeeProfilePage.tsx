@@ -24,7 +24,6 @@ import StatusBadge from '../../../ui/StatusBadge';
 import KpiCard from '../../../ui/KpiCard';
 import { employeeService } from '../services/employeeService';
 import type { Employee } from '../types/Employee';
-import { attendanceRepository } from '../../Attendance/repositories/attendanceRepository';
 import type { DailyAttendance, AttendanceRequest } from '../../Attendance/types/attendance';
 import { leaveRepository } from '../../Leave/repositories/leaveRepository';
 import type { LeaveBalance, LeaveRequest } from '../../Leave/types/leave';
@@ -104,11 +103,39 @@ export default function EmployeeProfilePage() {
         // Fetch sensitive sub-module data ONLY for authorized HR/Admin or self
         if (canViewSensitive) {
           const idToFetch = emp.employeeId || emp.employeeCode || emp.id || '';
-          const [attList, attReqs, lBalances, lReqs, perfData, docList] = await Promise.all([
-            attendanceRepository.getDailyForEmployee(idToFetch, '2026-01-01', '2026-12-31').catch(() => []),
-            attendanceRepository.getRequestsForEmployee(idToFetch).catch(() => []),
+                    let attList: any[] = [];
+          let attReqs: any[] = [];
+          let lReqs: any[] = [];
+
+          try {
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions } = await import('../../../firebase/firebase');
+            
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const todayStr = `${currentMonth}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const attCallable = httpsCallable(functions, 'getScopedAttendanceDashboard');
+            const attResult = await attCallable({ month: currentMonth, today: todayStr, targetEmployeeId: idToFetch }).catch(() => ({ data: {} }));
+            const attData = attResult.data as any;
+            if (attData) {
+               attList = attData.daily || [];
+               attReqs = attData.requests || [];
+            }
+
+            const leaveCallable = httpsCallable(functions, 'getScopedLeaveRequests');
+            const leaveResult = await leaveCallable({}).catch(() => ({ data: {} }));
+            const leaveData = leaveResult.data as any;
+            if (leaveData) {
+               const allReqs = [...(leaveData.ownRequests || []), ...(leaveData.organizationRequests || [])];
+               lReqs = allReqs.filter((r: any) => r.employeeId === idToFetch);
+            }
+          } catch (e) {
+            console.warn('[EmployeeProfilePage] Scoped callable fetch failed:', e);
+          }
+
+          const [lBalances, perfData, docList] = await Promise.all([
             leaveRepository.getBalances(idToFetch).catch(() => []),
-            leaveRepository.getRequestsForEmployee(idToFetch).catch(() => []),
             performanceService.getPerformanceForEmployee(idToFetch).catch(() => null),
             documentService.getByReference(idToFetch).catch(() => []),
           ]);
@@ -751,3 +778,4 @@ function AuditTab({ employee }: { employee: Employee }) {
     </div>
   );
 }
+

@@ -444,13 +444,15 @@ class UniversalPayrollEngineService {
       try {
         const attRecords = await attendanceRepository.getDailyForEmployee(empId, startDate, endDate);
         if (attRecords && attRecords.length > 0) {
-          totalWorkingDays = attRecords.filter((r) =>
-            ['On Time', 'Grace Late', 'Late', 'WFH', 'Present', 'Half Day'].includes(r.status as string)
-          ).length;
+          const presentDays = attRecords.filter((r) => ['On Time', 'Grace Late', 'Present'].includes(r.status as string)).length;
+          const lateDays = attRecords.filter((r) => (r.status as string) === 'Late').length;
+          const halfDays = attRecords.filter((r) => (r.status as string) === 'Half Day').length;
           paidHolidayDays = attRecords.filter((r) => (r.status as string) === 'Holiday').length;
           weekOffDays = attRecords.filter((r) => (r.status as string) === 'Week Off' || (r.status as string) === 'WeekOff').length;
           paidLeaveDays = attRecords.filter((r) => (r.status as string) === 'Leave').length;
-          paidDays = totalWorkingDays + paidHolidayDays + weekOffDays + paidLeaveDays;
+          // One shared value drives display, earnings, deductions, finalization and exports.
+          totalWorkingDays = presentDays + lateDays + halfDays * 0.5 + paidHolidayDays + weekOffDays;
+          paidDays = totalWorkingDays;
         }
       } catch {
         paidDays = daysInMonth;

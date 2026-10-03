@@ -80,7 +80,7 @@ export class CrmService {
   filterCandidates(
     candidates: Candidate[],
     filters: CrmFilterState,
-    currentUser: { id: string; role: string; teamId?: string }
+    currentUser: { id: string; role: string }
   ): Candidate[] {
     const today = new Date().toISOString().split('T')[0];
 
@@ -175,7 +175,7 @@ export class CrmService {
    */
   calculateKpiSummary(
     candidates: Candidate[],
-    currentUser: { id: string; role: string; assignedRole?: string; teamId?: string },
+    currentUser: { id: string; role: string; assignedRole?: string },
     callsTodayMetric: number = 0
   ): KpiSummary {
     const today = new Date().toISOString().split('T')[0];
@@ -237,7 +237,7 @@ export class CrmService {
    */
   getTodaysWorkQueue(
     candidates: Candidate[],
-    _currentUser: { id: string; role: string; assignedRole?: string; teamId?: string }
+    _currentUser: { id: string; role: string; assignedRole?: string }
   ): Candidate[] {
     const today = new Date().toISOString().split('T')[0];
 
@@ -269,7 +269,7 @@ export class CrmService {
   /**
    * Role-masked Duplicate Phone Check
    */
-  async checkDuplicatePhone(phone: string, _userSession: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<DuplicateCheckResult> {
+  async checkDuplicatePhone(phone: string, _userSession: { id: string; role: string; assignedRole?: string; department?: string; departmentId?: string }): Promise<DuplicateCheckResult> {
     const candidate = await crmRepository.findDuplicateByPhone(phone);
     if (!candidate) {
       return { isDuplicate: false, isRestrictedView: false };

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import { canReadFinanceGlobally } from '../../core/authorization/financeAuthorization';
 import { payrollRegisterService } from './services/payrollRegisterService';
+import { attendanceOverrideFrom, recalculatePayrollRecord, recalculatePayrollRun } from './services/internalPayrollCalculator';
 import type { PayrollRegisterRun, AttendanceOverride } from './types';
 import { Loader2, RefreshCw, CheckCircle2, FileText, CreditCard} from 'lucide-react';
 import { adminService } from '../../services/admin/adminService';
@@ -11,13 +12,14 @@ import type { CompanyBankAccountV2 } from '../../types/Admin';
 export default function PayrollRegisterPage() {
   const { user } = useAuth();
   const canReadPayroll = canReadFinanceGlobally({
-    role: user?.authorization?.role || user?.assignedRole,
+    role: user?.authorization?.role || user?.assignedRole || user?.role,
   });
 
   const [month, setMonth] = useState('2026-09');
   const [run, setRun] = useState<PayrollRegisterRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [bankAccounts, setBankAccounts] = useState<CompanyBankAccountV2[]>([]);
   const [selectedDebitAccount, setSelectedDebitAccount] = useState<string>('');
@@ -31,13 +33,7 @@ export default function PayrollRegisterPage() {
   }, []);
   const [overrides, setOverrides] = useState<Record<string, AttendanceOverride>>({});
 
-  useEffect(() => {
-    if (canReadPayroll && month) {
-      loadRun();
-    }
-  }, [month, canReadPayroll]);
-
-  const loadRun = async () => {
+  const loadRun = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -49,7 +45,11 @@ export default function PayrollRegisterPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [month]);
+
+  useEffect(() => {
+    if (canReadPayroll && month) void loadRun();
+  }, [month, canReadPayroll, loadRun]);
 
   const handleCalculate = async () => {
     setLoading(true);
@@ -70,6 +70,8 @@ export default function PayrollRegisterPage() {
     setLoading(true);
     setError('');
     try {
+      const recalculatedRun = recalculatePayrollRun(run, overrides);
+      await payrollRegisterService.saveRun(recalculatedRun);
       await payrollRegisterService.finalizeRun(run.id);
       await loadRun();
     } catch (err: any) {
@@ -83,9 +85,10 @@ export default function PayrollRegisterPage() {
     if (!run) return;
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       await payrollRegisterService.generatePayslips(run);
-      alert('Payslips generated successfully!');
+      setSuccess('Payslips generated successfully.');
     } catch (err: any) {
       setError(err.message || 'Payslip generation failed');
     } finally {
@@ -112,14 +115,9 @@ export default function PayrollRegisterPage() {
 
   const handleOverrideChange = (empId: string, field: keyof AttendanceOverride, value: number) => {
     setOverrides(prev => {
-      const current = prev[empId] || {
-        employeeId: empId,
-        present: run?.records.find(r => r.employeeId === empId)?.attendance.present || 0,
-        leave: run?.records.find(r => r.employeeId === empId)?.attendance.leave || 0,
-        weekOff: run?.records.find(r => r.employeeId === empId)?.attendance.weekOff || 0,
-        holiday: run?.records.find(r => r.employeeId === empId)?.attendance.holiday || 0,
-        absent: run?.records.find(r => r.employeeId === empId)?.attendance.absent || 0,
-      };
+      const record = run?.records.find((item) => item.employeeId === empId);
+      if (!record) return prev;
+      const current = prev[empId] || attendanceOverrideFrom(record);
       
       return {
         ...prev,
@@ -173,6 +171,7 @@ export default function PayrollRegisterPage() {
           </div>
         </div>
 
+        {success && <div role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{success}</div>}
         {error && (
           <div className="p-3 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl text-xs font-bold">
             {error}
@@ -225,7 +224,9 @@ export default function PayrollRegisterPage() {
                   <tr>
                     <th className="p-3">Employee</th>
                     <th className="p-3 text-center">P</th>
-                    <th className="p-3 text-center">L</th>
+                    <th className="p-3 text-center">Late</th>
+                    <th className="p-3 text-center">HD</th>
+                    <th className="p-3 text-center">Leave</th>
                     <th className="p-3 text-center">WO</th>
                     <th className="p-3 text-center">H</th>
                     <th className="p-3 text-center">A</th>
@@ -239,7 +240,10 @@ export default function PayrollRegisterPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {run.records.map(record => {
+                  {run.records.map(baseRecord => {
+                    const record = overrides[baseRecord.employeeId]
+                      ? recalculatePayrollRecord(baseRecord, overrides[baseRecord.employeeId], Number(month.slice(5, 7)), month)
+                      : baseRecord;
                     const o = overrides[record.employeeId];
                     const isDraft = run.status !== 'Finalized';
                     return (
@@ -252,6 +256,16 @@ export default function PayrollRegisterPage() {
                           {isDraft ? (
                             <input type="number" className="w-12 bg-white border border-slate-300 rounded text-slate-800 px-1 py-0.5 text-center" value={o?.present ?? record.attendance.present} onChange={e => handleOverrideChange(record.employeeId, 'present', Number(e.target.value))} />
                           ) : record.attendance.present}
+                        </td>
+                        <td className="p-3 text-center">
+                          {isDraft ? (
+                            <input type="number" className="w-12 bg-white border border-slate-300 rounded text-slate-800 px-1 py-0.5 text-center" value={o?.late ?? record.attendance.late} onChange={e => handleOverrideChange(record.employeeId, 'late', Number(e.target.value))} />
+                          ) : record.attendance.late}
+                        </td>
+                        <td className="p-3 text-center">
+                          {isDraft ? (
+                            <input type="number" min="0" step="0.5" className="w-12 bg-white border border-slate-300 rounded text-slate-800 px-1 py-0.5 text-center" value={o?.halfDay ?? record.attendance.halfDay} onChange={e => handleOverrideChange(record.employeeId, 'halfDay', Number(e.target.value))} />
+                          ) : record.attendance.halfDay}
                         </td>
                         <td className="p-3 text-center">
                           {isDraft ? (

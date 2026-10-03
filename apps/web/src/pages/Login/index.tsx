@@ -78,6 +78,9 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
     const res = await handleNormalLogin();
     if (res && res.success) {
       if (res.mustChangePassword) {
+        if (res.employee?.employeeId) {
+          sessionStorage.setItem('activationEmpId', res.employee.employeeId);
+        }
         navigate('/change-password', { replace: true, state: { empId: res.employee?.employeeId } });
       } else if (res.employee) {
         navigate(landingModule || '/dashboard');
@@ -91,12 +94,13 @@ export default function Login({ forceTab }: { forceTab?: AuthTabMode }) {
   };
 
   const { state } = useLocation();
-  const fallbackEmpId = state?.empId || user?.employeeId;
+  const fallbackEmpId = state?.empId || user?.employeeId || sessionStorage.getItem('activationEmpId') || undefined;
 
   const onActivationPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await handleCompleteActivation(fallbackEmpId);
     if (res && res.success && res.employee) {
+      sessionStorage.removeItem('activationEmpId');
       navigate(landingModule || '/dashboard');
     }
   };

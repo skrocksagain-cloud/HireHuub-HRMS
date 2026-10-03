@@ -14,3 +14,6 @@ export { completePasswordReset } from './auth/completePasswordReset';
 export { resetHH0005 } from './resetHH0005';
 export { unlockEmployeeAccount } from './auth/unlockEmployeeAccount';
 export { resetEmployeePasswordByAdmin } from './auth/resetEmployeePasswordByAdmin';
+export { createEmployee } from './auth/createEmployee';
+export { getScopedAttendanceDashboard, getScopedAttendanceEmployees, getScopedLeaveRequests, decideAttendanceRequest, decideLeaveRequest, syncApprovedLeaveAttendance, processMonthlyLeaveAccrual, grantCompOffIfWorked } from './auth/scopedModuleAccess';
+export { refreshAccessScope, rebuildAllAccessScopes, rebuildAccessScopesOnEmployeeChange, getScopedCrmCandidates, getScopedWorkforce } from './auth/accessScope';

@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 
-export const resetEmployeePasswordByAdmin = functions.https.onCall(async (request) => {
+export const resetEmployeePasswordByAdmin = functions.https.onCall({ invoker: 'public' }, async (request) => {
   const { requestId, actorId, actorName } = request.data;
   const uid = request.auth?.uid;
 

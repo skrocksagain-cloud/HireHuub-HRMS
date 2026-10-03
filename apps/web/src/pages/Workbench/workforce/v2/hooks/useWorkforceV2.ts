@@ -95,10 +95,11 @@ const repoPlacements: any = {
       return Array.from(uniqueResults.values());
     }
   },
-  queryPayouts: async (clientId?: string, month?: string) => {
+  queryPayouts: async (clientId?: string, month?: string, role?: string) => {
+    if (role !== 'Super Admin') return [];
     let q = query(collection(db, 'workforce_imports'), where('isApproved', '==', true));
     if (clientId) q = query(q, where('clientId', '==', clientId));
-    const snap = await getDocs(q);
+    const snap = await getDocs(q).catch(() => ({ docs: [] } as any));
     const results: any[] = [];
 
     for (const d of snap.docs) {
@@ -282,3 +283,6 @@ export function useWorkforceV2(userContext: WorkforceContextV2) {
     updatePlacementDates
   };
 }
+
+
+

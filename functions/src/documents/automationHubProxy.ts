@@ -65,6 +65,7 @@ export interface AutomationHubResponsePayload {
  */
 export const requestAutomationDocument = onCall<ERPAutomationDocumentRequestPayload>(
   {
+    invoker: 'public',
     cors: true,
     secrets: [automationHubAuthToken, automationHubUrl],
   },

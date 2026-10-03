@@ -1,18 +1,6 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase/firebase';
-import { adminService } from '../../../services/admin/adminService';
-import { LEAVE_BALANCES_COLLECTION, LEAVE_REQUESTS_COLLECTION } from '../constants/leave';
+import { LEAVE_REQUESTS_COLLECTION } from '../constants/leave';
 
 export const LEAVE_ACCRUAL_LOGS_COLLECTION = 'leaveAccrualLogs';
 
@@ -95,84 +83,17 @@ class LeaveAccrualService {
   async processMonthlyAccrualForEmployee(
     employeeId: string,
     joiningDateStr: string,
-    accrualMonthStr?: string
+    _accrualMonthStr?: string
   ): Promise<{ credited: boolean; amount?: number; reason: string }> {
-    const state = calculateProbationState(joiningDateStr);
-    if (state.isProbation) {
-      return {
-        credited: false,
-        reason: `Employee is currently in 90-day probation (${state.elapsedDays} days elapsed). Monthly leave accrual is not active during probation.`,
-      };
-    }
-
-    const today = new Date();
-    const targetMonth =
-      accrualMonthStr || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-    // Read Leave Master policy from Company Settings
-    const settings = await adminService.getCompanySettings().catch(() => null);
-    const configuredAccrualRate = (settings as any)?.leavePolicy?.monthlyAccrualDays || 1.5;
-    const leaveType = 'Casual Leave';
-
-    const idempotencyKey = `${employeeId}:${leaveType}:${targetMonth}`;
-
-    // Check idempotency log
-    const logDocRef = doc(db, LEAVE_ACCRUAL_LOGS_COLLECTION, idempotencyKey);
-    const logSnap = await getDoc(logDocRef);
-
-    if (logSnap.exists()) {
-      return {
-        credited: false,
-        reason: `Monthly leave accrual for ${targetMonth} has already been credited (Log: ${idempotencyKey}).`,
-      };
-    }
-
-    // Update Leave Balance
-    const balanceQuery = await getDocs(
-      query(
-        collection(db, LEAVE_BALANCES_COLLECTION),
-        where('employeeId', '==', employeeId),
-        where('leaveType', '==', leaveType)
-      )
-    );
-
-    if (!balanceQuery.empty) {
-      const balanceDoc = balanceQuery.docs[0];
-      const data = balanceDoc.data();
-      const currentAvailable = Number(data.available ?? 0);
-      const currentCredited = Number(data.credited ?? 0);
-
-      await updateDoc(doc(db, LEAVE_BALANCES_COLLECTION, balanceDoc.id), {
-        available: currentAvailable + configuredAccrualRate,
-        credited: currentCredited + configuredAccrualRate,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await addDoc(collection(db, LEAVE_BALANCES_COLLECTION), {
-        employeeId,
-        leaveType,
-        available: configuredAccrualRate,
-        credited: configuredAccrualRate,
-        carriedForward: 0,
-        used: 0,
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    // Save Idempotency Log
-    await setDoc(logDocRef, {
-      id: idempotencyKey,
-      employeeId,
-      leaveType,
-      accrualMonth: targetMonth,
-      creditedAmount: configuredAccrualRate,
-      createdAt: serverTimestamp(),
-    });
-
+    if (!employeeId || !joiningDateStr) return { credited: false, reason: 'Employee identity or joining date is missing.' };
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../../firebase/firebase');
+    const result = await httpsCallable(functions, 'processMonthlyLeaveAccrual')({});
+    const outcome = result.data as { credited?: boolean; amount?: number; reason?: string };
     return {
-      credited: true,
-      amount: configuredAccrualRate,
-      reason: `Successfully credited ${configuredAccrualRate} days ${leaveType} for ${targetMonth}.`,
+      credited: Boolean(outcome.credited),
+      ...(typeof outcome.amount === 'number' ? { amount: outcome.amount } : {}),
+      reason: typeof outcome.reason === 'string' ? outcome.reason : 'Leave accrual processing completed.',
     };
   }
 }

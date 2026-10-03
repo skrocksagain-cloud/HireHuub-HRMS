@@ -51,7 +51,15 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
         dashboardRepository.getAnnouncements(),
         dashboardRepository.getNotifications(effectiveUserId),
         dashboardRepository.getRecentAuditLogs(10),
-        dashboardService.getLiveStatusMetrics(),
+        dashboardService.getLiveStatusMetrics({
+          employeeId: effectiveUserId,
+          name: user?.name || '',
+          role: user?.authorization?.role || user?.assignedRole || user?.role || roleName,
+          assignedRole: user?.authorization?.role || user?.assignedRole || user?.role || roleName,
+          department: user?.department || '',
+          departmentId: user?.departmentId,
+          reportingManagerId: user?.reportingManagerId,
+        }),
         dashboardService.getDepartmentKPIs(roleName, effectiveUserId),
         dashboardService.getUserRanking(roleName),
       ]);
@@ -73,7 +81,7 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [effectiveUserId, roleName]);
+  }, [effectiveUserId, roleName, user]);
 
   useEffect(() => {
     loadDashboardData();

@@ -148,6 +148,7 @@ export class AuthService {
         mobileNumber: employee.mobileNumber,
         accountStatus: 'Active',
       },
+      mustChangePassword: !employee.firstLoginCompleted,
       sessionId,
     };
   }
@@ -198,31 +199,19 @@ export class AuthService {
       throw new Error(policyResult.errors.join(' '));
     }
 
-    const canonicalEmail = `${cleanId.toLowerCase()}@hirehuub.local`;
-    const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
+    const { updatePassword } = await import('firebase/auth');
     const { auth } = await import('../../firebase/firebase');
 
-    let currentUser = auth.currentUser;
+    const currentUser = auth.currentUser;
 
-    // If not signed in (because login() signed them out), sign in with temporary password
     if (!currentUser) {
-      try {
-        let signCred;
-        try {
-          signCred = await signInWithEmailAndPassword(auth, canonicalEmail, 'Password@123');
-        } catch (fallbackError) {
-          signCred = await signInWithEmailAndPassword(auth, canonicalEmail, `${cleanId}@123`);
-        }
-        currentUser = signCred.user;
-      } catch (e: any) {
-        throw new Error('Failed to authenticate with temporary password for setup. If your temporary password was customized, you must sign in normally. ' + (e.message || ''));
-      }
+      throw new Error('Your session has expired. Please log in again.');
     }
 
     // Now authenticated, query Firestore
     const employee = await authRepository.getEmployeeByIdOrMobile(cleanId);
     if (!employee) {
-      throw new Error('Employee record not found.');
+      throw new Error('Employee profile could not be loaded. Please contact HR/Admin.');
     }
 
     // Skip OTP verification in first login (OTP removed per earlier steps)
@@ -252,6 +241,7 @@ export class AuthService {
     const authDataUpdates: Record<string, any> = {
       mobileVerified: true,
       firstLoginCompleted: true,
+      mustChangePassword: false,
       activatedAt: now,
       lastPasswordChangedAt: now,
       accountStatus: 'Active',

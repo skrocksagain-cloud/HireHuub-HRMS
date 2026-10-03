@@ -335,7 +335,15 @@ class DashboardService {
   /**
    * Get Live Status Strip Metrics dynamically from Firestore repositories
    */
-  async getLiveStatusMetrics(): Promise<{
+  async getLiveStatusMetrics(actor: {
+    employeeId: string;
+    name: string;
+    role: string;
+    assignedRole?: string;
+    department: string;
+    departmentId?: string;
+    reportingManagerId?: string;
+  }): Promise<{
     workingToday: number;
     present: number;
     onLeave: number;
@@ -345,74 +353,38 @@ class DashboardService {
   }> {
     try {
       const { getLocalAttendanceDate } = await import('../../pages/Attendance/utils/attendance');
-      const todayStr = getLocalAttendanceDate();
-      const mmDd = todayStr.slice(5);
-
-      const { employeeService } = await import('../../pages/Employee/services/employeeService');
-      const { attendanceRepository } = await import('../../pages/Attendance/repositories/attendanceRepository');
-      const { leaveRepository } = await import('../../pages/Leave/repositories/leaveRepository');
-      const { calendarRepository } = await import('../calendar/repositories/calendarRepository');
-
-      const [employees, attendanceList, leaveRequests, calendarEvents, pendingLeaves] = await Promise.all([
-        employeeService.getEmployees().catch(() => []),
-        attendanceRepository.getDailyForOrganization(todayStr, todayStr).catch(() => []),
-        leaveRepository.getOrganizationRequests().catch(() => []),
-        calendarRepository.getEvents().catch(() => []),
-        leaveRepository.getPendingRequests().catch(() => []),
+      const today = getLocalAttendanceDate();
+      const month = today.slice(0, 7);
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('../../firebase/firebase');
+      const [attendanceResult, leaveResult, employeeResult, calendarEvents] = await Promise.all([
+        httpsCallable(functions, 'getScopedAttendanceDashboard')({ month, today, targetEmployeeId: actor.employeeId }),
+        httpsCallable(functions, 'getScopedLeaveRequests')({}),
+        httpsCallable(functions, 'getScopedAttendanceEmployees')({}),
+        (await import('../calendar/repositories/calendarRepository')).calendarRepository.getEvents().catch(() => []),
       ]);
-
-      // Working Today: Active employees (not Inactive / Terminated / Resigned)
-      const workingToday = employees.filter(
-        (e: { employmentStatus?: string; status?: string }) =>
-          e.employmentStatus === 'Active' || e.employmentStatus === 'Notice Period' || e.status === 'Active'
-      ).length;
-
-      // Present: Attendance status = Present / Late / Half Day / WFH today
-      const presentRecords = attendanceList.filter(
-        (a: { status?: string, employeeId: string }) => a.status === 'Present' || a.status === 'Late' || a.status === 'Half Day' || a.status === 'WFH'
-      );
-      const present = new Set(presentRecords.map((a: { employeeId: string }) => a.employeeId)).size;
-
-      // On Leave: Approved leave requests spanning today
-      const onLeave = leaveRequests.filter(
-        (l: { status?: string; startDate: string; endDate: string }) =>
-          l.status === 'Approved' && l.startDate <= todayStr && l.endDate >= todayStr
-      ).length;
-
-      // Meetings Today: Today's calendar events of type Meeting or Interview
-      const meetingsToday = calendarEvents.filter(
-        (c: { date: string; eventType?: string; type?: string }) =>
-          c.date === todayStr && (c.eventType === 'Meeting' || c.eventType === 'Interview' || c.type === 'Review' || c.type === 'Interview')
-      ).length;
-
-      // Birthdays: Active employees whose dateOfBirth matches MM-DD today
-      const birthdays = employees.filter((e: { dateOfBirth?: string }) => {
-        if (!e.dateOfBirth) return false;
-        const dobMmDd = e.dateOfBirth.slice(5);
-        return dobMmDd === mmDd;
-      }).length;
-
-      // Pending Approvals: Total pending leave requests + pending attendance requests
-      const pendingAttendance = await attendanceRepository.getPendingRequests().catch(() => []);
-      const pendingApprovals = pendingLeaves.length + pendingAttendance.length;
-
+      const attendancePayload = attendanceResult.data as { organizationRecords?: unknown[]; requests?: unknown[] };
+      const leavePayload = leaveResult.data as { organizationRequests?: unknown[] };
+      const employeePayload = employeeResult.data as { employees?: Array<{ employeeId: string; employmentStatus: string; birthdayMonthDay: string }> };
+      const dailyRecords = (attendancePayload.organizationRecords || []).filter((value): value is Record<string, unknown> => typeof value === 'object' && value !== null);
+      const leaveRequests = (leavePayload.organizationRequests || []).filter((value): value is Record<string, unknown> => typeof value === 'object' && value !== null);
+      const employees = employeePayload.employees || [];
+      const present = new Set(dailyRecords.filter((record) => record.attendanceDate === today && ['Present', 'Late', 'Half Day', 'WFH'].includes(String(record.status))).map((record) => String(record.employeeId || ''))).size;
+      const onLeave = leaveRequests.filter((record) => record.status === 'Approved' && String(record.startDate || '') <= today && String(record.endDate || '') >= today).length;
+      const mmDd = today.slice(5);
+      const meetingsToday = calendarEvents.filter((event) => event.date === today && (event.eventType.endsWith('Meeting') || event.eventType === 'Interview')).length;
+      const pendingAttendance = (attendancePayload.requests || []).length;
+      const pendingLeaves = leaveRequests.filter((record) => record.status === 'Pending').length;
       return {
-        workingToday,
+        workingToday: employees.filter((employee) => employee.employmentStatus === 'Active' || employee.employmentStatus === 'Notice Period').length,
         present,
         onLeave,
         meetingsToday,
-        birthdays,
-        pendingApprovals,
+        birthdays: employees.filter((employee) => employee.birthdayMonthDay === mmDd).length,
+        pendingApprovals: pendingLeaves + pendingAttendance,
       };
     } catch {
-      return {
-        workingToday: 0,
-        present: 0,
-        onLeave: 0,
-        meetingsToday: 0,
-        birthdays: 0,
-        pendingApprovals: 0,
-      };
+      return { workingToday: 0, present: 0, onLeave: 0, meetingsToday: 0, birthdays: 0, pendingApprovals: 0 };
     }
   }
 

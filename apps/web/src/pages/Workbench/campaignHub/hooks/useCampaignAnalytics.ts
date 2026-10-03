@@ -29,7 +29,6 @@ export function useCampaignAnalytics(campaigns: CampaignMaster[]) {
         id: (user as any).employeeId || 'HH0000',
         name: user.name || 'Admin',
         role: (user as any).role || 'Super Admin',
-        teamId: (user as any).teamId,
         departmentId: (user as any).department
       } : undefined;
 

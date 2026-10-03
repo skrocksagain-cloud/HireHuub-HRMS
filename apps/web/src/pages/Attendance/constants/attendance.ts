@@ -1,7 +1,7 @@
 import type { AttendanceStatus } from '../types/attendance';
 
 export const ATTENDANCE_COLLECTION = 'attendance';
-export const HOLIDAYS_COLLECTION = 'holidays';
+export const HOLIDAYS_COLLECTION = 'admin_holidays';
 export const LEAVE_REQUESTS_COLLECTION = 'leaveRequests';
 export const OFFICE_START_MINUTES = 10 * 60;
 export const SATURDAY_START_MINUTES = 10 * 60 + 30;
@@ -17,6 +17,7 @@ export const ATTENDANCE_STATUS_STYLES: Record<AttendanceStatus, string> = {
   Holiday: 'bg-violet-100 text-violet-800',
   'Week Off': 'bg-slate-100 text-slate-700',
   Absent: 'bg-rose-100 text-rose-800',
+  Incomplete: 'bg-amber-100 text-amber-700 border-amber-200',
   WFH: 'bg-cyan-100 text-cyan-800',
   'Regularization Pending': 'bg-yellow-100 text-yellow-800',
 };

@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -112,6 +111,7 @@ export const toEmployee = (id: string, data: Record<string, unknown>): Employee 
     lastWorkingDate: readString(data, 'lastWorkingDate') || undefined,
     exitRecord: (data.exitRecord as any) || undefined,
     assignedRole: readString(data, 'assignedRole') as any,
+    firebaseUid: readString(data, 'firebaseUid') || undefined,
     createdAt: readTimestamp(data, 'createdAt'),
     updatedAt: readTimestamp(data, 'updatedAt'),
   };
@@ -235,12 +235,15 @@ export class FirestoreEmployeeRepository implements EmployeeRepository {
 
   async createEmployee(employee: EmployeeFormData): Promise<string> {
     await this.ensureUniqueEmployeeFields(employee);
-    const document = await addDoc(collection(db, EMPLOYEES_COLLECTION), {
-      ...createEmployeeRecord(employee),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return document.id;
+    
+    const record = createEmployeeRecord(employee);
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('../../../firebase/firebase');
+    
+    const createEmployeeFn = httpsCallable(functions, 'createEmployee');
+    const result = await createEmployeeFn({ employeeRecord: record });
+    
+    return (result.data as any).id;
   }
 
   async updateEmployee(employeeId: string, employee: EmployeeFormData): Promise<void> {

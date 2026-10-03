@@ -14,30 +14,16 @@ import type { Candidate, CreateCandidateInput, ImportHistoryItem, QuickUpdateInp
 export function useCrm() {
   const { user } = useAuth();
   
-  const effectiveUser = user ?? {
-    employeeId: 'HH0000',
-    name: 'Beta Super Admin',
-    role: 'Super Admin',
-    designation: 'Super Admin',
-    companyId: 'HH0000',
-    assignedRole: 'Super Admin',
-    department: 'Administration',
-    departmentId: 'admin',
-    teamId: undefined,
-  };
-
-  if (!user) {
-    console.warn('[CRM Hub] No authenticated user session found. Operating with Beta Super Admin session (Company ID: HH0000).');
-  }
+  // CRM must always use the authenticated Firebase identity; never synthesize an admin session.
+  const effectiveUser = user;
 
   const sessionUser = useMemo(() => ({
-    id: effectiveUser.employeeId,
-    name: effectiveUser.name,
-    role: effectiveUser.role,
-    assignedRole: effectiveUser.assignedRole || effectiveUser.role,
-    department: effectiveUser.department,
-    teamId: effectiveUser.teamId,
-    departmentId: effectiveUser.departmentId || effectiveUser.department
+    id: effectiveUser?.employeeId || '',
+    name: effectiveUser?.name || '',
+    role: effectiveUser?.role || '',
+    assignedRole: effectiveUser?.assignedRole || effectiveUser?.role || '',
+    department: effectiveUser?.department,
+    departmentId: effectiveUser?.departmentId || effectiveUser?.department
   }), [effectiveUser]);
   const [allCandidates, setCandidates] = useState<Candidate[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -60,14 +46,22 @@ export function useCrm() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
+    if (!effectiveUser?.employeeId) {
+      setCandidates([]); setClients([]); setOpenings([]); setEmployees([]); setImportHistory([]); setCallsToday(0);
+      setError('An authenticated employee session is required to load CRM.');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+      const scope = getAuthorizationScope(sessionUser.assignedRole || sessionUser.role);
+      const isPrivileged = scope === 'GLOBAL' || scope === 'DEPARTMENT' || scope === 'TEAM';
       const [c, cl, o, e, h, calls] = await Promise.all([
         crmRepository.getCandidates(sessionUser),
         clientRepository.getClients(),
         openingRepository.getOpenings(),
         employeeService.getEmployees(),
-        crmRepository.getImportHistory(),
+        isPrivileged ? crmRepository.getImportHistory() : Promise.resolve([]),
         crmRepository.getCallsTodayForUser(sessionUser)
       ]);
       setCandidates(c);
@@ -94,7 +88,7 @@ export function useCrm() {
     const scope = getAuthorizationScope(sessionUser.assignedRole || sessionUser.role);
     if (scope === 'OWN') return [];
     if (scope === 'TEAM') {
-      return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.teamId === sessionUser.teamId || e.employeeId === sessionUser.id);
+      return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.employeeId === sessionUser.id);
     }
     if (scope === 'DEPARTMENT') {
       return activeEmployees.filter(e => e.departmentId === sessionUser.departmentId || e.department === sessionUser.department);

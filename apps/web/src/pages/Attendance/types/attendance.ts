@@ -8,7 +8,10 @@ export interface AttendanceActor {
   employeeId: string;
   name: string;
   role: string;
+  assignedRole?: string;
   department: string;
+  departmentId?: string;
+  reportingManagerId?: string;
 }
 
 export interface DeviceDetails {
@@ -70,6 +73,7 @@ export interface AttendanceDashboardData {
   monthRecords: DailyAttendance[];
   requests: AttendanceRequest[];
   organizationRecords: DailyAttendance[];
+  approvedLeaves: import('../../Leave/types/leave').LeaveRequest[];
 }
 
 export interface AttendanceSummary {
