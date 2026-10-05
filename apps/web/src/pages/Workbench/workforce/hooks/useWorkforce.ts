@@ -80,13 +80,7 @@ export function useWorkforce() {
       };
 
       // 2. Keep Payout Imports fetching for KPIs/History and Working Status
-      let imports: any[] = [];
-      if (currentRole === 'Super Admin') {
-        imports = await workforceRepository.getPayoutImports().catch((err) => {
-          console.warn('[useWorkforce] Optional imports fetch failed:', err);
-          return [];
-        });
-      }
+      const imports = await workforceRepository.getPayoutImports();
 
       const now = new Date();
       const currentMonthString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -94,7 +88,7 @@ export function useWorkforce() {
 
       const currentMonthPayoutMap = new Map<string, any>();
       currentMonthApprovedImports.forEach((imp) => {
-        imp.rows.forEach((r: any) => {
+        imp.rows.forEach((r) => {
           if (r.matched && r.employeeId) {
             currentMonthPayoutMap.set(r.employeeId.trim().toLowerCase(), r);
           }

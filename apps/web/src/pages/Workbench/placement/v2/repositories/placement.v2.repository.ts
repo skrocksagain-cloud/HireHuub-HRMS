@@ -5,6 +5,5 @@ export interface PlacementRepositoryV2 {
   queryPlacements(filters: any): Promise<PlacementV2[]>;
   createPlacement(placement: PlacementV2, transaction?: any): Promise<void>;
   updatePlacement(placementId: string, updates: Partial<PlacementV2>, transaction?: any): Promise<void>;
-  queryPayouts?(clientId?: string, month?: string, role?: string): Promise<any[]>;
+  queryPayouts?(clientId?: string, month?: string): Promise<any[]>;
 }
-

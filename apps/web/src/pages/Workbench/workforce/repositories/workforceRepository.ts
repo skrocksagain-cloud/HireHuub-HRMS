@@ -103,22 +103,27 @@ export class WorkforceRepository {
     return doc(workforceCollection, id);
   }
 
-  private async getScopedWorkforceRecords(): Promise<Array<Record<string, unknown> & { id: string }>> {
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../../firebase/firebase');
-    const result = await httpsCallable<unknown, { items: Array<Record<string, unknown> & { id: string }> }>(functions, 'getScopedWorkforce')({});
-    return result.data.items;
+  async getNextOtsId(): Promise<string> {
+    // Generate a proper sequential OTS ID
+    const snap = await getDocs(workforceCollection);
+    const otsItems = snap.docs
+      .map(d => d.id)
+      .filter(id => id.startsWith('HHWF'))
+      .map(id => parseInt(id.replace('HHWF', ''), 10))
+      .filter(n => !isNaN(n));
+      
+    const maxSeq = otsItems.length > 0 ? Math.max(...otsItems) : 0;
+    return WorkforceNumberService.generateOtsWorkforceId(maxSeq + 1);
   }
 
   async getWorkforceItems(
     activeMonth: string = new Date().toISOString().slice(0, 7),
     userRole: string = 'Super Admin',
-    userSession: { id: string; name: string; departmentId?: string } = { id: 'user-admin', name: 'Super Admin' }
+    userSession: { id: string; name: string; teamId?: string; departmentId?: string } = { id: 'user-admin', name: 'Super Admin' }
   ): Promise<WorkforceItem[]> {
     const [wfSnapshot, payoutImports, crmCandidates, apPartners, clients, placementsSnap] = await Promise.all([
-      this.getScopedWorkforceRecords(),
-      // Payout imports are Super Admin only by rule; other roles see workforce without payout aggregation.
-      this.getPayoutImports().catch(() => [] as ClientPayoutImportRecord[]),
+      getDocs(workforceCollection),
+      this.getPayoutImports(),
       crmRepository.getCandidates(),
       associatePartnerRepository.getPartners(),
       clientRepository.getClients(),
@@ -141,7 +146,7 @@ export class WorkforceRepository {
 
     // Map historical workforce data by candidate phone (since IDs might differ for AP)
     // We prioritize canonical candidateId if it exists.
-    const historicalDocs = wfSnapshot.map(d => workforceFromDoc(d.id, d));
+    const historicalDocs = wfSnapshot.docs.map(d => workforceFromDoc(d.id, d.data()));
     const historyById = new Map<string, WorkforceItem>();
     const historyByPhone = new Map<string, WorkforceItem>();
     
@@ -178,6 +183,7 @@ export class WorkforceRepository {
           workforceType: finalWorkforceType as any,
           recruiterId: cand.assignedRecruiterId || '',
           recruiterName: cand.assignedRecruiterName || '',
+          teamLeadId: cand.teamId,
           teamLeadName: cand.teamName,
           teamId: cand.teamId,
           teamName: cand.teamName,

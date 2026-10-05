@@ -5,7 +5,7 @@ import { attendanceService } from '../../Attendance/services/attendanceService';
 import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { leaveRepository } from '../repositories/leaveRepository';
 import { calculateProbationState, leaveAccrualService } from './leaveAccrualService';
-import { getLeaveDays, getLeaveSummary } from '../utils/leave';
+import { datesInRange, getLeaveDays, getLeaveSummary } from '../utils/leave';
 import { validateCarryForward, validateLeaveApplication, validateLeaveDecision } from '../validation/leaveValidation';
 import type {
   CarryForwardInput,
@@ -16,58 +16,37 @@ import type {
   LeaveSummary,
 } from '../types/leave';
 
-import { hasApprovalAuthority } from '../../../core/authorization/authorizationResolver';
-import { Timestamp } from 'firebase/firestore';
-import type { LeaveRequest, LeaveStatus } from '../types/leave';
-
-
-const normalizeRequest = (value: unknown): LeaveRequest | null => {
-  if (typeof value !== 'object' || value === null) return null;
-  const data = value as Record<string, unknown>;
-  const toTimestamp = (candidate: unknown): Timestamp => {
-    if (candidate instanceof Timestamp) return candidate;
-    if (candidate instanceof Date) return Timestamp.fromDate(candidate);
-    if (typeof candidate === 'string') {
-      const date = new Date(candidate);
-      if (!Number.isNaN(date.getTime())) return Timestamp.fromDate(date);
-    }
-    if (typeof candidate === 'object' && candidate !== null && 'seconds' in candidate) {
-      const seconds = Number((candidate as { seconds?: unknown }).seconds);
-      const nanoseconds = Number((candidate as { nanoseconds?: unknown }).nanoseconds ?? 0);
-      if (Number.isFinite(seconds) && Number.isFinite(nanoseconds)) return new Timestamp(seconds, nanoseconds);
-    }
-    return Timestamp.now();
-  };
-  return {
-    id: String(data.id ?? ''), employeeId: String(data.employeeId ?? ''), employeeName: String(data.employeeName ?? ''),
-    department: String(data.department ?? ''), requestType: data.requestType === 'Comp Off' ? 'Comp Off' : 'Leave',
-    leaveType: String(data.leaveType ?? ''), startDate: String(data.startDate ?? ''), endDate: String(data.endDate ?? ''),
-    days: Number(data.days ?? 0), reason: String(data.reason ?? ''), medicalCertificateReference: String(data.medicalCertificateReference ?? ''),
-    status: (data.status as LeaveStatus) || 'Pending', approverEmployeeId: typeof data.approverEmployeeId === 'string' ? data.approverEmployeeId : null,
-    decisionReason: String(data.decisionReason ?? ''), isArchived: Boolean(data.isArchived),
-    createdAt: toTimestamp(data.createdAt), updatedAt: toTimestamp(data.updatedAt),
-  };
-};
+import { getSimplifiedModuleScope, hasApprovalAuthority, ROLE_RANK, getCanonicalRole } from '../../../core/authorization/authorizationResolver';
 
 class LeaveService {
   async getDashboard(actor: LeaveActor & { assignedRole?: string }): Promise<LeaveDashboardData> {
+    // Check dynamic probation and trigger monthly accrual if post 90-days
     try {
       const emp = await employeeRepository.getEmployeeById(actor.employeeId).catch(() => null);
-      if (emp?.joiningDate) await leaveAccrualService.processMonthlyAccrualForEmployee(actor.employeeId, emp.joiningDate);
+      if (emp?.joiningDate) {
+        await leaveAccrualService.processMonthlyAccrualForEmployee(actor.employeeId, emp.joiningDate);
+      }
     } catch {
       // Non-blocking
     }
 
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const callable = httpsCallable(functions, 'getScopedLeaveRequests');
-    const result = await callable({});
-    const payload = result.data as { ownRequests?: unknown[]; organizationRequests?: unknown[] };
-    const balances = await leaveRepository.getBalances(actor.employeeId);
-    const requests = (payload.ownRequests || []).map(normalizeRequest).filter((request): request is LeaveRequest => request !== null && !request.isArchived);
-    const organizationRequests = (payload.organizationRequests || []).map(normalizeRequest).filter((request): request is LeaveRequest => request !== null && !request.isArchived);
-    const approvalRequests = organizationRequests.filter((request) => request.status === 'Pending');
-    return { balances, requests, approvalRequests, organizationRequests };
+    const scope = getSimplifiedModuleScope(actor.assignedRole);
+
+    const [balances, requests, organizationRequests] = await Promise.all([
+      leaveRepository.getBalances(actor.employeeId),
+      leaveRepository.getRequestsForEmployee(actor.employeeId),
+      scope === 'GLOBAL'
+        ? leaveRepository.getOrganizationRequests()
+        : scope === 'DEPARTMENT'
+        ? leaveRepository.getOrganizationRequestsForDepartment(actor.department)
+        : Promise.resolve([]),
+    ]);
+
+    const finalApprovalRequests = (scope === 'GLOBAL' || scope === 'DEPARTMENT')
+      ? organizationRequests.filter(req => req.status === 'Pending')
+      : [];
+
+    return { balances, requests, approvalRequests: finalApprovalRequests, organizationRequests };
   }
 
   async apply(actor: LeaveActor, input: LeaveApplicationInput): Promise<void> {
@@ -128,29 +107,85 @@ class LeaveService {
 
   async decide(actor: LeaveActor, input: LeaveDecisionInput): Promise<void> {
     validateLeaveDecision(input);
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const readCallable = httpsCallable(functions, 'getScopedLeaveRequests');
-    const readResult = await readCallable({});
-    const payload = readResult.data as { organizationRequests?: unknown[] };
-    const request = (payload.organizationRequests || []).map(normalizeRequest).find((item) => item?.id === input.requestId);
-    if (!request || request.status !== 'Pending') throw new Error('This leave request is no longer pending.');
+    const request = await leaveRepository.getRequest(input.requestId);
+    if (!request || request.status !== 'Pending') {
+      throw new Error('This leave request is no longer pending.');
+    }
 
-    const decideCallable = httpsCallable(functions, 'decideLeaveRequest');
-    await decideCallable({ ...input, reason: input.reason.trim() });
+    const emp = await employeeRepository.getEmployeeById(request.employeeId).catch(() => null);
+    if (!emp) throw new Error('Employee not found.');
+
+    if (actor.employeeId === emp.employeeId) {
+      throw new Error('You cannot approve your own request.');
+    }
+
+    const actorRank = ROLE_RANK[getCanonicalRole(actor.role)];
+    const targetRank = ROLE_RANK[getCanonicalRole(emp.assignedRole)];
+
+    if (actorRank < targetRank) {
+      throw new Error('Insufficient role rank to approve this request.');
+    }
+
+    const isManager = !!emp.reportingManagerId && actor.employeeId === emp.reportingManagerId;
+
+    if (emp.reportingManagerId) {
+      if (!isManager) {
+        throw new Error('Approval must be performed by the direct reporting manager.');
+      }
+    } else {
+      if (targetRank === ROLE_RANK['User'] || targetRank === ROLE_RANK['Admin']) {
+        if (actorRank < ROLE_RANK['Master Admin']) {
+          throw new Error('Escalation requires Master Admin or Super Admin.');
+        }
+      } else if (targetRank === ROLE_RANK['Master Admin']) {
+        if (actorRank < ROLE_RANK['Super Admin']) {
+          throw new Error('Escalation requires Super Admin.');
+        }
+      }
+    }
+
+    await leaveRepository.decideRequest(request.id, actor.employeeId, input.decision, input.reason.trim());
+
     if (input.decision === 'Approved') {
+      // Sync approved leave to Attendance Resolution Engine
       await attendanceService.syncApprovedLeave({
-        leaveRequestId: request.id,
+        employeeId: request.employeeId,
+        employeeName: request.employeeName,
+        department: request.department,
+        attendanceDates: datesInRange(request.startDate, request.endDate),
       });
+
+      // Deduct used balance for approved leave
+      const balances = await leaveRepository.getBalances(request.employeeId);
+      const targetBalance = balances.find(
+        (b) => b.leaveType.toLowerCase() === request.leaveType.toLowerCase()
+      );
+      if (targetBalance) {
+        const newUsed = targetBalance.used + request.days;
+        const newAvailable = Math.max(0, targetBalance.available - request.days);
+        await leaveRepository.updateBalance(targetBalance.id, {
+          used: newUsed,
+          available: newAvailable,
+        });
+      }
     }
 
     await auditService.record({
-      module: 'Leave', action: input.decision, recordId: request.id, performedBy: actor.employeeId,
-      role: actor.role, previousValue: { status: 'Pending' }, newValue: { status: input.decision }, remarks: input.reason.trim(),
+      module: 'Leave',
+      action: input.decision,
+      recordId: request.id,
+      performedBy: actor.employeeId,
+      role: actor.role,
+      previousValue: { status: 'Pending' },
+      newValue: { status: input.decision },
+      remarks: input.reason.trim(),
     });
     await notificationService.send({
-      recipientEmployeeId: request.employeeId, title: 'Leave request ' + input.decision.toLowerCase(),
-      message: input.reason.trim(), module: 'Leave', type: input.decision === 'Approved' ? 'success' : 'warning',
+      recipientEmployeeId: request.employeeId,
+      title: `Leave request ${input.decision.toLowerCase()}`,
+      message: input.reason.trim(),
+      module: 'Leave',
+      type: input.decision === 'Approved' ? 'success' : 'warning',
     });
   }
 

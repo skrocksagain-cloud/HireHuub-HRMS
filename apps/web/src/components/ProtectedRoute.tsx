@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ moduleKey, pageKey, path, children }: ProtectedRouteProps) {
-  const { user, isLoading, scopeError } = useAuth();
+  const { user, isLoading } = useAuth();
   const { activeRole, canAccessModule, canAccessPage, canAccessRoute, landingModule } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,29 +24,6 @@ export default function ProtectedRoute({ moduleKey, pageKey, path, children }: P
         <Loader2 className="animate-spin text-emerald-600 mb-4" size={32} />
         <span className="text-slate-500 font-medium tracking-tight">Authenticating ONE Identity...</span>
       </div>
-    );
-  }
-
-  if (scopeError) {
-    return (
-      <DashboardLayout>
-        <div className="flex flex-col items-center justify-center min-h-[70vh] p-8 text-center">
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-3xl text-rose-600 mb-6 shadow-sm">
-            <ShieldAlert size={48} />
-          </div>
-          <div className="space-y-3 max-w-md">
-            <span className="px-3 py-1 bg-rose-100 text-rose-700 text-xs font-mono font-bold rounded-full uppercase tracking-wider">
-              500 Scope Initialization Error
-            </span>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Access Scope Error
-            </h1>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              {scopeError}
-            </p>
-          </div>
-        </div>
-      </DashboardLayout>
     );
   }
 

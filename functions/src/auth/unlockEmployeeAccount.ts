@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 
-export const unlockEmployeeAccount = onCall({ cors: true, invoker: 'public' }, async (request) => {
+export const unlockEmployeeAccount = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to perform this action.');
   }

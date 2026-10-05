@@ -95,7 +95,7 @@ export class WorkforceServiceImplV2 {
     }
 
     // Optional: fetch monthly payouts to resolve Working Status and Earnings/Orders
-    const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month, _context.assignedRole || _context.role) : [];
+    const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month) : [];
 
     const uniqueCandidateIds = Array.from(placementsByCandidate.keys());
     const uniqueClientIds = Array.from(new Set(resolvedActivePlacements.map(p => p.clientId)));
@@ -307,4 +307,3 @@ export class WorkforceServiceImplV2 {
     return imported;
   }
 }
-

@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 
-export const requestPasswordReset = functions.https.onCall({ invoker: 'public' }, async (request) => {
+export const requestPasswordReset = functions.https.onCall(async (request) => {
   const { employeeId } = request.data;
   const genericResponse = {
     success: true,

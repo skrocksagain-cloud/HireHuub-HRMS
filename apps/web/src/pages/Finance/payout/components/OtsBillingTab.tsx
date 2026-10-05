@@ -21,6 +21,7 @@ export default function OtsBillingTab() {
           role: (user?.role as any) || 'Super Admin',
           assignedRole: (user as any)?.assignedRole || user?.role,
           departmentId: user?.departmentId,
+          teamId: user?.teamId,
           department: (user as any)?.department
         } as any,
         {}

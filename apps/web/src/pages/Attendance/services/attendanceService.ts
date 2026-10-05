@@ -1,90 +1,54 @@
 import { auditService } from '../../../core/audit/auditService';
 import { notificationService } from '../../../core/notifications/notificationService';
 
+import { calendarService } from '../../../services/calendar/calendarService';
 import { MINIMUM_HALF_DAY_WORK_MINUTES } from '../constants/attendance';
-import { Timestamp } from 'firebase/firestore';
 import { attendanceRepository } from '../repositories/attendanceRepository';
+import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { compOffService } from './compOffService';
-import { getAttendanceStatusForLogin, getLocalAttendanceDate } from '../utils/attendance';
+import { getAttendanceStatusForLogin, getLocalAttendanceDate, getMonthBounds } from '../utils/attendance';
 import { validateAttendanceDecision, validateAttendanceRequest } from '../validation/attendanceValidation';
 import type {
   AttendanceActor,
   AttendanceApprovalInput,
   AttendanceDashboardData,
-  AttendanceRequest,
   AttendanceRequestType,
-  DailyAttendance,
   DeviceDetails,
 } from '../types/attendance';
 
+import { getSimplifiedModuleScope, getCanonicalRole, ROLE_RANK } from '../../../core/authorization/authorizationResolver';
 
 export interface ApprovedLeaveAttendanceInput {
-  leaveRequestId: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  attendanceDates: string[];
 }
 
 class AttendanceService {
   async getDashboard(actor: AttendanceActor & { assignedRole?: string }, month: string): Promise<AttendanceDashboardData> {
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const callable = httpsCallable(functions, 'getScopedAttendanceDashboard');
-    const result = await callable({ month, today: getLocalAttendanceDate(), targetEmployeeId: actor.employeeId });
-    const payload = result.data as Record<string, unknown>;
-    const toTimestamp = (value: unknown): import('firebase/firestore').Timestamp | null => {
-      if (value instanceof Timestamp) return value;
-      if (value instanceof Date) return Timestamp.fromDate(value);
-      if (typeof value === 'string') {
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
-      }
-      if (typeof value === 'object' && value !== null && 'seconds' in value) {
-        const seconds = Number((value as { seconds?: unknown }).seconds);
-        const nanos = Number((value as { nanoseconds?: unknown }).nanoseconds ?? 0);
-        if (Number.isFinite(seconds) && Number.isFinite(nanos)) return new Timestamp(seconds, nanos);
-      }
-      return null;
-    };
-    const daily = (value: unknown): DailyAttendance | null => {
-      if (typeof value !== 'object' || value === null) return null;
-      const record = value as Record<string, unknown>;
-      const createdAt = toTimestamp(record.createdAt) || Timestamp.now();
-      const updatedAt = toTimestamp(record.updatedAt) || createdAt;
-      return {
-        id: String(record.id ?? ''), documentType: 'daily', employeeId: String(record.employeeId ?? ''),
-        employeeName: String(record.employeeName ?? ''), department: String(record.department ?? ''),
-        attendanceDate: String(record.attendanceDate ?? ''), status: record.status as DailyAttendance['status'],
-        loginTime: toTimestamp(record.loginTime), logoutTime: toTimestamp(record.logoutTime),
-        totalWorkMinutes: Number(record.totalWorkMinutes ?? 0), isLocked: Boolean(record.isLocked),
-        createdAt, updatedAt,
-      };
-    };
-    const request = (value: unknown): AttendanceRequest | null => {
-      if (typeof value !== 'object' || value === null) return null;
-      const record = value as Record<string, unknown>;
-      const createdAt = toTimestamp(record.createdAt) || Timestamp.now();
-      return {
-        id: String(record.id ?? ''), documentType: 'request', employeeId: String(record.employeeId ?? ''),
-        employeeName: String(record.employeeName ?? ''), department: String(record.department ?? ''),
-        requestType: record.requestType === 'WFH' ? 'WFH' : 'Regularization', attendanceDate: String(record.attendanceDate ?? ''),
-        reason: String(record.reason ?? ''), status: (record.status as AttendanceRequest['status']) || 'Pending',
-        approvalStage: record.approvalStage as AttendanceRequest['approvalStage'], managerApproved: Boolean(record.managerApproved),
-        managerApproverId: typeof record.managerApproverId === 'string' ? record.managerApproverId : null,
-        managerApprovedAt: toTimestamp(record.managerApprovedAt), adminApproved: Boolean(record.adminApproved),
-        adminApproverId: typeof record.adminApproverId === 'string' ? record.adminApproverId : null,
-        adminApprovedAt: toTimestamp(record.adminApprovedAt), approverEmployeeId: typeof record.approverEmployeeId === 'string' ? record.approverEmployeeId : null,
-        decisionReason: String(record.decisionReason ?? ''), createdAt, updatedAt: toTimestamp(record.updatedAt) || createdAt,
-      };
-    };
-    const list = (value: unknown, map: (item: unknown) => DailyAttendance | AttendanceRequest | null) =>
-      Array.isArray(value) ? value.map(map).filter((item): item is DailyAttendance | AttendanceRequest => item !== null) : [];
-    const approvedLeaves = Array.isArray(payload.approvedLeaves) ? payload.approvedLeaves as AttendanceDashboardData['approvedLeaves'] : [];
-    const today = daily(payload.today);
-    return {
-      today,
-      monthRecords: list(payload.monthRecords, daily).filter((item): item is DailyAttendance => item.documentType === 'daily'),
-      requests: list(payload.requests, request).filter((item): item is AttendanceRequest => item.documentType === 'request'),
-      organizationRecords: list(payload.organizationRecords, daily).filter((item): item is DailyAttendance => item.documentType === 'daily'),
-      approvedLeaves,
-    };
+    const bounds = getMonthBounds(month);
+    const scope = getSimplifiedModuleScope(actor.assignedRole);
+
+    const requestsPromise = scope === 'GLOBAL'
+      ? attendanceRepository.getPendingRequests()
+      : scope === 'DEPARTMENT'
+      ? attendanceRepository.getPendingRequestsForDepartment(actor.department)
+      : attendanceRepository.getRequestsForEmployee(actor.employeeId);
+
+    const organizationRecordsPromise = scope === 'GLOBAL'
+      ? attendanceRepository.getDailyForOrganization(bounds.start, bounds.end)
+      : scope === 'DEPARTMENT'
+      ? attendanceRepository.getDailyForDepartment(bounds.start, bounds.end, actor.department)
+      : Promise.resolve([]);
+
+    const [today, monthRecords, requests, organizationRecords] = await Promise.all([
+      attendanceRepository.getDaily(actor.employeeId, getLocalAttendanceDate()),
+      attendanceRepository.getDailyForEmployee(actor.employeeId, bounds.start, bounds.end),
+      requestsPromise,
+      organizationRecordsPromise,
+    ]);
+    return { today, monthRecords, requests, organizationRecords };
   }
 
   async login(actor: AttendanceActor, device: DeviceDetails): Promise<void> {
@@ -109,7 +73,7 @@ class AttendanceService {
     });
 
     // Evaluate Comp Off if worked on Holiday / Sunday
-    void this.evaluateCompOff(attendanceDate);
+    void this.evaluateCompOff(actor, attendanceDate);
 
     await auditService.record({
       module: 'Attendance',
@@ -149,7 +113,7 @@ class AttendanceService {
     await attendanceRepository.closeDaily(daily.id, status, workMinutes);
 
     // Evaluate Comp Off if worked on Holiday / Sunday
-    void this.evaluateCompOff(attendanceDate);
+    void this.evaluateCompOff(actor, attendanceDate);
 
     await auditService.record({
       module: 'Attendance',
@@ -170,9 +134,27 @@ class AttendanceService {
     });
   }
 
-  private async evaluateCompOff(attendanceDate: string): Promise<void> {
+  private async evaluateCompOff(actor: AttendanceActor, attendanceDate: string): Promise<void> {
     try {
-      await compOffService.grantCompOffIfWorked({ attendanceDate });
+      const [year, monthNum, dayNum] = attendanceDate.split('-').map(Number);
+      const dObj = new Date(year, monthNum - 1, dayNum);
+      const isSunday = dObj.getDay() === 0;
+
+      const holidays = await calendarService.getHolidays().catch(() => []);
+      const matchedHoliday = holidays.find((h) => h.date === attendanceDate);
+      const isHoliday = Boolean(matchedHoliday);
+
+      if (isSunday || isHoliday) {
+        await compOffService.grantCompOffIfWorked({
+          employeeId: actor.employeeId,
+          employeeName: actor.name,
+          department: actor.department,
+          attendanceDate,
+          isHoliday,
+          isSunday,
+          holidayName: matchedHoliday?.name,
+        });
+      }
     } catch {
       // Safe non-blocking
     }
@@ -210,29 +192,159 @@ class AttendanceService {
    * Only FULLY APPROVED requests update authoritative attendance in Firestore and feed payroll.
    */
   async decideRequest(actor: AttendanceActor, input: AttendanceApprovalInput): Promise<void> {
+    const requests = await attendanceRepository.getPendingRequests();
+    const request = requests.find(({ id }) => id === input.requestId);
+    if (!request) throw new Error('This attendance request is no longer pending.');
+
+    const emp = await employeeRepository.getEmployeeById(request.employeeId).catch(() => null);
+    if (!emp) throw new Error('Employee not found.');
+
+    if (actor.employeeId === emp.employeeId) {
+      throw new Error('You cannot approve your own request.');
+    }
+
+    const actorRank = ROLE_RANK[getCanonicalRole(actor.role)];
+    const targetRank = ROLE_RANK[getCanonicalRole(emp.assignedRole)];
+
+    if (actorRank < targetRank) {
+      throw new Error('Insufficient role rank to approve this request.');
+    }
+
     validateAttendanceDecision(input);
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const callable = httpsCallable(functions, 'decideAttendanceRequest');
-    const result = await callable({ ...input, reason: input.reason.trim() });
-    const decision = result.data as { employeeId: string; employeeName: string; requestType: AttendanceRequestType; status: string; approvalStage: string };
+
+    const isManager = !!emp.reportingManagerId && actor.employeeId === emp.reportingManagerId;
+    const currentStage = request.approvalStage || 'Pending';
+
+    if (input.decision === 'Rejected') {
+      if (!isManager && actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('You do not have permission to reject this request.');
+      }
+      await attendanceRepository.updateRequestStage(input.requestId, {
+        status: 'Rejected',
+        approvalStage: 'Rejected',
+        approverEmployeeId: actor.employeeId,
+        decisionReason: input.reason.trim(),
+      });
+
+      await auditService.record({
+        module: 'Attendance',
+        action: 'Rejected',
+        recordId: request.id,
+        performedBy: actor.employeeId,
+        role: actor.role,
+        previousValue: { status: request.status, stage: request.approvalStage },
+        newValue: { status: 'Rejected', stage: 'Rejected' },
+        remarks: input.reason.trim(),
+      });
+      return;
+    }
+
+    // Decision === 'Approved'
+    let finalStatus: 'Pending' | 'Approved' = 'Pending';
+    let newStage: 'Approved by Manager' | 'Fully Approved' = 'Approved by Manager';
+
+    if (currentStage === 'Pending') {
+      if (emp.reportingManagerId && !isManager) {
+        throw new Error('Stage 1 approval must be performed by the direct reporting manager.');
+      }
+      if (!emp.reportingManagerId && actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('No reporting manager assigned. Master Admin or Super Admin approval required.');
+      }
+      finalStatus = 'Pending';
+      newStage = 'Approved by Manager';
+      await attendanceRepository.updateRequestStage(input.requestId, {
+        status: 'Pending',
+        approvalStage: 'Approved by Manager',
+        managerApproved: true,
+        managerApproverId: actor.employeeId,
+        decisionReason: input.reason.trim(),
+      });
+    } else if (currentStage === 'Approved by Manager') {
+      if (actorRank < ROLE_RANK['Master Admin']) {
+        throw new Error('Stage 2 final approval requires Master Admin or Super Admin role.');
+      }
+      finalStatus = 'Approved';
+      newStage = 'Fully Approved';
+      await attendanceRepository.updateRequestStage(input.requestId, {
+        status: 'Approved',
+        approvalStage: 'Fully Approved',
+        adminApproved: true,
+        adminApproverId: actor.employeeId,
+        approverEmployeeId: actor.employeeId,
+        decisionReason: input.reason.trim(),
+      });
+    } else {
+      throw new Error('Request is already fully approved.');
+    }
+
+    // Apply Authoritative Attendance Correction ONLY IF FULLY APPROVED
+    if (finalStatus === 'Approved' && newStage === 'Fully Approved') {
+      const targetStatus = request.requestType === 'WFH' ? 'WFH' : 'Present';
+      const daily = await attendanceRepository.getDaily(request.employeeId, request.attendanceDate);
+
+      if (daily) {
+        await attendanceRepository.updateDaily(daily.id, { status: targetStatus });
+      } else {
+        await attendanceRepository.createStatusDaily({
+          documentType: 'daily',
+          employeeId: request.employeeId,
+          employeeName: request.employeeName,
+          department: request.department,
+          attendanceDate: request.attendanceDate,
+          status: targetStatus,
+          isLocked: false,
+        });
+      }
+
+      // Check Comp Off if regularized date is a Holiday or Sunday
+      void this.evaluateCompOff(
+        {
+          employeeId: request.employeeId,
+          name: request.employeeName,
+          role: 'Employee',
+          department: request.department,
+        },
+        request.attendanceDate
+      );
+    }
+
     await auditService.record({
-      module: 'Attendance', action: input.decision, recordId: input.requestId, performedBy: actor.employeeId,
-      role: actor.role, newValue: { status: decision.status, stage: decision.approvalStage }, remarks: input.reason.trim(),
+      module: 'Attendance',
+      action: input.decision,
+      recordId: request.id,
+      performedBy: actor.employeeId,
+      role: actor.role,
+      previousValue: { status: request.status, stage: request.approvalStage },
+      newValue: { status: finalStatus, stage: newStage },
+      remarks: input.reason.trim(),
     });
+
     await notificationService.send({
-      recipientEmployeeId: decision.employeeId,
-      title: decision.requestType + ' request ' + decision.approvalStage.toLowerCase(),
-      message: input.reason.trim(), module: 'Attendance', type: decision.status === 'Approved' ? 'success' : 'info',
+      recipientEmployeeId: request.employeeId,
+      title: `${request.requestType} request ${newStage.toLowerCase()}`,
+      message: input.reason.trim(),
+      module: 'Attendance',
+      type: finalStatus === 'Approved' ? 'success' : 'info',
     });
   }
 
   async syncApprovedLeave(input: ApprovedLeaveAttendanceInput): Promise<void> {
-    if (!input.leaveRequestId) return;
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const callable = httpsCallable(functions, 'syncApprovedLeaveAttendance');
-    await callable(input);
+    await Promise.all(
+      input.attendanceDates.map(async (attendanceDate) => {
+        const daily = await attendanceRepository.getDaily(input.employeeId, attendanceDate);
+        if (daily) await attendanceRepository.updateDaily(daily.id, { status: 'Leave' });
+        else
+          await attendanceRepository.createStatusDaily({
+            documentType: 'daily',
+            employeeId: input.employeeId,
+            employeeName: input.employeeName,
+            department: input.department,
+            attendanceDate,
+            status: 'Leave',
+            isLocked: false,
+          });
+      })
+    );
   }
 }
 

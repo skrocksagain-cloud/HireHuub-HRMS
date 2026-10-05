@@ -80,7 +80,7 @@ export class FirestoreAuthRepository implements AuthRepository {
       name,
       firstName,
       lastName,
-      role: typeof data.role === 'string' ? data.role : 'User',
+      role: typeof data.role === 'string' ? data.role : typeof data.designation === 'string' ? data.designation : 'Employee',
       assignedRole: typeof data.assignedRole === 'string' ? data.assignedRole : undefined,
       departmentId: typeof data.departmentId === 'string' ? data.departmentId : undefined,
       department: typeof data.department === 'string' ? data.department : undefined,

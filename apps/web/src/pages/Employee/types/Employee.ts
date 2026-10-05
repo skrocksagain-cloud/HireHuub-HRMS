@@ -92,8 +92,6 @@ export interface Employee {
   lastWorkingDate?: string;
   rehireDate?: string;
   assignedRole?: 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
-  /** A payroll employee is a provisioned Hire Huub employee, never external workforce data. */
-  firebaseUid?: string;
   exitRecord?: ExitRecord;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

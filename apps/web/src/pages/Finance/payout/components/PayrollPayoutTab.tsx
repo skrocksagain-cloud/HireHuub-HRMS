@@ -44,29 +44,8 @@ export default function PayrollPayoutTab() {
       const clientName = client?.name || '';
       const selectedClientName = client?.name?.trim().toLowerCase();
 
-      let allImports: any[] = [];
-      const { db } = await import('../../../../firebase/firebase');
-      const { collection, getDocs } = await import('firebase/firestore');
-      const { getAuth } = await import('firebase/auth');
-      const currentUser = getAuth().currentUser;
-
-      let currentRole = '';
-      if (currentUser) {
-        const { authRepository } = await import('../../../../services/auth/repositories/authRepository');
-        const emp = await authRepository.getEmployeeByFirebaseUid(currentUser.uid);
-        currentRole = emp?.role || '';
-      }
-
-      let candidatesSnap = { docs: [] as any[] };
-      const [placementsSnap] = await Promise.all([
-        getDocs(collection(db, 'placements'))
-      ]);
-
-      if (currentRole === 'Super Admin') {
-        const { workforceRepository } = await import('../../../Workbench/workforce/repositories/workforceRepository');
-        allImports = await workforceRepository.getPayoutImports().catch(() => []);
-        candidatesSnap = await getDocs(collection(db, 'crm_candidates')).catch(() => ({ docs: [] as any[] })) as any;
-      }
+      const { workforceRepository } = await import('../../../Workbench/workforce/repositories/workforceRepository');
+      const allImports = await workforceRepository.getPayoutImports();
 
       console.debug('[PayrollPayout] Total imports:', allImports.length);
       console.debug('[PayrollPayout] Selected client:', { selectedClient, selectedClientName });
@@ -79,6 +58,13 @@ export default function PayrollPayoutTab() {
 
       console.debug('[PayrollPayout] Matching approved imports:', applicableImports.length);
       console.debug('[PayrollPayout] Selected period:', { fromDate, toDate });
+
+      const { db } = await import('../../../../firebase/firebase');
+      const { collection, getDocs } = await import('firebase/firestore');
+      const [placementsSnap, candidatesSnap] = await Promise.all([
+        getDocs(collection(db, 'placements')),
+        getDocs(collection(db, 'crm_candidates'))
+      ]);
 
       const candidatesMap = new Map<string, any>();
       candidatesSnap.docs.forEach(d => {

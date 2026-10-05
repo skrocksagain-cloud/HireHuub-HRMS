@@ -207,7 +207,7 @@ export const useEmployees = (): UseEmployeesResult => {
         setSuccessMessage('Employee updated successfully.');
       } else {
         await employeeService.createEmployee(formData);
-        setSuccessMessage('Employee created successfully. The employee can log in using their Employee ID and the default first-time password (Password@123).');
+        setSuccessMessage('Employee created successfully.');
       }
 
       closePanel();

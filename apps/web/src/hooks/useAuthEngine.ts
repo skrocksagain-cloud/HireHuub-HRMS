@@ -174,7 +174,7 @@ export function useAuthEngine(): UseAuthEngineReturn {
     try {
       const empIdToUse = targetEmployeeId || fallbackEmpId;
       if (!empIdToUse) {
-         setError("Employee profile could not be loaded. Please contact HR/Admin.");
+         setError("Session expired. Please log in again.");
          setIsLoading(false);
          return null;
       }

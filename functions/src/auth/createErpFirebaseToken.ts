@@ -1,7 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { writeAccessScope } from './accessScope';
 import { getAuth } from 'firebase-admin/auth';
 
 if (!getApps().length) {
@@ -29,14 +28,9 @@ export interface CreateErpTokenResponsePayload {
  */
 export const createErpFirebaseToken = onCall<CreateErpTokenRequestPayload>(
   {
-    invoker: 'public',
     cors: true,
   },
   async (request): Promise<CreateErpTokenResponsePayload> => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in to create an ERP token.');
-    }
-
     const payload = request.data;
     const sessionId = payload?.sessionId;
 
@@ -103,12 +97,10 @@ export const createErpFirebaseToken = onCall<CreateErpTokenRequestPayload>(
     }
 
     const employeeData = employeeQuery.docs[0].data();
-    const activeAccountStatuses = ['Active', 'Pending Activation'];
-    const activeEmploymentStatuses = ['Active', 'Notice Period', 'Pending Activation'];
-    const accountStatus = employeeData.accountStatus || 'Active';
-    const employmentStatus = employeeData.employmentStatus || employeeData.status || 'Active';
+    const activeStatuses = ['Active', 'Pending Activation'];
+    const employeeStatus = employeeData.accountStatus || employeeData.status || 'Active';
 
-    if (!activeAccountStatuses.includes(accountStatus) || !activeEmploymentStatuses.includes(employmentStatus)) {
+    if (!activeStatuses.includes(employeeStatus) && employeeData.accountStatus === 'Locked') {
       throw new HttpsError(
         'permission-denied',
         'Employee account is locked or inactive.'
@@ -122,42 +114,23 @@ export const createErpFirebaseToken = onCall<CreateErpTokenRequestPayload>(
       );
     }
 
-    if (employeeData.firebaseUid !== request.auth.uid) {
-      throw new HttpsError('permission-denied', 'The session does not belong to the authenticated employee.');
-    }
-
     // 3. Set Firebase Custom Claims on the existing native Firebase UID
     try {
-      const assignedRole = typeof employeeData.assignedRole === 'string'
-        ? employeeData.assignedRole
-        : typeof employeeData.role === 'string'
-          ? employeeData.role
-          : '';
-      const normalizedRole = assignedRole.trim().toLowerCase();
-      const canonicalRole = normalizedRole === 'super admin' || normalizedRole === 'super_admin'
-        ? 'Super Admin'
-        : normalizedRole === 'master admin' || normalizedRole === 'master_admin'
-          ? 'Master Admin'
-          : normalizedRole === 'admin'
-            ? 'Admin'
-            : 'User';
-      const otherClaims = { ...(await adminAuth.getUser(employeeData.firebaseUid)).customClaims };
-      delete otherClaims.role;
-      delete otherClaims.employeeId;
-      delete otherClaims.departmentId;
-      delete otherClaims.teamId;
+      const explicitAssigned = employeeData.assignedRole ? String(employeeData.assignedRole).trim().toLowerCase() : '';
+
+      let canonicalRole = 'User';
+      if (explicitAssigned === 'super admin' || explicitAssigned === 'super_admin') {
+        canonicalRole = 'Super Admin';
+      } else if (explicitAssigned === 'master admin') {
+        canonicalRole = 'Master Admin';
+      } else if (explicitAssigned === 'admin') {
+        canonicalRole = 'Admin';
+      }
 
       await adminAuth.setCustomUserClaims(employeeData.firebaseUid, {
-        ...otherClaims,
         role: canonicalRole,
-        employeeId: employeeData.employeeId,
-      });
-      await writeAccessScope({
-        employeeId: String(employeeData.employeeId),
-        role: canonicalRole,
-        departmentId: typeof employeeData.departmentId === 'string' ? employeeData.departmentId : '',
-        department: typeof employeeData.department === 'string' ? employeeData.department : '',
-        reportingManagerId: typeof employeeData.reportingManagerId === 'string' ? employeeData.reportingManagerId : '',
+        departmentId: employeeData.departmentId || null,
+        employeeId: employeeData.employeeId
       });
       
       return {

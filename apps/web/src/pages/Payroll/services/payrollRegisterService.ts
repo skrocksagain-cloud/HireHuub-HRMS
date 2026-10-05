@@ -4,8 +4,6 @@ import { db } from '../../../firebase/firebase';
 import type { AttendanceOverride, EmployeePayrollRecord, PayrollRegisterRun } from '../types';
 import { employeeRepository } from '../../Employee/repositories/employeeRepository';
 import { attendanceRepository } from '../../Attendance/repositories/attendanceRepository';
-import { calendarService } from '../../../services/calendar/calendarService';
-import { calculateWorkingDays, recalculatePayrollRecord } from './internalPayrollCalculator';
 
 const PAYROLL_REGISTER_COLLECTION = 'payroll_register_runs';
 
@@ -39,17 +37,13 @@ export const payrollRegisterService = {
 
     // Fetch data
     const allEmployees = await employeeRepository.getEmployees();
-    // Internal Payroll is only for provisioned Hire Huub employees. Workforce,
-    // candidates, client staff and other external records do not have a Firebase UID.
     const activeEmployees = allEmployees.filter(e => 
       (e.employmentStatus === 'Active' || e.status === 'Active') &&
-      Boolean(e.firebaseUid)
+      e.department?.toLowerCase() !== 'management'
     );
 
     const currentAttendance = await attendanceRepository.getDailyForOrganization(startDate, endDate);
     const previousAttendance = await attendanceRepository.getDailyForOrganization(`${prevMonthStr}-01`, `${prevMonthStr}-${prevDaysInMonth.toString().padStart(2, '0')}`);
-    const holidays = await calendarService.getHolidays().catch(() => []);
-    const holidayDates = new Set(holidays.filter((holiday) => holiday.date >= startDate && holiday.date <= endDate).map((holiday) => holiday.date));
 
     // Fetch incentives
     let incentiveService: any = null;
@@ -67,23 +61,16 @@ export const payrollRegisterService = {
       
       // Calculate Attendance for current month
       let present = 0;
-      let late = 0;
-      let halfDay = 0;
       let leave = 0;
       let weekOff = 0;
       let holiday = 0;
       let absent = 0;
 
       const empDaily = currentAttendance.filter(a => a.employeeId === empId);
-      const recordedDates = new Set(empDaily.map((daily) => daily.attendanceDate));
       empDaily.forEach(d => {
         const s = d.status.toLowerCase();
-        if (s.includes('half day')) {
-          halfDay += 1;
-        } else if (s === 'late') {
-          late += 1;
-        } else if (s.includes('present') || s.includes('regularized') || s === 'wfh') {
-          present += 1;
+        if (s.includes('present') || s.includes('regularized') || s.includes('half day')) {
+          present += (s.includes('half day') ? 0.5 : 1);
         } else if (s.includes('leave')) {
           leave += 1;
         } else if (s.includes('week off')) {
@@ -95,29 +82,17 @@ export const payrollRegisterService = {
         }
       });
 
-      // Attendance calendar resolves non-recorded calendar days as Holiday, then Sunday Week Off.
-      // Mirror that canonical precedence for payroll so Sundays are never silently lost.
-      for (let day = 1; day <= daysInMonth; day += 1) {
-        const date = `${monthStr}-${String(day).padStart(2, '0')}`;
-        if (recordedDates.has(date)) continue;
-        if (holidayDates.has(date)) holiday += 1;
-        else if (new Date(year, month - 1, day).getDay() === 0) weekOff += 1;
-      }
-
       // Apply Overrides if any
       const manual = overrides[empId];
       if (manual) {
         present = manual.present;
-        late = manual.late;
-        halfDay = manual.halfDay;
         leave = manual.leave;
         weekOff = manual.weekOff;
         holiday = manual.holiday;
         absent = manual.absent;
       }
 
-      // Half Day is weighted at 0.5; WFH, Late, Present, Holiday, and Week Off count as full days.
-      const currentTotalWorkingDays = calculateWorkingDays({ present, late, halfDay, leave, weekOff, holiday, absent });
+      const currentTotalWorkingDays = present + leave + weekOff + holiday;
 
       // Carry forward logic
       let currentMonthPayableDays = currentTotalWorkingDays;
@@ -137,28 +112,18 @@ export const payrollRegisterService = {
         } else if (joiningMonthStr === prevMonthStr && joiningDay >= 21) {
           // Joined last month >= 21, bring those days here
           const empPrevDaily = previousAttendance.filter(a => a.employeeId === empId && a.attendanceDate >= emp.joiningDate);
-          const previousMonthAttendance = {
-            present: 0,
-            late: 0,
-            halfDay: 0,
-            leave: 0,
-            weekOff: 0,
-            holiday: 0,
-            absent: 0,
-          };
-          empPrevDaily.forEach((daily) => {
-            const status = daily.status.toLowerCase();
-            if (status.includes('half day')) previousMonthAttendance.halfDay += 1;
-            else if (status === 'late') previousMonthAttendance.late += 1;
-            else if (status.includes('present') || status.includes('regularized') || status === 'wfh') previousMonthAttendance.present += 1;
-            else if (status.includes('leave')) previousMonthAttendance.leave += 1;
-            else if (status.includes('week off')) previousMonthAttendance.weekOff += 1;
-            else if (status.includes('holiday')) previousMonthAttendance.holiday += 1;
-            else if (status.includes('absent')) previousMonthAttendance.absent += 1;
+          let prevWd = 0;
+          empPrevDaily.forEach(d => {
+            const s = d.status.toLowerCase();
+            if (s.includes('present') || s.includes('regularized') || s.includes('leave') || s.includes('week off') || s.includes('holiday')) {
+              prevWd += 1;
+            }
           });
-          carryForwardPayableDays = calculateWorkingDays(previousMonthAttendance);
+          carryForwardPayableDays = prevWd;
         }
       }
+
+      const totalPayableDays = currentMonthPayableDays + carryForwardPayableDays;
 
       // Salary Profile
       const configuredGross = Number(emp.grossSalary || emp.monthlyGross || emp.salary || 0);
@@ -169,6 +134,16 @@ export const payrollRegisterService = {
       const pfApplicable = Boolean(emp.pfApplicable);
       const esicApplicable = Boolean(emp.esicApplicable);
       const ptApplicable = Boolean(emp.ptApplicable);
+
+      // Prorate Earnings
+      // If there is carry forward, it should be based on previous month's divisor, but for simplicity we'll just sum the days 
+      // or prorate current days by current month divisor, and previous days by prev month divisor.
+      const currentRatio = currentMonthPayableDays / daysInMonth;
+      const prevRatio = carryForwardPayableDays / prevDaysInMonth;
+
+      const earnedBasic = Math.round((basicConfig * currentRatio) + (basicConfig * prevRatio));
+      const earnedHra = Math.round((hraConfig * currentRatio) + (hraConfig * prevRatio));
+      const earnedSpecialAllowance = Math.round((specialAllowanceConfig * currentRatio) + (specialAllowanceConfig * prevRatio));
 
       // Incentive Arrears (Previous Month)
       let previousMonthIncentive = 0;
@@ -183,7 +158,24 @@ export const payrollRegisterService = {
         }
       }
 
-      const baseRecord: EmployeePayrollRecord = {
+      const grossSalary = earnedBasic + earnedHra + earnedSpecialAllowance + previousMonthIncentive;
+
+      // Statutory Deductions
+      const calculatedPf = pfApplicable ? Math.min(1800, Math.round(earnedBasic * 0.12)) : 0;
+      const calculatedEsic = (esicApplicable && grossSalary <= 21000) ? Math.round(grossSalary * 0.0075) : 0;
+      let calculatedPt = 0;
+      if (ptApplicable) {
+        if (grossSalary > 25000) {
+          calculatedPt = month === 2 ? 208 : 200;
+        } else if (grossSalary > 15000) {
+          calculatedPt = 150;
+        }
+      }
+
+      const totalDeductions = calculatedPf + calculatedEsic + calculatedPt;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+      records.push({
         employeeId: empId,
         employeeCode: emp.employeeCode || empId,
         employeeName: emp.fullName || `${emp.firstName} ${emp.lastName}`,
@@ -198,8 +190,6 @@ export const payrollRegisterService = {
 
         attendance: {
           present,
-          late,
-          halfDay,
           leave,
           weekOff,
           holiday,
@@ -208,24 +198,21 @@ export const payrollRegisterService = {
         },
         currentMonthPayableDays,
         carryForwardPayableDays,
-        totalPayableDays: 0,
+        totalPayableDays,
         daysInMonth,
-        carryForwardDaysInMonth: prevDaysInMonth,
 
-        earnedBasic: 0,
-        earnedHra: 0,
-        earnedSpecialAllowance: 0,
+        earnedBasic,
+        earnedHra,
+        earnedSpecialAllowance,
         previousMonthIncentive,
-        grossSalary: 0,
+        grossSalary,
 
-        calculatedPf: 0,
-        calculatedEsic: 0,
-        calculatedPt: 0,
-        totalDeductions: 0,
-        netSalary: 0
-      };
-      // One pure calculator is used for initial aggregation and manual recalculation.
-      records.push(recalculatePayrollRecord(baseRecord, baseRecord.attendance, month, monthStr));
+        calculatedPf,
+        calculatedEsic,
+        calculatedPt,
+        totalDeductions,
+        netSalary
+      });
     }
 
     const runId = `register-${monthStr}`;
@@ -403,10 +390,25 @@ export const payrollRegisterService = {
     }
 
     const { employeeRepository } = await import('../../Employee/repositories/employeeRepository');
+    const { workforceRepository } = await import('../../Workbench/workforce/repositories/workforceRepository');
+    
 
     const allEmployees = await employeeRepository.getEmployees();
     const empMap = new Map(allEmployees.map(e => [e.employeeId || e.id, e]));
     
+    // Resolve existing Employee Brand from workforce placements
+    const workforceItems = await workforceRepository.getWorkforceItems();
+    const placementBrandMap = new Map<string, string>();
+    workforceItems.forEach((item: any) => {
+      const pEmpId = item.placement?.payrollEmployeeId || item.payrollEmployeeId || item.id;
+      const clientName = item.client?.name || item.clientName;
+      if (pEmpId && clientName) {
+        placementBrandMap.set(pEmpId, clientName);
+      }
+    });
+
+    
+
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const [yearStr, monthNumStr] = runRecord.month.split('-');
     const payrollMonthStr = monthNames[parseInt(monthNumStr, 10) - 1];
@@ -437,25 +439,26 @@ export const payrollRegisterService = {
     
     for (const record of runRecord.records) {
       if (record.netSalary > 0) {
-        const emp = empMap.get(record.employeeId);
-        if (!emp) {
-          throw new Error(`Validation Error: Employee ${record.employeeCode} has no Employee Profile.`);
-        }
+        const emp = empMap.get(record.employeeId) || {} as any;
         const acct = emp.accountNumber?.trim();
         const ifsc = emp.ifscCode?.trim();
         
-        if (!acct) {
-           throw new Error(`Validation Error: Employee ${record.employeeCode} is missing Bank Account Number in the Employee Profile.`);
-        }
-        if (!ifsc) {
-           throw new Error(`Validation Error: Employee ${record.employeeCode} is missing IFSC Code in the Employee Profile.`);
+        if (!acct || !ifsc) {
+           throw new Error(`Validation Error: Employee ${record.employeeName} (${record.employeeCode}) is missing Bank Account or IFSC details. Please correct their profile and try again.`);
         }
 
         const firstName = (emp.firstName || record.employeeName.split(' ')[0]).replace(/\s+/g, '');
         const actualEmpId = record.employeeId || '';
-        // Internal Payroll is paid by Hire Huub, not by a client. The existing
-        // bank-file reference remains deterministic without a placement lookup.
-        const customerRef = `${firstName}HireHuub${payrollMonthStr}${payrollYearStr}${actualEmpId}`;
+        
+        const rawBrand = placementBrandMap.get(actualEmpId) || placementBrandMap.get(record.employeeCode);
+        
+        if (!rawBrand) {
+           throw new Error(`Validation Error: Employee ${record.employeeName} (${record.employeeCode}) has no assigned Brand or Client placement. Please assign a valid Brand/Client to this employee before generating the Bank Excel.`);
+        }
+        
+        const finalBrand = rawBrand.replace(/\s+/g, '');
+        
+        const customerRef = `${firstName}${finalBrand}${payrollMonthStr}${payrollYearStr}${actualEmpId}`;
 
         worksheet.addRow({
           debit: debitAccountNumber,

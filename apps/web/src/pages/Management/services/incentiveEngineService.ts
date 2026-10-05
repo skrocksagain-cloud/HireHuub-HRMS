@@ -5,6 +5,8 @@ import {
   type IncentiveSnapshot,
 } from '../repositories/incentiveRepository';
 import { performanceService } from '../../People/services/performanceService';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../../firebase/firebase';
 import type { WorkforceItem } from '../../Workbench/workforce/types/workforce';
 
 export interface QualifyingCandidateResult {
@@ -191,11 +193,9 @@ export class IncentiveEngineService {
     // 4. Fetch Candidate Placements for Employee
     let workforceCandidates: WorkforceItem[] = [];
     try {
-      const { httpsCallable } = await import('firebase/functions');
-      const { functions } = await import('../../../firebase/firebase');
-      const scoped = await httpsCallable<unknown, { items: Array<Record<string, unknown> & { id: string }> }>(functions, 'getScopedWorkforce')({});
-      workforceCandidates = scoped.data.items
-        .map((item) => item as unknown as WorkforceItem)
+      const snap = await getDocs(collection(db, 'workforce'));
+      workforceCandidates = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as WorkforceItem))
         .filter((c) => {
           let monthMatches = false;
           if (c.activeDate) {

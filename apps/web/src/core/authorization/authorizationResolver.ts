@@ -1,4 +1,4 @@
-export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
+﻿export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
 
 export type AuthorizationScope = 'OWN' | 'TEAM' | 'DEPARTMENT' | 'GLOBAL' | 'SELF' | 'DIRECT_REPORTS';
 export type SimplifiedModuleScope = 'SELF' | 'DEPARTMENT' | 'GLOBAL' | 'OWN' | 'TEAM';
@@ -40,26 +40,27 @@ export function getCanonicalRole(role?: string): CanonicalRole {
 }
 
 export function resolveAuthorizationIdentity(
-  employeeData: unknown,
+  employeeData: any,
   firebaseUid: string
 ): CanonicalAuthorizationIdentity {
-  const profile = typeof employeeData === 'object' && employeeData !== null
-    ? employeeData as Record<string, unknown>
-    : {};
-  const employeeId = typeof profile.employeeId === 'string' ? profile.employeeId : '';
-  const assignedRole = typeof profile.assignedRole === 'string'
-    ? profile.assignedRole
-    : typeof profile.role === 'string'
-      ? profile.role
-      : undefined;
-
+  const employeeId = employeeData?.employeeId;
+  if (!employeeId) {
+    return {
+      employeeId: '',
+      firebaseUid,
+      departmentId: null,
+      department: null,
+      role: 'User',
+      reportingManagerId: null,
+    };
+  }
   return {
     employeeId,
     firebaseUid,
-    departmentId: typeof profile.departmentId === 'string' ? profile.departmentId : null,
-    department: typeof profile.department === 'string' ? profile.department : null,
-    role: getCanonicalRole(assignedRole),
-    reportingManagerId: typeof profile.reportingManagerId === 'string' ? profile.reportingManagerId : null,
+    departmentId: employeeData?.departmentId || null,
+    department: employeeData?.department || null,
+    role: getCanonicalRole(employeeData?.assignedRole),
+    reportingManagerId: employeeData?.reportingManagerId || null,
   };
 }
 
@@ -181,13 +182,21 @@ export function canReassignBetweenEmployees(actor: AuthorizationContext, source:
 
   if (scope === 'GLOBAL') return true;
 
-  const canAccess = (candidate: AuthorizationContext): boolean => {
-    if (scope === 'DEPARTMENT') return isSameDepartment(actor, candidate) || actor.employeeId === candidate.employeeId;
-    if (scope === 'TEAM') return actor.employeeId === candidate.employeeId || isDirectReport(actor, candidate);
-    return actor.employeeId === candidate.employeeId;
-  };
+  let canAccessSource = false;
+  let canAccessTarget = false;
 
-  return canAccess(source) && canAccess(target);
+  if (scope === 'DEPARTMENT') {
+    canAccessSource = isSameDepartment(actor, source) || actor.employeeId === source.employeeId;
+    canAccessTarget = isSameDepartment(actor, target) || actor.employeeId === target.employeeId;
+  } else if (scope === 'TEAM') {
+    canAccessSource = actor.employeeId === source.employeeId || isDirectReport(actor, source);
+    canAccessTarget = actor.employeeId === target.employeeId || isDirectReport(actor, target);
+  } else {
+    canAccessSource = actor.employeeId === source.employeeId;
+    canAccessTarget = actor.employeeId === target.employeeId;
+  }
+
+  return canAccessSource && canAccessTarget;
 }
 
 export function canAccessErpArea(

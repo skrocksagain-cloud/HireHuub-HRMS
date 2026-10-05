@@ -70,26 +70,16 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   async getDailyForOrganization(from: string, to: string): Promise<DailyAttendance[]> {
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const month = from.substring(0, 7);
-    const callable = httpsCallable(functions, 'getScopedAttendanceDashboard');
-    const result = await callable({ month, today: from, targetEmployeeId: '' }).catch(() => ({ data: {} }));
-    const data = result.data as any;
-    const orgRecords = (data?.organizationRecords || []) as DailyAttendance[];
-    return orgRecords.filter((item) => item.attendanceDate >= from && item.attendanceDate <= to).sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily')));
+    const list = result.docs.map(dailyFrom).filter((item) => item.attendanceDate >= from && item.attendanceDate <= to);
+    return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
   }
 
   async getDailyForDepartment(from: string, to: string, department: string): Promise<DailyAttendance[]> {
     if (!department?.trim()) return [];
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const month = from.substring(0, 7);
-    const callable = httpsCallable(functions, 'getScopedAttendanceDashboard');
-    const result = await callable({ month, today: from, targetEmployeeId: '' }).catch(() => ({ data: {} }));
-    const data = result.data as any;
-    const orgRecords = (data?.organizationRecords || []) as DailyAttendance[];
-    return orgRecords.filter((item) => item.department === department && item.attendanceDate >= from && item.attendanceDate <= to).sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'daily'), where('department', '==', department)));
+    const list = result.docs.map(dailyFrom).filter((item) => item.attendanceDate >= from && item.attendanceDate <= to);
+    return list.sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
   }
 
   async getRequestsForEmployee(employeeId: string): Promise<AttendanceRequest[]> {
@@ -99,29 +89,16 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   async getPendingRequests(): Promise<AttendanceRequest[]> {
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const todayStr = `${currentMonth}-${String(now.getDate()).padStart(2, '0')}`;
-    const callable = httpsCallable(functions, 'getScopedAttendanceDashboard');
-    const result = await callable({ month: currentMonth, today: todayStr, targetEmployeeId: '' }).catch(() => ({ data: {} }));
-    const data = result.data as any;
-    return (data?.requests || []) as AttendanceRequest[];
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request')));
+    const list = result.docs.map(requestFrom).filter((item) => item.status === 'Pending' || item.approvalStage !== 'Fully Approved');
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }
 
   async getPendingRequestsForDepartment(department: string): Promise<AttendanceRequest[]> {
     if (!department?.trim()) return [];
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('../../../firebase/firebase');
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const todayStr = `${currentMonth}-${String(now.getDate()).padStart(2, '0')}`;
-    const callable = httpsCallable(functions, 'getScopedAttendanceDashboard');
-    const result = await callable({ month: currentMonth, today: todayStr, targetEmployeeId: '' }).catch(() => ({ data: {} }));
-    const data = result.data as any;
-    const reqs = (data?.requests || []) as AttendanceRequest[];
-    return reqs.filter(r => r.department === department);
+    const result = await getDocs(query(collection(db, ATTENDANCE_COLLECTION), where('documentType', '==', 'request'), where('department', '==', department)));
+    const list = result.docs.map(requestFrom).filter((item) => item.status === 'Pending' || item.approvalStage !== 'Fully Approved');
+    return list.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }
 
   async createDaily(record: Omit<DailyAttendance, 'id' | 'createdAt' | 'updatedAt'> & DeviceDetails): Promise<DailyAttendance> {

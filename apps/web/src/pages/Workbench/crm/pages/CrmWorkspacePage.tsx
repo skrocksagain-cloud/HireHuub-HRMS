@@ -215,6 +215,7 @@ export default function CrmWorkspacePage({ embedLayout = true }: { embedLayout?:
           id: sessionUser.id,
           name: sessionUser.name,
           role: sessionUser.role,
+          teamId: sessionUser.teamId,
         }}
         onOpenDuplicateProfile={(dupId) => {
           const found = allCandidates.find((c) => c.id === dupId);

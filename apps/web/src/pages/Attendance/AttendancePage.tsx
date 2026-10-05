@@ -15,14 +15,12 @@ import { Smartphone, User } from 'lucide-react';
 export default function AttendancePage() {
   const { user } = useAuth();
 
-  const actor: AttendanceActor = {
+  const actor: AttendanceActor & { assignedRole?: string } = {
     employeeId: user?.employeeId || user?.id || '',
     name: user?.name || '',
-    role: user?.authorization?.role || user?.assignedRole || user?.role || '',
+    role: user?.role || '',
     department: user?.department || '',
-    assignedRole: user?.authorization?.role || user?.assignedRole || user?.role,
-    departmentId: user?.departmentId,
-    reportingManagerId: user?.reportingManagerId,
+    assignedRole: (user as any)?.authorization?.role || user?.assignedRole,
   };
 
   const { canApprove: checkCanApprove } = usePermissions();
@@ -30,7 +28,7 @@ export default function AttendancePage() {
   const canApprove = checkCanApprove('attendance');
   
   const activeScope = getSimplifiedModuleScope(actor.assignedRole);
-  const isOrganizationAdmin = activeScope === 'GLOBAL' || activeScope === 'DEPARTMENT' || activeScope === 'TEAM';
+  const isOrganizationAdmin = activeScope === 'GLOBAL' || activeScope === 'DEPARTMENT';
 
   const todayRecord = attendance.data.today;
   const currentStatus = !todayRecord?.loginTime

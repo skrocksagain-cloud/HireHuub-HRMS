@@ -31,7 +31,6 @@ interface AuthContextType {
   setTheme: (theme: 'light' | 'dark') => void;
   logout: () => Promise<void>;
   isLoading: boolean;
-  scopeError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionIdState] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
-  const [scopeError, setScopeErrorState] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,17 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               };
 
               setUserState(emp);
-
-              if (emp.role === 'Admin' || emp.role === 'Master Admin') {
-                try {
-                  const { httpsCallable } = await import('firebase/functions');
-                  const { functions } = await import('../firebase/firebase');
-                  await httpsCallable(functions, 'refreshAccessScope')({});
-                } catch (error) {
-                  console.error('[AuthContext] Scope initialization failed:', error);
-                  setScopeErrorState('Access scope initialization failed. Module access may be restricted.');
-                }
-              }
             } else {
               setUserState(null);
             }
@@ -164,7 +151,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTheme,
         logout,
         isLoading,
-        scopeError,
       }}
     >
       {children}
