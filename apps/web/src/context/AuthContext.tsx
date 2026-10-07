@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { authRepository } from '../services/auth/repositories/authRepository';
 import type { CanonicalAuthorizationIdentity } from '../core/authorization/authorizationResolver';
+import { getIdTokenResult } from 'firebase/auth';
 
 export interface Employee {
   employeeId: string;
@@ -31,6 +32,7 @@ interface AuthContextType {
   setTheme: (theme: 'light' | 'dark') => void;
   logout: () => Promise<void>;
   isLoading: boolean;
+  authError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionIdState] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,18 +57,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (firebaseUser) {
           try {
             setIsLoading(true);
+            setAuthError(null);
 
-            const employeeData =
-              await authRepository.getEmployeeByFirebaseUid(firebaseUser.uid);
+            const tokenResult = await getIdTokenResult(firebaseUser);
+            const claims = tokenResult.claims;
+
+            if (!claims.employeeId || !claims.role) {
+              console.error('Authorization not provisioned. Please contact your administrator.');
+              setAuthError('Authorization not provisioned. Please contact your administrator.');
+              setUserState(null);
+              setIsLoading(false);
+              return;
+            }
+
+            const employeeData = await authRepository.getEmployeeByFirebaseUid(firebaseUser.uid);
 
             if (employeeData) {
-              const { resolveAuthorizationIdentity } =
-                await import('../core/authorization/authorizationResolver');
-
-              const authIdentity = resolveAuthorizationIdentity(
-                employeeData,
-                firebaseUser.uid
-              );
+              const authIdentity: CanonicalAuthorizationIdentity = {
+                employeeId: String(claims.employeeId),
+                firebaseUid: firebaseUser.uid,
+                role: String(claims.role) as any,
+              };
 
               const emp: Employee = {
                 id: employeeData.id,
@@ -90,14 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
               setUserState(emp);
             } else {
+              setAuthError('Employee record not found.');
               setUserState(null);
             }
           } catch (error) {
             console.error('[AuthContext] Authentication initialization failed:', error);
+            setAuthError('Authentication initialization failed.');
             setUserState(null);
           }
         } else {
           setUserState(null);
+          setAuthError(null);
         }
 
         if (isMounted) {
@@ -130,12 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { signOut } = await import('firebase/auth');
       const { auth } = await import('../firebase/firebase');
-
       await signOut(auth);
     } catch {
       // Ignore sign-out errors
     }
-
     setUserState(null);
     setSessionIdState(null);
   };
@@ -151,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTheme,
         logout,
         isLoading,
+        authError,
       }}
     >
       {children}
@@ -160,10 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
-  }
-
+  if (!context) throw new Error('useAuth must be used inside AuthProvider');
   return context;
 }

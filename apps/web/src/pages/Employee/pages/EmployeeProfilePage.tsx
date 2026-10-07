@@ -32,6 +32,7 @@ import { performanceService, type PerformanceSummary } from '../../People/servic
 import { documentService } from '../../../services/document/documentService';
 import type { Document } from '../../../types/Document';
 import { useAuth } from '../../../context/AuthContext';
+import { canViewEmployee } from '../../../core/authorization/authorizationResolver';
 
 import ExitTab from '../components/ExitTab';
 import { payslipService, type PayslipDisplayItem } from '../../../services/payroll/payslipService';
@@ -95,6 +96,14 @@ export default function EmployeeProfilePage() {
 
         if (!emp) {
           setError('Employee record not found.');
+          setLoading(false);
+          return;
+        }
+
+        const actorContext = { employeeId: user?.employeeId || user?.id, assignedRole: user?.role || user?.assignedRole };
+        const targetContext = { employeeId: emp.employeeId || emp.employeeCode || emp.id };
+        if (!canViewEmployee(actorContext, targetContext)) {
+          setError('Missing or insufficient permissions.');
           setLoading(false);
           return;
         }

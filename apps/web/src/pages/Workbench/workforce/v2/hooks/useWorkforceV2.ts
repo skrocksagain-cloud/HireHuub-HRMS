@@ -18,6 +18,16 @@ const repoCrm: any = {
     } catch (e) {
       return null;
     }
+  },
+  queryActiveCandidates: async (filters: any) => {
+    try {
+      const { crmRepository } = await import('../../../crm/repositories/crmRepository');
+      const candidates = await crmRepository.getCandidates(filters.userSession);
+      return candidates.filter((c: any) => c.currentCrmStatus === 'Active');
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
   }
 };
 const repoPlacements: any = {
@@ -30,34 +40,10 @@ const repoPlacements: any = {
 
     if (scope === 'GLOBAL') {
       authorizedIds = null;
-    } else if (scope === 'DEPARTMENT') {
-      const targetDeptId = userSession?.departmentId;
-      const targetDept = (userSession as any)?.department;
-      if (!targetDeptId && !targetDept) return [];
-
-      let empSnap;
-      if (targetDeptId) {
-        empSnap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', targetDeptId)));
-      } else {
-        empSnap = await getDocs(query(collection(db, 'employees'), where('department', '==', targetDept)));
-      }
-
-      authorizedIds = [];
-      empSnap.forEach(d => {
-        const data = d.data();
-        if (data.employeeId) authorizedIds!.push(data.employeeId);
-      });
-      if (authorizedIds.length === 0) return [];
-      filterField = 'recruiterId';
-    } else if (scope === 'TEAM' || scope === 'DIRECT_REPORTS') {
-      authorizedIds = [userSession.id];
-      const empQ = query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id));
-      const empSnap = await getDocs(empQ);
-      empSnap.forEach(d => { if (d.data().employeeId) authorizedIds!.push(d.data().employeeId); });
     } else if (scope === 'OWN' || scope === 'SELF') {
-      authorizedIds = [userSession.id];
+      authorizedIds = [(userSession.employeeId || userSession.id || '')];
     } else {
-      authorizedIds = [userSession.id];
+      authorizedIds = [(userSession.employeeId || userSession.id || '')];
     }
 
     const baseConstraints: any[] = [];
@@ -143,7 +129,6 @@ const repoPlacements: any = {
 const integrationAp: any = {
   getAssociatePartnerForCandidate: async (candidateId: string, candidateData?: any) => {
     try {
-      // Very basic AP discovery: Check if candidate was sourced by an AP
       let cData = candidateData;
       if (!cData) {
         const snap = await getDoc(doc(db, 'crm_candidates', candidateId));
@@ -152,7 +137,6 @@ const integrationAp: any = {
       }
 
       if (!cData.source || cData.source !== 'Associate Partner' || !cData.associatePartnerId) {
-        // If not AP sourced, we consider them "Joined" by default to bypass the AP gate
         return {
           id: 'INTERNAL',
           name: 'Internal Team',
@@ -160,7 +144,6 @@ const integrationAp: any = {
         };
       }
 
-      // If AP sourced, check the actual AP submission status
       const apDoc = await getDoc(doc(db, 'associate_partners', cData.associatePartnerId));
       if (apDoc.exists()) {
         const apData = apDoc.data();
@@ -174,6 +157,24 @@ const integrationAp: any = {
       return null;
     } catch (e) {
       return null;
+    }
+  },
+  getJoinedCandidates: async () => {
+    try {
+      const { associatePartnerRepository } = await import('../../../Network/associatePartners/repositories/associatePartnerRepository');
+      const partners = await associatePartnerRepository.getPartners();
+      const joined: any[] = [];
+      for (const p of partners) {
+        for (const s of (p.submissions || [])) {
+          if (s.status === 'Joined') {
+            joined.push({ candidateId: s.id, phone: s.mobileNumber, city: s.city, partnerId: p.id, partnerName: p.name || p.subVendorName, ...s });
+          }
+        }
+      }
+      return joined;
+    } catch (e) {
+      console.error(e);
+      return [];
     }
   }
 };

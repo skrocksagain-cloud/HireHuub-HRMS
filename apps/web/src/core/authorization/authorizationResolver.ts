@@ -1,26 +1,19 @@
-﻿export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
+export type CanonicalRole = 'User' | 'Admin' | 'Master Admin' | 'Super Admin';
 
-export type AuthorizationScope = 'OWN' | 'TEAM' | 'DEPARTMENT' | 'GLOBAL' | 'SELF' | 'DIRECT_REPORTS';
-export type SimplifiedModuleScope = 'SELF' | 'DEPARTMENT' | 'GLOBAL' | 'OWN' | 'TEAM';
-export type LegacyAuthorizationScope = 'SELF' | 'SELF_AND_DIRECT_REPORTS' | 'DEPARTMENT' | 'GLOBAL';
+export type AuthorizationScope = 'OWN' | 'GLOBAL' | string;
+export type SimplifiedModuleScope = 'SELF' | 'GLOBAL' | string;
 
 export type ErpArea = 'People' | 'Workbench' | 'Finance' | 'Administration';
 
 export interface AuthorizationContext {
   employeeId?: string;
-  departmentId?: string;
-  department?: string;
   assignedRole?: string;
-  reportingManagerId?: string;
 }
 
 export interface CanonicalAuthorizationIdentity {
   employeeId: string;
   firebaseUid: string;
-  departmentId: string | null;
-  department: string | null;
   role: CanonicalRole;
-  reportingManagerId: string | null;
 }
 
 export const ROLE_RANK: Record<CanonicalRole, number> = {
@@ -48,37 +41,28 @@ export function resolveAuthorizationIdentity(
     return {
       employeeId: '',
       firebaseUid,
-      departmentId: null,
-      department: null,
-      role: 'User',
-      reportingManagerId: null,
+      role: 'User'
     };
   }
   return {
     employeeId,
     firebaseUid,
-    departmentId: employeeData?.departmentId || null,
-    department: employeeData?.department || null,
-    role: getCanonicalRole(employeeData?.assignedRole),
-    reportingManagerId: employeeData?.reportingManagerId || null,
+    role: getCanonicalRole(employeeData?.assignedRole)
   };
 }
 
-export function getAuthorizationScope(role?: string | null): AuthorizationScope {
+export function getAuthorizationScope(role?: string | null, area?: ErpArea): AuthorizationScope {
   const canonicalRole = getCanonicalRole(role || undefined);
-  switch (canonicalRole) {
-    case 'Super Admin': return 'GLOBAL';
-    case 'Master Admin': return 'DEPARTMENT';
-    case 'Admin': return 'TEAM';
-    default: return 'OWN';
+  if (canonicalRole === 'Super Admin' || canonicalRole === 'Master Admin') return 'GLOBAL';
+  if (canonicalRole === 'Admin') {
+     if (area === 'People') return 'OWN';
+     return 'GLOBAL';
   }
+  return 'OWN';
 }
 
-export function getSimplifiedModuleScope(role?: string | null): SimplifiedModuleScope {
-  const scope = getAuthorizationScope(role);
-  if (scope === 'OWN' || scope === 'SELF') return 'SELF';
-  if (scope === 'TEAM') return 'TEAM';
-  if (scope === 'DEPARTMENT') return 'DEPARTMENT';
+export function getSimplifiedModuleScope(role?: string | null, area?: ErpArea): SimplifiedModuleScope {
+  const scope = getAuthorizationScope(role, area);
   if (scope === 'GLOBAL') return 'GLOBAL';
   return 'SELF';
 }
@@ -88,34 +72,29 @@ export function isSuperAdmin(actor?: AuthorizationContext): boolean {
 }
 
 export function canAccessModule(actor: AuthorizationContext, moduleKey: string): boolean {
-  const dept = (actor.department || '').trim().toLowerCase();
-  if (dept === 'management') return true;
-
+  const role = getCanonicalRole(actor.assignedRole);
   const m = (moduleKey || '').toLowerCase();
 
-  if (['attendance', 'leave', 'performance', 'profile'].includes(m)) return true;
+  if (role === 'Super Admin') return true;
 
-  if (dept === 'hr') {
-    if (['employees', 'people', 'recruitment'].includes(m)) return true;
+  if (role === 'Master Admin') {
+    if (['administration', 'managementcontrol', 'management', 'calendar', 'announcements', 'settings', 'organization'].includes(m)) return false;
+    return true;
   }
 
-  if (dept === 'marketing') {
-    if (['clients', 'client'].includes(m)) return true;
+  if (role === 'Admin') {
+    if (m === 'dashboard') return true;
+    if (['attendance', 'leave', 'performance', 'profile', 'people', 'employees'].includes(m)) return true;
+    if (['staffinghub', 'staffing-hub', 'staffing hub', 'workbench', 'openings', 'crm', 'workforce'].includes(m)) return true;
+    return false;
   }
 
-  if (dept === 'staffing') {
-    if (['associatepartner', 'associate partners', 'associate_partners', 'associate-partners', 'openings', 'crm', 'workforce', 'campaignhub', 'campaign-hub', 'campaign hub'].includes(m)) return true;
+  if (role === 'User') {
+    if (m === 'dashboard') return true;
+    if (['attendance', 'leave', 'performance', 'profile', 'people', 'employees'].includes(m)) return true;
+    if (['crm', 'workforce', 'workbench'].includes(m)) return true;
+    return false;
   }
-
-  if (dept === 'finance') {
-    if (['finance', 'invoices', 'creditnotes', 'credit-notes', 'internalpayroll', 'payroll', 'transactions', 'payout'].includes(m)) return true;
-  }
-
-  if (dept === 'admin') {
-    if (['administration', 'managementcontrol', 'management', 'calendar', 'announcements', 'settings', 'organization'].includes(m)) return true;
-  }
-
-  if (m === 'dashboard') return true;
 
   return false;
 }
@@ -126,33 +105,10 @@ export function hasApprovalAuthority(actorRole: string, targetRole: string): boo
   return ROLE_RANK[actorCanonical] >= ROLE_RANK[targetCanonical];
 }
 
-export function isDirectReportingManager(actorEmployeeId?: string | null, targetReportingManagerId?: string | null): boolean {
-  if (!actorEmployeeId || !targetReportingManagerId) return false;
-  return actorEmployeeId === targetReportingManagerId;
-}
-
-export function isDirectReport(actor: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (!actor.employeeId) return false;
-  return target.reportingManagerId === actor.employeeId;
-}
-
-export function isSameDepartment(actor: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (actor.departmentId && target.departmentId) {
-    return actor.departmentId === target.departmentId;
-  }
-  return !!actor.department && actor.department === target.department;
-}
-
 export function canAccessEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
   if (!actor.employeeId) return false;
-
-  const scope = getAuthorizationScope(actor.assignedRole);
-
-  if (scope === 'GLOBAL') return true;
-  if (scope === 'DEPARTMENT') return isSameDepartment(actor, target) || actor.employeeId === target.employeeId;
-  if (scope === 'TEAM') {
-    return actor.employeeId === target.employeeId || isDirectReport(actor, target);
-  }
+  const role = getCanonicalRole(actor.assignedRole);
+  if (role === 'Super Admin' || role === 'Master Admin') return true;
   return actor.employeeId === target.employeeId;
 }
 
@@ -164,52 +120,26 @@ export function canEditEmployee(actor: AuthorizationContext, target: Authorizati
   return canAccessEmployee(actor, target);
 }
 
-export function canAssignToEmployee(actor: AuthorizationContext, target: AuthorizationContext): boolean {
+export function canAssignToEmployee(actor: AuthorizationContext, _target: AuthorizationContext): boolean {
   if (!actor.employeeId) return false;
-  const scope = getAuthorizationScope(actor.assignedRole);
-
-  if (scope === 'GLOBAL') return true;
-  if (scope === 'DEPARTMENT') return isSameDepartment(actor, target);
-  if (scope === 'TEAM') {
-    return actor.employeeId === target.employeeId || isDirectReport(actor, target);
-  }
-  return actor.employeeId === target.employeeId;
-}
-
-export function canReassignBetweenEmployees(actor: AuthorizationContext, source: AuthorizationContext, target: AuthorizationContext): boolean {
-  if (!actor.employeeId) return false;
-  const scope = getAuthorizationScope(actor.assignedRole);
-
-  if (scope === 'GLOBAL') return true;
-
-  let canAccessSource = false;
-  let canAccessTarget = false;
-
-  if (scope === 'DEPARTMENT') {
-    canAccessSource = isSameDepartment(actor, source) || actor.employeeId === source.employeeId;
-    canAccessTarget = isSameDepartment(actor, target) || actor.employeeId === target.employeeId;
-  } else if (scope === 'TEAM') {
-    canAccessSource = actor.employeeId === source.employeeId || isDirectReport(actor, source);
-    canAccessTarget = actor.employeeId === target.employeeId || isDirectReport(actor, target);
-  } else {
-    canAccessSource = actor.employeeId === source.employeeId;
-    canAccessTarget = actor.employeeId === target.employeeId;
-  }
-
-  return canAccessSource && canAccessTarget;
-}
-
-export function canAccessErpArea(
-  actor: AuthorizationContext,
-  area: ErpArea
-): boolean {
-  const dept = (actor.department || '').trim().toLowerCase();
-  if (dept === 'management') return true;
-
-  if (area === 'People' && dept === 'hr') return true;
-  if (area === 'Workbench' && ['staffing', 'marketing'].includes(dept)) return true;
-  if (area === 'Finance' && dept === 'finance') return true;
-  if (area === 'Administration' && dept === 'admin') return true;
-
+  const role = getCanonicalRole(actor.assignedRole);
+  if (role === 'Super Admin' || role === 'Master Admin') return true;
+  if (role === 'Admin') return true; 
   return false;
 }
+
+export function canReassignBetweenEmployees(actor: AuthorizationContext, _source: AuthorizationContext, _target: AuthorizationContext): boolean {
+  if (!actor.employeeId) return false;
+  const role = getCanonicalRole(actor.assignedRole);
+  if (role === 'Super Admin' || role === 'Master Admin' || role === 'Admin') return true;
+  return false;
+}
+
+export function canAccessErpArea(actor: AuthorizationContext, area: ErpArea): boolean {
+  const role = getCanonicalRole(actor.assignedRole);
+  if (role === 'Super Admin') return true;
+  if (role === 'Master Admin') return area !== 'Administration';
+  if (role === 'Admin' || role === 'User') return area === 'People' || area === 'Workbench';
+  return false;
+}
+

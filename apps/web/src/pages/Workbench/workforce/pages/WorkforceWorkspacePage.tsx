@@ -45,7 +45,7 @@ export default function WorkforceWorkspacePage() {
   const [selectedProfileItem, setSelectedProfileItem] = useState<WorkforceItem | null>(null);
 
   const scope = getAuthorizationScope((userSession as any).assignedRole);
-  const isFinanceOrAdmin = scope === 'GLOBAL' || scope === 'DEPARTMENT';
+  const isFinanceOrAdmin = scope === 'GLOBAL' || scope === 'GLOBAL';
 
   const handleOpenProfile = (item: WorkforceItem) => {
     setSelectedProfileItem(item);

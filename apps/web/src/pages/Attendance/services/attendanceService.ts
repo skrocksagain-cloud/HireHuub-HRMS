@@ -31,15 +31,11 @@ class AttendanceService {
     const scope = getSimplifiedModuleScope(actor.assignedRole);
 
     const requestsPromise = scope === 'GLOBAL'
-      ? attendanceRepository.getPendingRequests()
-      : scope === 'DEPARTMENT'
-      ? attendanceRepository.getPendingRequestsForDepartment(actor.department)
+        ? attendanceRepository.getPendingRequests()
       : attendanceRepository.getRequestsForEmployee(actor.employeeId);
 
     const organizationRecordsPromise = scope === 'GLOBAL'
-      ? attendanceRepository.getDailyForOrganization(bounds.start, bounds.end)
-      : scope === 'DEPARTMENT'
-      ? attendanceRepository.getDailyForDepartment(bounds.start, bounds.end, actor.department)
+        ? attendanceRepository.getDailyForOrganization(bounds.start, bounds.end)
       : Promise.resolve([]);
 
     const [today, monthRecords, requests, organizationRecords] = await Promise.all([

@@ -1,3 +1,5 @@
+// DEPRECATED - DO NOT USE - Employee provisioning is now handled strictly via createEmployee Cloud Function.
+process.exit(1);
 const fs = require('fs');
 
 const filePath = '../apps/web/src/services/auth/authService.ts';
@@ -118,3 +120,4 @@ code = code.replace(resetPasswordBlockOld, resetPasswordBlockNew);
 
 fs.writeFileSync(filePath, code);
 console.log('authService.ts patched successfully');
+

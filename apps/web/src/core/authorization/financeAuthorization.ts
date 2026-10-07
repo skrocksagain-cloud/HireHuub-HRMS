@@ -9,7 +9,7 @@ export interface FinanceAuthorizationContext {
 /** Finance has no verified department key for invoices, credit notes, or payroll runs. */
 export const getFinanceScope = (actor?: FinanceAuthorizationContext): SimplifiedModuleScope => {
   if (getAuthorizationScope(actor?.role) === 'GLOBAL') return 'GLOBAL';
-  if (getAuthorizationScope(actor?.role) === 'DEPARTMENT') return 'DEPARTMENT';
+  if (getAuthorizationScope(actor?.role) === 'GLOBAL') return 'DEPARTMENT';
   return 'SELF';
 };
 

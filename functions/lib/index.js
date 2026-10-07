@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetHH0005 = exports.completePasswordReset = exports.requestPasswordReset = exports.syncOpeningToGoogleSheet = exports.createErpFirebaseToken = exports.generateNativeDocument = exports.generateDocumentV3 = exports.requestAutomationDocument = exports.generateDocument = exports.ping = void 0;
+exports.syncEmployeeClaims = exports.resetEmployeePasswordByAdmin = exports.unlockEmployeeAccount = exports.completePasswordReset = exports.requestPasswordReset = exports.syncOpeningToGoogleSheet = exports.createErpFirebaseToken = exports.generateNativeDocument = exports.generateDocumentV3 = exports.requestAutomationDocument = exports.generateDocument = exports.ping = void 0;
 var ping_1 = require("./health/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var generateDocument_1 = require("./documents/generateDocument");
@@ -19,6 +19,10 @@ var requestPasswordReset_1 = require("./auth/requestPasswordReset");
 Object.defineProperty(exports, "requestPasswordReset", { enumerable: true, get: function () { return requestPasswordReset_1.requestPasswordReset; } });
 var completePasswordReset_1 = require("./auth/completePasswordReset");
 Object.defineProperty(exports, "completePasswordReset", { enumerable: true, get: function () { return completePasswordReset_1.completePasswordReset; } });
-var resetHH0005_1 = require("./resetHH0005");
-Object.defineProperty(exports, "resetHH0005", { enumerable: true, get: function () { return resetHH0005_1.resetHH0005; } });
+var unlockEmployeeAccount_1 = require("./auth/unlockEmployeeAccount");
+Object.defineProperty(exports, "unlockEmployeeAccount", { enumerable: true, get: function () { return unlockEmployeeAccount_1.unlockEmployeeAccount; } });
+var resetEmployeePasswordByAdmin_1 = require("./auth/resetEmployeePasswordByAdmin");
+Object.defineProperty(exports, "resetEmployeePasswordByAdmin", { enumerable: true, get: function () { return resetEmployeePasswordByAdmin_1.resetEmployeePasswordByAdmin; } });
+var syncEmployeeClaims_1 = require("./auth/syncEmployeeClaims");
+Object.defineProperty(exports, "syncEmployeeClaims", { enumerable: true, get: function () { return syncEmployeeClaims_1.syncEmployeeClaims; } });
 //# sourceMappingURL=index.js.map

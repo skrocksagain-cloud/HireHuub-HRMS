@@ -37,6 +37,9 @@ export interface WorkforceRecordV2 {
     phone: string;
     area: string;
     city: string;
+    assignedRecruiterId: string;
+    assignedRecruiterName: string;
+    createdAt?: string;
   };
 
   associatePartner?: {
@@ -54,6 +57,8 @@ export interface WorkforceRecordV2 {
   employeeId: string;
 
   workforceType: 'Payroll' | 'OTS';
+  
+  points?: number;
 
   payroll?: PayrollOperationalDataV2;
   ots?: OtsOperationalDataV2;

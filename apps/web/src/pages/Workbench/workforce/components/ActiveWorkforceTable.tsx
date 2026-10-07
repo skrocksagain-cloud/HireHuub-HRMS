@@ -48,12 +48,16 @@ export default function ActiveWorkforceTable({
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {workforce.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                <tr key={item.id || item.candidateId} className="hover:bg-slate-50/80 transition">
                   {/* Employee ID */}
                   <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                    <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md border border-slate-200 text-[11px]">
-                      {item.id}
-                    </span>
+                    {item.id ? (
+                      <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md border border-slate-200 text-[11px]">
+                        {item.id}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs italic font-sans font-medium">Missing</span>
+                    )}
                   </td>
 
                   {/* Candidate & Phone */}

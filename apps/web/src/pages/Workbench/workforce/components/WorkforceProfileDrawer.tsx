@@ -1,4 +1,4 @@
-﻿/* eslint-disable */
+/* eslint-disable */
 import { useState, useEffect } from 'react';
 import {
   RefreshCw,
@@ -288,7 +288,7 @@ export default function WorkforceProfileDrawer({ item: initialItem, onRefresh, o
               <div className="flex flex-wrap items-center gap-3 text-slate-500 font-mono text-xs mt-1">
                 <span>Placement ID: {(item as any).placementBusinessId ? <strong className="text-blue-800">{(item as any).placementBusinessId}</strong> : <span className="text-rose-600 bg-rose-50 px-1 rounded border border-rose-200">Missing ID</span>}</span>
                 <span>â€¢</span>
-                <span>Employee ID: <strong className="text-slate-900">{item.id}</strong></span>
+                <span>Employee ID: <strong className="text-slate-900">{item.id || 'Missing'}</strong></span>
                 <span>â€¢</span>
                 <span>Mobile: {item.phone}</span>
                 <span>â€¢</span>

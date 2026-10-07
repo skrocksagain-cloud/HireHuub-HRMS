@@ -1,7 +1,7 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where  } from 'firebase/firestore';
 import { db } from '../../../firebase/firebase';
 import type { Employee } from '../../Employee/types/Employee';
-import { workforceService } from '../../Workbench/workforce/v2/hooks/useWorkforceV2';
+
 
 export interface PerformanceSummary {
   employeeId: string;
@@ -89,29 +89,41 @@ function getMonthString(dateToParse: any): string | null {
 }
 
 export class FirestorePerformanceRepository implements PerformanceRepository {
-  private async fetchPlacements(input: PerformanceScopeQuery): Promise<any[]> {
-    const context = {
-      id: input.employeeId || 'unknown',
-      name: input.employeeName || 'Unknown',
-      role: input.employeeRole || 'Unknown',
-      assignedRole: input.assignedRole || input.scope,
-      departmentId: input.departmentId,
-      department: input.department,
-    };
-    const activeWorkforce = await workforceService.getActiveWorkforce(context);
-    return activeWorkforce.map(v2 => {
-      return {
-        id: v2.employeeId,
-        candidateId: v2.candidate.id,
-        candidateName: v2.candidate.name,
-        clientId: v2.client.id,
-        clientName: v2.client.name,
-        recruiterId: v2.placement.recruiterId || '',
-        recruiterName: v2.placement.recruiterName || '',
-        rawActiveDate: v2.placement.activeDate,
-        status: v2.placement.status,
-      };
-    });
+    private async getAuthorizedIds(input: PerformanceScopeQuery): Promise<string[] | null> {
+    const scope = input.scope;
+    let authorizedIds: string[] | null = null;
+    if (scope === 'GLOBAL') {
+      return null;
+    } else if (scope === 'DEPARTMENT') {
+      const empsSnap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', input.departmentId)));
+      authorizedIds = empsSnap.docs.flatMap(d => [d.id, d.data().employeeId].filter(Boolean) as string[]);
+    } else if (scope === 'TEAM') {
+      const empsSnap = await getDocs(query(collection(db, 'employees'), where('reportingManagerId', '==', input.employeeId)));
+      authorizedIds = empsSnap.docs.flatMap(d => [d.id, d.data().employeeId].filter(Boolean) as string[]);
+      if (input.employeeId) authorizedIds.push(input.employeeId);
+    } else {
+      authorizedIds = [input.employeeId || ''];
+    }
+    return authorizedIds;
+  }
+
+  private async fetchCrmCandidates(authorizedIds: string[] | null): Promise<any[]> {
+    const allResults: any[] = [];
+    if (authorizedIds === null) {
+      const snap = await getDocs(query(collection(db, 'crm_candidates')));
+      snap.forEach(d => allResults.push({ id: d.id, ...d.data() }));
+    } else {
+      const chunks = [];
+      for (let i = 0; i < authorizedIds.length; i += 30) {
+        chunks.push(authorizedIds.slice(i, i + 30));
+      }
+      for (const chunk of chunks) {
+        if (chunk.length === 0) continue;
+        const snap = await getDocs(query(collection(db, 'crm_candidates'), where('assignedRecruiterId', 'in', chunk)));
+        snap.forEach(d => allResults.push({ id: d.id, ...d.data() }));
+      }
+    }
+    return allResults;
   }
 
   private async fetchEmployees(input: PerformanceScopeQuery): Promise<Employee[]> {
@@ -149,25 +161,68 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
     return snap.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as object) } as Employee));
   }
 
-  async getMonthlyPerformanceAggregate(input: PerformanceScopeQuery & { brandId: string }): Promise<MonthlyAggregate[]> {
-    const allPlacements = await this.fetchPlacements(input);
+  
+  private async getCandidateLatestActiveDates(crmCandidates: any[]): Promise<Map<string, string>> {
+    const latestDates = new Map<string, string>();
+    const chunkSize = 20; // prevent too many concurrent requests
+    for (let i = 0; i < crmCandidates.length; i += chunkSize) {
+      const chunk = crmCandidates.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(async (c) => {
+        try {
+          const snap = await getDocs(query(collection(db, 'crm_candidates', c.id, 'statusHistory'), where('newStatus', '==', 'Active')));
+          let latestTimestamp = '';
+          snap.forEach(d => {
+            const data = d.data();
+            const ts = data.timestamp; // The CRM event timestamp is 'timestamp' based on our previous audit of crmRepository.ts
+            if (!latestTimestamp || new Date(ts) > new Date(latestTimestamp)) {
+              latestTimestamp = ts;
+            }
+          });
+          if (latestTimestamp) {
+            latestDates.set(c.id, latestTimestamp);
+          }
+        } catch (err) {
+           console.error('Error fetching statusHistory for', c.id, err);
+        }
+      }));
+    }
+    return latestDates;
+  }
 
-    const clientsSnap = await getDocs(collection(db, 'clients'));
-    const clientPointsMap = new Map<string, number>();
-    clientsSnap.forEach(d => {
+  private async getClientPointsMap(): Promise<Map<string, number>> {
+    const clientPoints = new Map<string, number>();
+    const snap = await getDocs(collection(db, 'clients'));
+    snap.forEach(d => {
       const data = d.data();
-      const points = data.points ?? data.commercial?.points ?? 0;
-      clientPointsMap.set(d.id, points);
-      if (data.name) clientPointsMap.set(data.name, points);
+      // Current CRM client ID fallback can be checked, we'll store by doc ID and clientId
+      const pts = typeof data.points === 'number' ? data.points : 0;
+      clientPoints.set(d.id, pts);
+      if (data.clientId) {
+        clientPoints.set(data.clientId, pts);
+      }
     });
+    return clientPoints;
+  }
+
+  async getMonthlyPerformanceAggregate(input: PerformanceScopeQuery & { brandId: string }): Promise<MonthlyAggregate[]> {
+    const authorizedIds = await this.getAuthorizedIds(input);
+    const crmCandidates = await this.fetchCrmCandidates(authorizedIds);
+    const [latestDatesMap, clientPointsMap] = await Promise.all([
+      this.getCandidateLatestActiveDates(crmCandidates),
+      this.getClientPointsMap()
+    ]);
 
     const monthMap = new Map<string, { totalPoints: number, activeCandidates: number }>();
 
-    for (const p of allPlacements) {
-      const monthStr = getMonthString(p.rawActiveDate);
+    for (const c of crmCandidates) {
+      const latestActive = latestDatesMap.get(c.id);
+      if (!latestActive) continue;
+
+      const monthStr = getMonthString(latestActive);
       if (!monthStr) continue;
 
-      const pts = clientPointsMap.get(p.clientId) || clientPointsMap.get(p.clientName) || 0;
+      const clientId = c.currentClientId;
+      const pts = clientId && clientPointsMap.has(clientId) ? (clientPointsMap.get(clientId) || 0) : 0;
 
       const existing = monthMap.get(monthStr) || { totalPoints: 0, activeCandidates: 0 };
       existing.totalPoints += pts;
@@ -187,53 +242,74 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
   }
 
   async getPerformanceSummaries(input: PerformanceScopeQuery): Promise<PerformanceSummary[]> {
-    const [allPlacements, employees] = await Promise.all([
-      this.fetchPlacements(input),
-      this.fetchEmployees(input)
+    const authorizedIds = await this.getAuthorizedIds(input);
+    const [employees, crmCandidates, clientPointsMap] = await Promise.all([
+      this.fetchEmployees(input),
+      this.fetchCrmCandidates(authorizedIds),
+      this.getClientPointsMap()
     ]);
-    let targetPlacements = allPlacements;
-    if (input.month) {
-      targetPlacements = allPlacements.filter((p) => {
-        const placementMonthStr = getMonthString(p.rawActiveDate);
-        return placementMonthStr?.toLowerCase() === input.month!.toLowerCase();
-      });
-    }
+    const latestDatesMap = await this.getCandidateLatestActiveDates(crmCandidates);
+
+    // Build map of qualifying candidates per recruiter
     const recruiterMap = new Map<string, any[]>();
-    targetPlacements.forEach((placement) => {
-      const key = placement.recruiterId || placement.recruiterName;
-      if (!key) return;
-      const existing = recruiterMap.get(key) || [];
-      existing.push(placement);
-      recruiterMap.set(key, existing);
-    });
-    const clientsSnap = await getDocs(collection(db, 'clients'));
-    const clientPointsMap = new Map<string, number>();
-    clientsSnap.forEach(d => {
-      const data = d.data();
-      const points = data.points ?? data.commercial?.points ?? 0;
-      clientPointsMap.set(d.id, points);
-      if (data.name) clientPointsMap.set(data.name, points);
-    });
+
+    for (const c of crmCandidates) {
+      const latestActive = latestDatesMap.get(c.id);
+      if (!latestActive) continue;
+      
+      const candidateMonthStr = getMonthString(latestActive);
+      if (!candidateMonthStr) continue;
+
+      // Filter by selected month
+      if (input.month && candidateMonthStr.toLowerCase() !== input.month.toLowerCase()) {
+        continue;
+      }
+
+      const recId = c.assignedRecruiterId;
+      if (!recId) continue;
+
+      const existing = recruiterMap.get(recId) || [];
+      existing.push({
+        candidate: c,
+        points: (c.currentClientId && clientPointsMap.has(c.currentClientId)) ? (clientPointsMap.get(c.currentClientId) || 0) : 0
+      });
+      recruiterMap.set(recId, existing);
+    }
+
     const summaries: PerformanceSummary[] = employees.map((emp) => {
       const keys = [emp.employeeId, emp.employeeCode, emp.id, emp.fullName].filter(Boolean);
-      let placementList: any[] = [];
+      let qualifyingCandidates: any[] = [];
+      const seenCandidateIds = new Set<string>();
+
       for (const k of keys) {
         if (k && recruiterMap.has(k)) {
-          placementList = placementList.concat(recruiterMap.get(k) || []);
+          const list = recruiterMap.get(k) || [];
+          for (const item of list) {
+            if (!seenCandidateIds.has(item.candidate.id)) {
+              seenCandidateIds.add(item.candidate.id);
+              qualifyingCandidates.push(item);
+            }
+          }
         }
       }
-      const uniquePlacements = new Map();
-      placementList.forEach(p => uniquePlacements.set(p.candidateId, p));
-      placementList = Array.from(uniquePlacements.values());
+
+      let totalPoints = 0;
+      let activeCandidateCount = qualifyingCandidates.length;
+
       const clientGroup = new Map<string, { clientName: string; count: number; pointsPerCand: number; totalEarned: number }>();
-      placementList.forEach((placement) => {
-        const basePts = clientPointsMap.get(placement.clientId) || clientPointsMap.get(placement.clientName) || 0;
-        const clientName = placement.clientName || 'Unknown Client';
-        const existing = clientGroup.get(clientName) || { clientName, count: 0, pointsPerCand: basePts, totalEarned: 0 };
+      
+      qualifyingCandidates.forEach((item) => {
+        const c = item.candidate;
+        const pts = item.points;
+        const clientName = c.currentClientName || 'Unknown Client';
+        totalPoints += pts;
+
+        const existing = clientGroup.get(clientName) || { clientName, count: 0, pointsPerCand: pts, totalEarned: 0 };
         existing.count += 1;
-        existing.totalEarned += basePts;
+        existing.totalEarned += pts;
         clientGroup.set(clientName, existing);
       });
+
       const clientPointsBreakdown = Array.from(clientGroup.values()).map((cg) => ({
         clientId: cg.clientName.toLowerCase().replace(/\s+/g, '-'),
         clientName: cg.clientName,
@@ -241,10 +317,10 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
         pointsPerCandidate: cg.pointsPerCand,
         totalEarned: cg.totalEarned,
       }));
-      const totalPoints = clientPointsBreakdown.reduce((sum, item) => sum + item.totalEarned, 0);
-      const activeCandidateCount = placementList.length;
+
       const brandIdVal = (emp as any).brandId || (emp as any).brand || undefined;
       const brandNameVal = (emp as any).brandName || undefined;
+
       return {
         employeeId: emp.employeeId ?? emp.employeeCode ?? emp.id ?? '',
         employeeCode: emp.employeeCode || emp.employeeId || '',
@@ -264,6 +340,7 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
         companyRank: 1,
       };
     });
+
     summaries.sort((a, b) => b.totalPoints - a.totalPoints);
     summaries.forEach((s, idx) => { s.companyRank = idx + 1; });
     const deptGroups = new Map<string, PerformanceSummary[]>();
@@ -276,12 +353,13 @@ export class FirestorePerformanceRepository implements PerformanceRepository {
       list.sort((a, b) => b.totalPoints - a.totalPoints);
       list.forEach((s, idx) => { s.departmentRank = idx + 1; });
     });
+
     return summaries;
   }
-
   async getPerformanceForEmployee(employeeId: string, month?: string): Promise<PerformanceSummary | null> {
-    const all = await this.getPerformanceSummaries({ scope: 'SELF', employeeId, month });
-    return all.find((s) => s.employeeId === employeeId) ?? null;
+    const summaries = await this.getPerformanceSummaries({ scope: 'SELF', employeeId, month });
+    return summaries.length > 0 ? summaries[0] : null;
   }
 }
+
 export const performanceRepository: PerformanceRepository = new FirestorePerformanceRepository();

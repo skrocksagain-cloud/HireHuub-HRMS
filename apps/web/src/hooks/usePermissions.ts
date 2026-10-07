@@ -1,3 +1,4 @@
+import { getCanonicalRole } from '../core/authorization/authorizationResolver';
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,16 +11,11 @@ export function usePermissions() {
   const { user } = useAuth();
 
   const authContext: AuthorizationContext = useMemo(() => ({
-    employeeId: user?.employeeId,
-    departmentId: user?.departmentId,
-    department: user?.department,
-    assignedRole: user?.assignedRole,
-    reportingManagerId: user?.reportingManagerId
+    employeeId: user?.authorization?.employeeId,
+    assignedRole: user?.authorization?.role
   }), [user]);
 
-  const activeRole = useMemo(() => ({ name: user?.assignedRole || 'User' }), [user]);
-  const simulatedRole = null as { name: string } | null;
-  const setSimulatedRole = useCallback(() => {}, []);
+  const activeRole = useMemo(() => ({ name: user?.authorization?.role || 'User' }), [user]);
   const visibleModules = useMemo(() => [], []);
   const visibleNavigation = useMemo(() => [], []);
   const dashboardWidgets = useMemo(() => [], []);
@@ -85,8 +81,28 @@ export function usePermissions() {
     return checkModuleAccess(authContext, moduleKey);
   }, [authContext]);
 
+  const canAssign = useCallback((moduleKey: string) => {
+    if (!checkModuleAccess(authContext, moduleKey)) return false;
+    const role = getCanonicalRole(authContext.assignedRole);
+    return role === 'Super Admin' || role === 'Master Admin' || role === 'Admin';
+  }, [authContext]);
+
+  const canReassign = useCallback((moduleKey: string) => {
+    if (!checkModuleAccess(authContext, moduleKey)) return false;
+    const role = getCanonicalRole(authContext.assignedRole);
+    return role === 'Super Admin' || role === 'Master Admin' || role === 'Admin';
+  }, [authContext]);
+
+  const canUpload = useCallback((moduleKey: string) => {
+    if (!checkModuleAccess(authContext, moduleKey)) return false;
+    const role = getCanonicalRole(authContext.assignedRole);
+    return role === 'Super Admin' || role === 'Master Admin' || role === 'Admin';
+  }, [authContext]);
+
   const canGenerateDocument = useCallback((docType?: string) => {
-    return checkModuleAccess(authContext, docType || 'documents');
+    if (!checkModuleAccess(authContext, docType || 'documents')) return false;
+    const role = getCanonicalRole(authContext.assignedRole);
+    return role === 'Super Admin' || role === 'Master Admin';
   }, [authContext]);
 
   const canManage = useCallback((moduleKey: string) => {
@@ -104,8 +120,6 @@ export function usePermissions() {
   return {
     authContext,
     activeRole,
-    simulatedRole,
-    setSimulatedRole,
     canAccessModule,
     canAccessPage,
     canAccessRoute,
@@ -116,6 +130,9 @@ export function usePermissions() {
     canApprove,
     canReject,
     canExport,
+    canAssign,
+    canReassign,
+    canUpload,
     canGenerateDocument,
     canManage,
     isFeatureEnabled,

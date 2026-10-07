@@ -82,11 +82,6 @@ export class AuthService {
     }
 
     // Account Status Validation
-    if (employee.accountStatus === 'Pending Activation') {
-      await signOut(auth);
-      throw new Error('Account is pending activation. Please use the First Time Activation tab to set up your password.');
-    }
-
     if (employee.accountStatus === 'Locked') {
       // Check 30-minute lockout auto-unlock for failed login attempts
       if (employee.lockReason === 'Failed Login Attempts' && employee.lockedUntil) {
@@ -146,8 +141,9 @@ export class AuthService {
         designation: employee.designation,
         email: employee.email,
         mobileNumber: employee.mobileNumber,
-        accountStatus: 'Active',
+        accountStatus: employee.accountStatus,
       },
+      mustChangePassword: employee.accountStatus === 'Pending Activation' || !employee.firstLoginCompleted,
       sessionId,
     };
   }
@@ -202,6 +198,7 @@ export class AuthService {
     const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
     const { auth } = await import('../../firebase/firebase');
 
+    await auth.authStateReady();
     let currentUser = auth.currentUser;
 
     // If not signed in (because login() signed them out), sign in with temporary password

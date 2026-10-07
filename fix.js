@@ -1,108 +1,129 @@
 const fs = require('fs');
-let content = fs.readFileSync('apps/web/src/core/permissions/permissionService.ts', 'utf8');
 
-// Replace evaluateMatrix with getMatrixValue and fix the methods
-content = content.replace(
-  /private evaluateMatrix\(role: RoleItem, moduleKey: string, action: 'View'\|'Edit'\|'Upload'\|'Approve'\): boolean \{/,
-  "getMatrixValue(role: RoleItem | string, moduleKey: string, action: 'View'|'Edit'|'Upload'|'Approve'): string {"
+// --- performanceService.ts ---
+const svc_path = 'apps/web/src/pages/People/services/performanceService.ts';
+let svc = fs.readFileSync(svc_path, 'utf8');
+
+svc = svc.replace(
+    /async getPerformanceForBrand\([\s\S]*?\): Promise<\{ summaries: PerformanceSummary\[\]; targets: PerformanceTarget\[\] \}> \{/,
+    `async getPerformanceData(
+    month: string,
+    actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+  ): Promise<{ summaries: PerformanceSummary[]; targets: PerformanceTarget[] }> {`
 );
 
-// We need to fix the return values of getMatrixValue to return strings instead of booleans
-content = content.replace(/if \(\!mod\) return false;/g, "if (!mod) return 'Restricted';");
-content = content.replace(/if \(\!deptMatrix\) return false;/g, "if (!deptMatrix) return 'Restricted';");
-content = content.replace(/if \(\!roleMatrix\) return false;/g, "if (!roleMatrix) return 'Restricted';");
-content = content.replace(/if \(\!moduleMatrix\) return false;/g, "if (!moduleMatrix) return 'Restricted';");
-
-content = content.replace(
-  /if \(action === 'Approve'\) \{\s*return assignedRole !== 'User';\s*\}/,
-  ""
+svc = svc.replace(
+    "const targets = await performanceTargetRepository.getTargetsForMonth(brandId, month);",
+    "const targets = await performanceTargetRepository.getTargetsForMonth('ALL', month);"
 );
 
-content = content.replace(
-  /const value = moduleMatrix\[action\];\s*if \(\!value\) return false;\s*const v = value\.toLowerCase\(\);\s*return v !== 'restricted' && v !== 'none';/,
-  "const value = moduleMatrix[action];\n    if (!value) return 'Restricted';\n    return value;"
+svc = svc.replace(
+    /calculateIncentiveForEmployee\(\s*s\.employeeId,\s*brandId,\s*month\s*\);/,
+    "calculateIncentiveForEmployee(s.employeeId, 'ALL', month);"
 );
 
-content = content.replace(
-  /canAccessModule\(role: RoleItem \| string, moduleKey: string\): boolean \{[\s\S]*?return this\.evaluateMatrix\(active, moduleKey, 'View'\);\s*\}/,
-  "canAccessModule(role: RoleItem | string, moduleKey: string): boolean {\n    if (moduleKey === 'dashboard' || moduleKey === 'dashboard-shell') return true;\n    const active = this.getEffectiveRole(role);\n    if (this.isSuperAdmin(active)) return true;\n    const val = this.getMatrixValue(active, moduleKey, 'View').toLowerCase();\n    return val !== 'restricted' && val !== 'none';\n  }"
+svc = svc.replace(
+    /async getMonthlyRegisterForBrand\([\s\S]*?\): Promise<MonthlyRegisterItem\[\]> \{/,
+    `async getMonthlyRegister(
+    currentMonth: string,
+    currentMonthTarget: number,
+    currentMonthPoints: number,
+    currentActiveCandidates: number,
+    actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
+  ): Promise<MonthlyRegisterItem[]> {`
 );
 
-const newMethods = `
-  getApprovalScope(role: RoleItem | string): string {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return 'All';
-    const assignedRole = active.name || active.roleName || 'User';
-    if (assignedRole === 'Master Admin') return 'Department';
-    if (assignedRole === 'Admin') return 'Team';
-    return 'None';
-  }
-
-  canView(role: RoleItem | string, moduleKey: string, recordDeptId?: string, recordOwnerId?: string, currentUserId?: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const val = this.getMatrixValue(active, moduleKey, 'View').toLowerCase();
-    if (val === 'restricted' || val === 'none') return false;
-    if (val === 'own' && recordOwnerId && currentUserId) return recordOwnerId === currentUserId;
-    if (val === 'department' && recordDeptId) return recordDeptId === (active.description || '');
-    return true;
-  }
-
-  canCreate(role: RoleItem | string, moduleKey: string): boolean {
-    return this.canEdit(role, moduleKey);
-  }
-
-  canEdit(role: RoleItem | string, moduleKey: string, recordDeptId?: string, recordOwnerId?: string, currentUserId?: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const val = this.getMatrixValue(active, moduleKey, 'Edit').toLowerCase();
-    if (val === 'restricted' || val === 'none' || val === 'view') return false;
-    if (val === 'own' && recordOwnerId && currentUserId) return recordOwnerId === currentUserId;
-    if (val === 'department' && recordDeptId) return recordDeptId === (active.description || '');
-    return true;
-  }
-
-  canUpload(role: RoleItem | string, moduleKey: string, recordDeptId?: string, recordOwnerId?: string, currentUserId?: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const val = this.getMatrixValue(active, moduleKey, 'Upload').toLowerCase();
-    if (val === 'restricted' || val === 'none' || val === 'view') return false;
-    if (val === 'own' && recordOwnerId && currentUserId) return recordOwnerId === currentUserId;
-    if (val === 'department' && recordDeptId) return recordDeptId === (active.description || '');
-    return true;
-  }
-
-  canDelete(role: RoleItem | string, moduleKey: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const val = this.getMatrixValue(active, moduleKey, 'Edit').toLowerCase();
-    return val !== 'restricted' && val !== 'none' && val !== 'view';
-  }
-
-  canApprove(role: RoleItem | string, moduleKey: string, targetDeptId?: string, targetEmployeeId?: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const scope = this.getApprovalScope(active);
-    if (scope === 'None') return false;
-    if (scope === 'Department' && targetDeptId) return targetDeptId === (active.description || '');
-    return true;
-  }
-
-  canReject(role: RoleItem | string, moduleKey: string): boolean {
-    return this.canApprove(role, moduleKey);
-  }
-
-  canExport(role: RoleItem | string, moduleKey: string): boolean {
-    const active = this.getEffectiveRole(role);
-    if (this.isSuperAdmin(active)) return true;
-    const val = this.getMatrixValue(active, moduleKey, 'View').toLowerCase();
-    return val !== 'restricted' && val !== 'none';
-  }
-`;
-
-content = content.replace(
-  /canView\(role: RoleItem \| string, moduleKey: string, recordDeptId\?: string, recordOwnerId\?: string, currentUserId\?: string\): boolean \{[\s\S]*?canGenerateDocument/g,
-  newMethods + '\n\n  canGenerateDocument'
+svc = svc.replace(
+    "performanceTargetRepository.getAllTargetsForBrand(brandId)",
+    "performanceTargetRepository.getAllTargetsForBrand('ALL')"
 );
 
-fs.writeFileSync('apps/web/src/core/permissions/permissionService.ts', content);
+svc = svc.replace(
+    /brandId,\s*scope: scope as any,/,
+    "brandId: 'ALL',\n        scope: scope as any,"
+);
+
+fs.writeFileSync(svc_path, svc, 'utf8');
+
+// --- PerformancePage.tsx ---
+const page_path = 'apps/web/src/pages/People/PerformancePage.tsx';
+let page = fs.readFileSync(page_path, 'utf8');
+
+page = page.replace(/import \{ adminService \} from '\.\.\/\.\.\/services\/admin\/adminService';\r?\n?/, "");
+page = page.replace(/import type \{ BrandProfile \} from '\.\.\/\.\.\/types\/Admin';\r?\n?/, "");
+page = page.replace(/const \[brands, setBrands\] = useState<BrandProfile\[\]>\(\[\]\);\r?\n?/, "");
+page = page.replace(/const \[selectedBrandId, setSelectedBrandId\] = useState<string>\(''\);\r?\n?/, "");
+page = page.replace(/const \[targetBrandId, setTargetBrandId\] = useState<string>\(''\);\r?\n?/, "");
+
+page = page.replace(/const activeRole: any = null;\s*\/\/ Placeholder.*?\r?\n?/, "");
+page = page.replace(/const userEmpId = user\?\.employeeId \|\| '';\r?\n?/, "");
+page = page.replace(/const viewScope = 'GLOBAL';\s*\/\/ Authorization.*?\r?\n?/, "");
+
+page = page.replace(/\s*\/\/ Load Active Brands from Company Settings[\s\S]*?\.catch\(\(\) => setBrands\(\[\]\)\);\s*\}, \[\]\);\r?\n?/, "");
+page = page.replace(/\s*\/\/ Selected Brand Profile Object[\s\S]*?\}, \[brands, selectedBrandId\]\);\r?\n?/, "");
+
+page = page.replace(/if \(\!selectedBrandId\) return;\r?\n?/, "");
+page = page.replace("getPerformanceForBrand(selectedBrandId, selectedMonth, actorContext);", "getPerformanceData(selectedMonth, actorContext);");
+
+page = page.replace(/if \(selectedBrandId\) \{\s*void loadPerformanceData\(\);\s*\}/, "void loadPerformanceData();");
+page = page.replace("}, [selectedBrandId, selectedMonth]);", "}, [selectedMonth]);");
+
+page = page.replace(/if \(\!selectedBrandId\) return \[\];\s*const firstBrandId = brands\[0\]\?\.id;\r?\n?/, "");
+page = page.replace(/\s*\/\/ Brand Filter Scoping[\s\S]*?return \([\s\S]*?\}\);/, "\n        return true;\n      });");
+page = page.replace("}, [summaries, selectedBrandId, selectedBrandObj, brands, activeRole, viewScope, userEmpId, user?.department, user?.name]);", "}, [summaries]);");
+
+page = page.replace(/if \(\!selectedBrandId\) \{\s*setMonthlyRegister\(\[\]\);\s*return;\s*\}/, "");
+page = page.replace(/\.getMonthlyRegisterForBrand\(\s*selectedBrandId,/, ".getMonthlyRegister(");
+page = page.replace("}, [selectedBrandId, selectedMonth, totalMonthlyTarget, totalAchievedPoints, totalActiveCandidates, totalIncentive]);", "}, [selectedMonth, totalMonthlyTarget, totalAchievedPoints, totalActiveCandidates, totalIncentive]);");
+
+page = page.replace(/const initialBrand = selectedBrandId \|\| brands\[0\]\?\.id \|\| '';\s*setTargetBrandId\(initialBrand\);\r?\n?/, "");
+page = page.replace("if (!targetEmpId || !targetBrandId || !targetPointsInput) {", "if (!targetEmpId || !targetPointsInput) {");
+page = page.replace("'Employee, Brand, and Target Points are required.'", "'Employee and Target Points are required.'");
+page = page.replace(/const brandObj = brands\.find\(\(b\) => b\.id === targetBrandId\);\r?\n?/, "");
+page = page.replace(/brandId: targetBrandId,\s*brandName: brandObj\?\.brandName \|\| 'Brand',/, "brandId: 'ALL',\n          brandName: 'Hire Huub',");
+
+page = page.replace(/\{selectedBrandObj\?\.brandName \|\| 'Selected Brand'\}/g, "Hire Huub");
+page = page.replace(/\{selectedBrandObj\?\.brandName \|\| 'Brand'\}/g, "Hire Huub");
+
+page = page.replace(/<div>\s*<label className="block text-xs font-semibold text-slate-700 mb-1">Target Brand \*<\/label>\s*<select\s*aria-label="Select Brand"[\s\S]*?<\/select>\s*<\/div>/, "");
+
+page = page.replace(
+    /\{\/\* Active Brand Selector & Actions Bar \*\/\}[\s\S]*?\{\/\* Employee Performance Table \*\/\}/,
+    `{/* Actions Bar */}
+        <div className="flex items-center justify-end gap-2 mb-4">
+            <select
+              aria-label="Select Performance Month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-emerald-500"
+            >
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {month}
+                </option>
+              ))}
+            </select>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => handleOpenTargetModal()}
+                className="rounded-xl bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-xs"
+              >
+                <Plus size={14} /> Assign Target
+              </button>
+            )}
+        </div>
+
+        {/* Employee Performance Table */}`
+);
+
+page = page.replace(
+    /\{loading \? \([\s\S]*?\) : brands\.length === 0 \? \([\s\S]*?\) : filteredSummaries\.length === 0 \? \(/,
+    `{loading ? (
+            <div className="p-8 text-center text-xs text-slate-500">Loading performance data...</div>
+          ) : filteredSummaries.length === 0 ? (`
+);
+
+fs.writeFileSync(page_path, page, 'utf8');
+
+console.log("Fixes applied.");

@@ -31,14 +31,13 @@ export class PerformanceService {
     return performanceRepository.getAllPerformanceSummaries(month);
   }
 
-  async getPerformanceForBrand(
-    brandId: string,
+  async getPerformanceData(
     month: string,
     actorContext?: { assignedRole?: string; departmentId?: string; department?: string; employeeId?: string; employeeName?: string; employeeRole?: string }
   ): Promise<{ summaries: PerformanceSummary[]; targets: PerformanceTarget[] }> {
     const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
     const allSummaries = await performanceRepository.getPerformanceSummaries({
-      scope,
+      scope: scope as any,
       assignedRole: actorContext?.assignedRole,
       departmentId: actorContext?.departmentId,
       department: actorContext?.department,
@@ -48,7 +47,7 @@ export class PerformanceService {
       month,
     });
 
-    const targets = await performanceTargetRepository.getTargetsForMonth(brandId, month);
+    const targets = await performanceTargetRepository.getTargetsForMonth('ALL', month);
 
     const targetMap = new Map<string, number>();
     targets.forEach((t) => {
@@ -61,11 +60,7 @@ export class PerformanceService {
         const pct = target > 0 ? Math.round((s.totalPoints / target) * 100) : 0;
         let incAmt = 0;
         try {
-          const snapshot = await incentiveEngineService.calculateIncentiveForEmployee(
-            s.employeeId,
-            brandId,
-            month
-          );
+          const snapshot = await incentiveEngineService.calculateIncentiveForEmployee(s.employeeId, 'ALL', month);
           if (snapshot) incAmt = snapshot.totalIncentive;
         } catch {
           incAmt = 0;
@@ -83,8 +78,7 @@ export class PerformanceService {
     return { summaries: enrichedSummaries, targets };
   }
 
-  async getMonthlyRegisterForBrand(
-    brandId: string,
+  async getMonthlyRegister(
     currentMonth: string,
     currentMonthTarget: number,
     currentMonthPoints: number,
@@ -93,10 +87,10 @@ export class PerformanceService {
   ): Promise<MonthlyRegisterItem[]> {
     const scope = getSimplifiedModuleScope(actorContext?.assignedRole);
     const [allTargets, historicalAggregates] = await Promise.all([
-      performanceTargetRepository.getAllTargetsForBrand(brandId),
+      performanceTargetRepository.getAllTargetsForBrand('ALL'),
       performanceRepository.getMonthlyPerformanceAggregate({
-        brandId,
-        scope,
+        brandId: 'ALL',
+        scope: scope as any,
         assignedRole: actorContext?.assignedRole,
         departmentId: actorContext?.departmentId,
       department: actorContext?.department,
@@ -175,3 +169,4 @@ export class PerformanceService {
 }
 
 export const performanceService = new PerformanceService();
+

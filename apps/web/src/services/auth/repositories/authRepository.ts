@@ -165,11 +165,18 @@ export class FirestoreAuthRepository implements AuthRepository {
   }
 
   async updateEmployeeAuthData(documentId: string, updates: Record<string, unknown>): Promise<void> {
+    console.log(`[HH-AUTH] START updateEmployeeAuthData for doc ${documentId}`, JSON.stringify(updates));
     const docRef = doc(db, EMPLOYEES_COLLECTION, documentId);
-    await updateDoc(docRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      await updateDoc(docRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+      console.log(`[HH-AUTH] SUCCESS updateEmployeeAuthData for doc ${documentId}`);
+    } catch (error: any) {
+      console.error(`[HH-AUTH] ERROR updateEmployeeAuthData for doc ${documentId}: code=${error?.code} message=${error?.message}`);
+      throw error;
+    }
   }
 
   async recordFailedLoginAttempt(documentId: string, currentAttempts: number, lockTimeMinutes = 30): Promise<{ isLocked: boolean; remainingAttempts: number }> {

@@ -14,5 +14,6 @@ export interface AssociatePartnerIntegrationV2 {
     id: string;
     name?: string;
     status: 'Joined' | 'Not Joined' | 'Not Found';
-  }>;
+  } | null>;
+  getJoinedCandidates?(): Promise<any[]>;
 }

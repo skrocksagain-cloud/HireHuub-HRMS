@@ -337,7 +337,7 @@ function GroupSection({
 export default function Sidebar() {
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const {  canView, simulatedRole } = usePermissions();
+  const { canView } = usePermissions();
 
     const isItemVisible = (path: string): boolean => {
     const p = path.toLowerCase();
@@ -405,11 +405,7 @@ export default function Sidebar() {
               <span className="font-bold text-sm tracking-tight text-white leading-none block whitespace-nowrap">
                 Hire Huub One
               </span>
-              {simulatedRole && (
-                <span className="text-[10px] text-amber-400 font-mono font-bold block truncate">
-                  Simulating: {simulatedRole.name}
-                </span>
-              )}
+              
             </div>
           )}
         </div>

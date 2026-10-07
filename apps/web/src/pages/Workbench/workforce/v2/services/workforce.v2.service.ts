@@ -5,9 +5,11 @@ import type { ClientIntegrationV2 } from '../../../placement/v2/services/placeme
 
 export interface CandidateRepositoryV2 {
   getCandidateById(id: string, transaction?: any): Promise<any | null>;
+  queryActiveCandidates?(context: any): Promise<any[]>;
 }
 
 export interface WorkforceContextV2 {
+  employeeId?: string;
   id: string;
   name: string;
   role: string;
@@ -34,13 +36,44 @@ export class WorkforceServiceImplV2 {
     this.clientIntegration = clientIntegration;
   }
 
-  async getActiveWorkforce(_context: WorkforceContextV2, filters?: { clientId?: string; month?: string; }): Promise<WorkforceRecordV2[]> {
-    // 1. Fetch all placements scoped by canonical authorization
-    const allPlacements = await this.placementRepo.queryPlacements({ userSession: _context, ...filters });
-    const records: WorkforceRecordV2[] = [];
+    async getActiveWorkforce(_context: WorkforceContextV2, filters?: { clientId?: string; month?: string; }): Promise<WorkforceRecordV2[]> {
+    const crmCandidates = this.candidateRepo.queryActiveCandidates ? await this.candidateRepo.queryActiveCandidates({ userSession: _context }) : [];
+    const apJoined = this.apIntegration.getJoinedCandidates ? await this.apIntegration.getJoinedCandidates() : [];
 
-    // Group placements by candidateId
-    const placementsByCandidate = new Map<string, typeof allPlacements>();
+    const populationMap = new Map<string, any>();
+    
+    for (const c of crmCandidates) {
+      if (c.currentCrmStatus === 'Active') {
+        populationMap.set(c.id, {
+          source: 'CRM',
+          candidate: c,
+        });
+      }
+    }
+
+    for (const ap of apJoined) {
+      let matchedCrm = Array.from(populationMap.values()).find(x => x.candidate.phone === ap.mobileNumber);
+      if (matchedCrm) {
+         matchedCrm.apInfo = ap;
+      } else {
+         const syntheticId = ap.candidateId || "AP-" + ap.id;
+         populationMap.set(syntheticId, {
+            source: 'AP',
+            candidate: {
+              id: syntheticId,
+              name: ap.candidateName,
+              phone: ap.mobileNumber,
+              area: ap.city || '',
+              city: ap.city || ''
+            },
+            apInfo: ap
+         });
+      }
+    }
+
+    const allPlacements = await this.placementRepo.queryPlacements({ userSession: _context, ...filters });
+    
+    const placementsByCandidate = new Map<string, any[]>();
     for (const p of allPlacements) {
       if (!p.candidateId) continue;
       const arr = placementsByCandidate.get(p.candidateId) || [];
@@ -48,9 +81,10 @@ export class WorkforceServiceImplV2 {
       placementsByCandidate.set(p.candidateId, arr);
     }
 
-    // Resolve the canonical CURRENT placement for each candidate
-    const resolvedActivePlacements: typeof allPlacements = [];
-    const debugLogs: any[] = [];
+    const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month) : [];
+
+    const records: WorkforceRecordV2[] = [];
+    const clientConfigMap = new Map<string, any>();
 
     const getTimestamp = (val: any): number => {
       if (!val) return 0;
@@ -61,148 +95,89 @@ export class WorkforceServiceImplV2 {
       return isNaN(d.getTime()) ? 0 : d.getTime();
     };
 
-    for (const [candidateId, placements] of Array.from(placementsByCandidate.entries())) {
-      // Sort descending by createdAt to find the latest lifecycle placemen
+    for (const [cId, popData] of populationMap.entries()) {
+      const candidate = popData.candidate;
+      const placements = placementsByCandidate.get(cId) || [];
+      
       placements.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
-
       const currentPlacement = placements[0];
 
-      let exclusionReason = null;
-      if (!currentPlacement) {
-        exclusionReason = "No placement found";
-      } else if (currentPlacement.status !== 'Active') {
-        exclusionReason = `Status is ${currentPlacement.status}`;
-      } else {
-        resolvedActivePlacements.push(currentPlacement);
-      }
-
-      if (_context.name.toLowerCase().includes('ishika') || _context.role.includes('System')) {
-        debugLogs.push({
-          candidateId,
-          totalPlacements: placements.length,
-          placementIds: placements.map((p: any) => p.id),
-          canonicalId: currentPlacement?.id,
-          canonicalStatus: currentPlacement?.status,
-          exclusionReason
-        });
-      }
-    }
-
-    if (debugLogs.length > 0) {
-      console.log("=== WORKFORCE RESOLVER DIAGNOSTICS ===");
-      console.log("Total placements fetched:", allPlacements.length);
-      console.log("Total candidates/groups:", placementsByCandidate.size);
-    }
-
-    // Optional: fetch monthly payouts to resolve Working Status and Earnings/Orders
-    const monthlyPayouts: any[] = this.placementRepo.queryPayouts ? await this.placementRepo.queryPayouts(filters?.clientId, filters?.month) : [];
-
-    const uniqueCandidateIds = Array.from(placementsByCandidate.keys());
-    const uniqueClientIds = Array.from(new Set(resolvedActivePlacements.map(p => p.clientId)));
-
-
-    const candidateMap = new Map<string, any>();
-    const apInfoMap = new Map<string, any>();
-    const clientConfigMap = new Map<string, any>();
-
-    // Parallel fetch Candidate & Client & AP info to fix N+1 query problem
-    await Promise.all([
-      // Candidates and APs
-      Promise.all(uniqueCandidateIds.map(async (cId) => {
-        const candidate = await this.candidateRepo.getCandidateById(cId);
-        if (candidate) {
-          candidateMap.set(cId, candidate);
-          if (candidate.currentStatus === 'Active') {
-            const apInfo = await this.apIntegration.getAssociatePartnerForCandidate(cId, candidate);
-            if (apInfo) {
-              apInfoMap.set(cId, apInfo);
-            }
-          }
+      const resolvedClientId = candidate.currentClientId || currentPlacement?.clientId || '';
+      
+      let clientConfig: any = null;
+      if (resolvedClientId) {
+        if (!clientConfigMap.has(resolvedClientId)) {
+           try {
+             const config = await this.clientIntegration.getClientConfig(resolvedClientId);
+             clientConfigMap.set(resolvedClientId, config);
+           } catch (e) {
+             clientConfigMap.set(resolvedClientId, null);
+           }
         }
-      })),
-      // Clients
-      Promise.all(uniqueClientIds.map(async (clientId) => {
-        try {
-          const config = await this.clientIntegration.getClientConfig(clientId);
-          if (config && config.commercialType) {
-            clientConfigMap.set(clientId, config);
-          }
-        } catch (e) {
-          console.error(`Data Integrity: Client configuration missing or invalid for client ${clientId}.`);
-        }
-      }))
-    ]);
-
-    for (const placement of resolvedActivePlacements) {
-
-
-      // 2. Lookup candidate
-      const candidate = candidateMap.get(placement.candidateId);
-      if (!candidate || candidate.currentStatus !== 'Active') continue;
-
-      // 3. Client Verification (Authoritative Lookup)
-      const clientConfig = clientConfigMap.get(placement.clientId);
-      if (!clientConfig) continue;
-
-      // 4. AP Gate Check
-      const apInfo = apInfoMap.get(candidate.id);
-      if (!apInfo || apInfo.status !== 'Joined') continue;
-
-      // 5. Employee ID Sourcing
-      const employeeId = placement.clientType === 'Payroll' ? placement.payrollEmployeeId : placement.otsEmployeeId;
-      if (!employeeId) {
-        console.error(`Data Integrity: Placement ${placement.id} is active but missing required Employee ID.`);
-        continue;
+        clientConfig = clientConfigMap.get(resolvedClientId);
       }
 
-      // Operational Payout Resolving
-      const matchedPayout = monthlyPayouts.find(p =>
-        (p.clientId === placement.clientId || !filters?.clientId) &&
-        (p.employeeId === employeeId || p.employeeId === `WF-${candidate.id}`)
+      const employeeId = (currentPlacement?.clientType === 'Payroll' ? currentPlacement.payrollEmployeeId : currentPlacement?.otsEmployeeId) || candidate.payrollEmployeeId;
+
+      const matchedPayout = monthlyPayouts.find(p => 
+        (p.clientId === currentPlacement?.clientId || !filters?.clientId) &&
+        (p.employeeId === employeeId || p.employeeId === "WF-" + cId)
       );
 
       let payrollData: any = undefined;
       let otsData: any = undefined;
 
-      if (placement.clientType === 'Payroll') {
-        const hasOrders = matchedPayout && matchedPayout.orders > 0;
-        payrollData = {
-          dateOfBirth: placement.operationalData?.dateOfBirth,
-          aadhaar: placement.operationalData?.aadhaar,
-          pan: placement.operationalData?.pan,
-          bankAccountNumber: placement.operationalData?.bankAccountNumber,
-          ifscCode: placement.operationalData?.ifscCode,
-          currentWorkingStatus: filters?.month ? (hasOrders ? 'Working' : 'Not Working') : 'Not Working'
-        };
-      } else if (placement.clientType === 'OTS') {
-        const tenureDays = this.calculateOtsTenure(placement.activeDate, placement.lastWorkingDate);
-        const configuredTenure = clientConfig.tenureDaysConfig;
-        otsData = {
-          dateOfBirth: placement.operationalData?.dateOfBirth,
-          tenureDays,
-          eligibility: this.calculateOtsEligibility(tenureDays, configuredTenure),
-          currentWorkingStatus: placement.lastWorkingDate ? 'Not Working' : 'Working'
-        };
+      if (currentPlacement) {
+        if (currentPlacement.clientType === 'Payroll') {
+          const hasOrders = matchedPayout && matchedPayout.orders > 0;
+          payrollData = {
+            dateOfBirth: currentPlacement.operationalData?.dateOfBirth,
+            aadhaar: currentPlacement.operationalData?.aadhaar,
+            pan: currentPlacement.operationalData?.pan,
+            bankAccountNumber: currentPlacement.operationalData?.bankAccountNumber,
+            ifscCode: currentPlacement.operationalData?.ifscCode,
+            currentWorkingStatus: filters?.month ? (hasOrders ? 'Working' : 'Not Working') : 'Not Working'
+          };
+        } else if (currentPlacement.clientType === 'OTS') {
+          const tenureDays = this.calculateOtsTenure(currentPlacement.activeDate, currentPlacement.lastWorkingDate);
+          otsData = {
+            dateOfBirth: currentPlacement.operationalData?.dateOfBirth,
+            tenureDays,
+            eligibility: clientConfig ? this.calculateOtsEligibility(tenureDays, clientConfig.tenureDaysConfig) : 'Config Missing',
+            currentWorkingStatus: currentPlacement.lastWorkingDate ? 'Not Working' : 'Working'
+          };
+        }
       }
 
-      // 6. Construct Read Model
+      let associatePartner = popData.apInfo ? {
+        id: popData.apInfo.partnerId || 'AP',
+        name: popData.apInfo.partnerName,
+        status: popData.apInfo.status || 'Joined'
+      } : (candidate.source?.category === 'Associate Partner' ? {
+        id: 'INTERNAL', name: 'Internal Team', status: 'Joined'
+      } : undefined);
+
       records.push({
-        placement,
+        placement: currentPlacement || ({} as any),
         candidate: {
           id: candidate.id,
           name: candidate.name,
           phone: candidate.phone,
-          area: candidate.area,
-          city: candidate.city
+          area: candidate.area || '',
+          city: candidate.city || '',
+          assignedRecruiterId: candidate.assignedRecruiterId || '',
+          assignedRecruiterName: candidate.assignedRecruiterName || '',
+          createdAt: candidate.createdAt,
         },
         client: {
-          id: placement.clientId,
-          name: clientConfig.clientName,
-          type: clientConfig.commercialType
+          id: resolvedClientId,
+          name: clientConfig?.clientName || candidate.currentClientName || currentPlacement?.clientName || 'Unassigned',
+          type: clientConfig?.commercialType || currentPlacement?.clientType || 'Payroll'
         },
-        associatePartner: apInfo,
-        employeeId,
-        workforceType: placement.clientType,
+        associatePartner,
+        employeeId: employeeId || '',
+        workforceType: clientConfig?.commercialType || currentPlacement?.clientType || 'Payroll',
+        points: currentPlacement?.totalPointAtActivation ?? 0,
         payroll: payrollData,
         ots: otsData,
         monthly: matchedPayout ? {
@@ -212,7 +187,6 @@ export class WorkforceServiceImplV2 {
       });
     }
 
-    // 7. Calculate Ranks if requested
     if (filters?.month && filters?.clientId) {
       const payrollRecords = records.filter(r => r.workforceType === 'Payroll' && r.monthly);
       payrollRecords.sort((a, b) => (b.monthly!.totalOrders || 0) - (a.monthly!.totalOrders || 0));
@@ -231,22 +205,8 @@ export class WorkforceServiceImplV2 {
       }
     }
 
-    const ishikaRecords = records.filter(r => (r.placement.recruiterName || '').toLowerCase().includes('ishika'));
-    if (ishikaRecords.length > 0) {
-      console.log("=== ISHIKA WORKFORCE ACTIVE ===");
-      console.log(JSON.stringify(ishikaRecords.map(r => ({
-        candidateId: r.candidate.id,
-        placementId: r.placement.id,
-        candidateName: r.candidate.name,
-        activeDate: r.placement.activeDate,
-        status: r.placement.status,
-        recruiterId: r.placement.recruiterId
-      })), null, 2));
-    }
-
     return records;
   }
-
   calculateOtsTenure(activeDate: string, lastWorkingDate?: string): number {
     const startDate = new Date(activeDate);
     const endDate = lastWorkingDate ? new Date(lastWorkingDate) : new Date();

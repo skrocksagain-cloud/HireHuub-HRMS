@@ -36,13 +36,11 @@ class LeaveService {
       leaveRepository.getBalances(actor.employeeId),
       leaveRepository.getRequestsForEmployee(actor.employeeId),
       scope === 'GLOBAL'
-        ? leaveRepository.getOrganizationRequests()
-        : scope === 'DEPARTMENT'
-        ? leaveRepository.getOrganizationRequestsForDepartment(actor.department)
+          ? leaveRepository.getOrganizationRequests()
         : Promise.resolve([]),
     ]);
 
-    const finalApprovalRequests = (scope === 'GLOBAL' || scope === 'DEPARTMENT')
+    const finalApprovalRequests = (scope === 'GLOBAL')
       ? organizationRequests.filter(req => req.status === 'Pending')
       : [];
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
   addDoc,
   collection,
   doc,
@@ -123,7 +123,7 @@ export class WorkforceRepository {
   ): Promise<WorkforceItem[]> {
     const [wfSnapshot, payoutImports, crmCandidates, apPartners, clients, placementsSnap] = await Promise.all([
       getDocs(workforceCollection),
-      this.getPayoutImports(),
+      this.getPayoutImports(userRole),
       crmRepository.getCandidates(),
       associatePartnerRepository.getPartners(),
       clientRepository.getClients(),
@@ -418,7 +418,8 @@ export class WorkforceRepository {
     });
   }
 
-  async getPayoutImports(): Promise<ClientPayoutImportRecord[]> {
+  async getPayoutImports(userRole: string = 'Super Admin'): Promise<ClientPayoutImportRecord[]> {
+    if (userRole === 'User') return [];
     const snap = await getDocs(importsCollection);
     const imports = snap.docs.map((d) => importFromDoc(d.id, d.data()));
     return imports.sort((a, b) => new Date(b.importedAt).getTime() - new Date(a.importedAt).getTime());
@@ -505,4 +506,5 @@ export class WorkforceRepository {
 }
 
 export const workforceRepository = new WorkforceRepository();
+
 

@@ -95,7 +95,7 @@ export default function LeavePage() {
 
   const leave = useLeave(actor);
   const scope = getSimplifiedModuleScope(actor.assignedRole);
-  const canApprove = scope === 'GLOBAL' || scope === 'DEPARTMENT';
+  const canApprove = scope === 'GLOBAL' || scope === 'GLOBAL';
 
   const totalRemaining = leave.data.balances.reduce((acc, b) => acc + b.available, 0);
   const totalUsed = leave.data.balances.reduce((acc, b) => acc + b.used, 0);

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dashboardService, type ServerTimeInfo, type DepartmentKpiSnapshot, type UserRankingInfo } from '../services/dashboard/dashboardService';
 import { dashboardRepository, type DashboardAttendanceRecord, type UserDashboardPreference, type DashboardCalendarEvent, type DashboardAnnouncement, type DashboardNotificationItem } from '../services/dashboard/repositories/dashboardRepository';
 import { usePermissions } from './usePermissions';
@@ -50,9 +50,9 @@ export function useDashboard(currentUserId?: string, currentUserName?: string) {
         dashboardRepository.getCalendarEvents(),
         dashboardRepository.getAnnouncements(),
         dashboardRepository.getNotifications(effectiveUserId),
-        dashboardRepository.getRecentAuditLogs(10),
+        (['Super Admin', 'Super_Admin'].includes(roleName) ? dashboardRepository.getRecentAuditLogs(10) : Promise.resolve([])),
         dashboardService.getLiveStatusMetrics(),
-        dashboardService.getDepartmentKPIs(roleName, effectiveUserId),
+        dashboardService.getDepartmentKPIs(roleName, effectiveUserId, user?.departmentId),
         dashboardService.getUserRanking(roleName),
       ]);
 

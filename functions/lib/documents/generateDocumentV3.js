@@ -18,6 +18,7 @@ function buildOfferPlaceholderDictionary(payload) {
     const data = payload.data || {};
     const pfApp = data.pfApplicable !== false;
     const esiApp = data.esiApplicable !== false;
+    const ptApp = data.ptApplicable !== false;
     const personNameVal = String(data.candidateName || data.personName || '');
     const personAddrVal = String(data.candidateAddress || data.personAddress || '');
     const personEmailVal = String(data.candidateEmail || data.personEmail || '');
@@ -56,8 +57,8 @@ function buildOfferPlaceholderDictionary(payload) {
         MOBILE_ANNUAL: formatCurrency(data.mobileAnnual || 0),
         SPECIAL_MONTHLY: formatCurrency(data.specialMonthly),
         SPECIAL_ANNUAL: formatCurrency(data.specialAnnual),
-        PROFESSIONAL_TAX_MONTHLY: formatCurrency(data.professionalTaxMonthly),
-        PROFESSIONAL_TAX_ANNUAL: formatCurrency(data.professionalTaxAnnual),
+        PROFESSIONAL_TAX_MONTHLY: ptApp ? formatCurrency(data.professionalTaxMonthly) : 'Not Applicable',
+        PROFESSIONAL_TAX_ANNUAL: ptApp ? formatCurrency(data.professionalTaxAnnual) : 'Not Applicable',
         EMPLOYEE_PF_MONTHLY: pfApp ? formatCurrency(data.employeePfMonthly) : 'Not Applicable',
         EMPLOYEE_PF_ANNUAL: pfApp ? formatCurrency(data.employeePfAnnual) : 'Not Applicable',
         EMPLOYER_PF_MONTHLY: pfApp ? formatCurrency(data.employerPfMonthly) : 'Not Applicable',

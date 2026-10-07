@@ -73,11 +73,9 @@ export const useEmployees = (): UseEmployeesResult => {
       setIsLoading(true);
       setError(null);
       
-      const scope = getSimplifiedModuleScope(user?.authorization?.role || user?.assignedRole);
+      const scope = getSimplifiedModuleScope(user?.authorization?.role || user?.assignedRole, 'People');
       const emps = scope === 'GLOBAL'
-        ? await employeeService.getAllEmployeesGlobal()
-        : scope === 'DEPARTMENT'
-        ? await employeeService.getEmployeesForDepartment(user?.departmentId)
+          ? await employeeService.getAllEmployeesGlobal()
         : await employeeService.getEmployeeForSelf(user?.employeeId || user?.id);
 
       setEmployees(emps);
@@ -283,3 +281,4 @@ export const useEmployees = (): UseEmployeesResult => {
     removeEmployee,
   };
 };
+

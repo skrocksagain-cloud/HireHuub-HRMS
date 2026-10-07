@@ -23,6 +23,14 @@ const STATUS_CONFIG: Record<
   ResolvedStatus,
   { bg: string; border: string; text: string; badgeBg: string; badgeText: string; dotColor: string }
 > = {
+  Incomplete: {
+    bg: 'bg-gray-50/60 hover:bg-gray-100/80',
+    border: 'border-gray-200',
+    text: 'text-gray-900',
+    badgeBg: 'bg-gray-600',
+    badgeText: 'text-white',
+    dotColor: 'bg-gray-500',
+  },
   Present: {
     bg: 'bg-emerald-50/60 hover:bg-emerald-100/80',
     border: 'border-emerald-200',

@@ -1,4 +1,4 @@
-import type { AttendanceStatus } from '../types/attendance';
+// import removed
 
 export const ATTENDANCE_COLLECTION = 'attendance';
 export const HOLIDAYS_COLLECTION = 'holidays';
@@ -9,7 +9,7 @@ export const GRACE_PERIOD_MINUTES = 15;
 export const MINIMUM_HALF_DAY_WORK_MINUTES = 4 * 60 + 30;
 export const REGULARIZATION_WINDOW_DAYS = 7;
 
-export const ATTENDANCE_STATUS_STYLES: Record<AttendanceStatus, string> = {
+export const ATTENDANCE_STATUS_STYLES: Record<any, string> = {
   Present: 'bg-emerald-100 text-emerald-800',
   Late: 'bg-amber-100 text-amber-800',
   'Half Day': 'bg-orange-100 text-orange-800',

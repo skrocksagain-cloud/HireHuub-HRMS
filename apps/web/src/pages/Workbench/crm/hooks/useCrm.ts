@@ -93,10 +93,10 @@ export function useCrm() {
   const assignableEmployees = useMemo(() => {
     const scope = getAuthorizationScope(sessionUser.assignedRole || sessionUser.role);
     if (scope === 'OWN') return [];
-    if (scope === 'TEAM') {
+    if (false) {
       return activeEmployees.filter(e => e.reportingManagerId === sessionUser.id || e.teamId === sessionUser.teamId || e.employeeId === sessionUser.id);
     }
-    if (scope === 'DEPARTMENT') {
+    if (scope === 'GLOBAL') {
       return activeEmployees.filter(e => e.departmentId === sessionUser.departmentId || e.department === sessionUser.department);
     }
     return activeEmployees; // GLOBAL

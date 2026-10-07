@@ -1,3 +1,5 @@
+// DEPRECATED - DO NOT USE - Employee provisioning is now handled strictly via createEmployee Cloud Function.
+process.exit(1);
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { getFirestore, doc, updateDoc, getDoc } from "firebase/firestore";
@@ -39,3 +41,4 @@ async function unlock() {
 }
 
 unlock();
+

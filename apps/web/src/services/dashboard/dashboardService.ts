@@ -163,106 +163,100 @@ class DashboardService {
   /**
    * Get Department KPIs filtered by Role & Scope
    */
-  async getDepartmentKPIs(role?: string, effectiveUserId?: string): Promise<DepartmentKpiSnapshot[]> {
+  async getDepartmentKPIs(role?: string, effectiveUserId?: string, departmentId?: string): Promise<DepartmentKpiSnapshot[]> {
     const roleName = role || 'User';
-
-    const { employeeService } = await import('../../pages/Employee/services/employeeService');
-    const { attendanceRepository } = await import('../../pages/Attendance/repositories/attendanceRepository');
-    const { invoiceService } = await import('../../pages/Finance/billing/services/invoiceService');
 
     const { getDocs, query, collection, where } = await import('firebase/firestore');
     const { db } = await import('../../firebase/firebase');
-
-    // Authorization context
-    const authContext = { role: roleName, employeeId: effectiveUserId };
+    const { workforceService } = await import('../../pages/Workbench/workforce/v2/hooks/useWorkforceV2');
+    const { performanceRepository } = await import('../../pages/People/repositories/performanceRepository');
+    
+    // Default context for API queries that need full objects
+    const mockContext = {
+      id: effectiveUserId || '',
+      name: roleName,
+      role: roleName,
+      assignedRole: roleName,
+      departmentId: departmentId
+    };
+    
     const currentMonth = new Date().toISOString().slice(0, 7);
 
-    if (roleName === 'Super Admin') {
-      const { workforceService } = await import('../../pages/Workbench/workforce/v2/hooks/useWorkforceV2');
-      const v2Records = await workforceService.getActiveWorkforce(
-        {
-          id: effectiveUserId || '',
-          name: 'Super Admin',
-          role: roleName,
-          assignedRole: roleName,
-          departmentId: undefined
-        },
-        { month: currentMonth }
-      ).catch(() => []);
-      const activeCandidates = v2Records.length;
+    // Helpers to fetch data
+    async function getActiveWorkforce() {
+      const records = await workforceService.getActiveWorkforce(mockContext as any, { month: currentMonth }).catch(() => []);
+      return records.length;
+    }
 
-      const invoices = await invoiceService.getInvoiceHistory(authContext).catch(() => []);
-      const mtdInvoices = invoices; // In a real app we'd filter by month, but this gets actual data
-      const revenue = mtdInvoices.reduce((sum: number, inv: any) => sum + (inv.grandTotal || 0), 0);
-
-      // Monthly Expenses from payrollRuns
+    async function getPoints(scope: 'OWN' | 'DEPARTMENT' | 'GLOBAL') {
+      try {
+        const summaries = await performanceRepository.getPerformanceSummaries({ scope, month: currentMonth, employeeId: effectiveUserId });
+        let total = 0;
+        let calls = 0;
+        summaries.forEach(s => {
+          total += (s.totalPoints || 0);
+          const sm = s as any; if (sm.metrics && sm.metrics['Calls']) {
+             calls += (sm.metrics['Calls'].achieved || 0);
+          }
+        });
+        return { total, calls };
+      } catch {
+        return { total: 0, calls: 0 };
+      }
+    }
+    
+    async function getExpensesAndReceived() {
       let expenses = 0;
+      let received = 0;
       try {
         const prSnap = await getDocs(query(collection(db, 'payrollRuns'), where('month', '==', currentMonth)));
         prSnap.forEach((d: any) => { expenses += (d.data().totalEmployerCost || 0); });
+        
+        const txSnap = await getDocs(query(collection(db, 'finance_transactions'), where('type', '==', 'Received')));
+        txSnap.forEach((d: any) => { 
+          const date = d.data().date || '';
+          if (date.startsWith(currentMonth)) {
+             received += (d.data().amount || 0); 
+          }
+        });
       } catch {
         // Ignore
       }
-
-      return [
-        { title: 'Total Active Candidates', value: activeCandidates, subtext: 'Staffing & OTS', change: '0%', trend: 'neutral' },
-        { title: 'Org Revenue (MTD)', value: `₹${revenue.toLocaleString('en-IN')}`, subtext: 'Based on invoices', change: '0%', trend: 'neutral' },
-        { title: 'Monthly Expenses', value: `₹${expenses.toLocaleString('en-IN')}`, subtext: 'Payroll & Operating Costs', change: '0%', trend: 'neutral' },
-        { title: 'Organization Health', value: 'Optimal', subtext: 'No Critical Blockers', change: '--', trend: 'neutral' },
-      ];
+      return { expenses, received };
     }
 
-    if (roleName === 'Master Admin') {
-      const { workforceService } = await import('../../pages/Workbench/workforce/v2/hooks/useWorkforceV2');
-      const v2Records = await workforceService.getActiveWorkforce(
-        {
-          id: effectiveUserId || '',
-          name: 'Master Admin',
-          role: roleName,
-          assignedRole: roleName,
-          departmentId: undefined
-        },
-        { month: currentMonth }
-      ).catch(() => []);
-      const activeCandidates = v2Records.length;
+    if (roleName === 'Super Admin' || roleName === 'Master Admin') {
+      const wf = await getActiveWorkforce();
+      const pts = await getPoints('GLOBAL');
+      const fin = await getExpensesAndReceived();
 
       return [
-        { title: 'Active Candidates', value: activeCandidates, subtext: 'Currently deployed', change: '0%', trend: 'neutral' },
-        { title: 'Recruiter Points', value: '0 pts', subtext: 'Target: 0 pts', change: '0%', trend: 'neutral' },
-        { title: 'Client Points', value: '0 pts', subtext: '0 Active Engagements', change: '0%', trend: 'neutral' },
-        { title: 'Client Highlights', value: '0 Placements', subtext: 'None', change: '0', trend: 'neutral' },
+        { title: 'Total Active Workforce', value: wf, subtext: 'Organization wide', change: '0%', trend: 'neutral' },
+        { title: 'Total Points', value: pts.total, subtext: 'MTD', change: '0%', trend: 'neutral' },
+        { title: 'Total Expense', value: `₹${fin.expenses.toLocaleString('en-IN')}`, subtext: 'MTD', change: '0%', trend: 'neutral' },
+        { title: 'Total Received Amount', value: `₹${fin.received.toLocaleString('en-IN')}`, subtext: 'MTD', change: '0%', trend: 'neutral' },
       ];
     }
 
     if (roleName === 'Admin') {
-      const invoices = await invoiceService.getInvoiceHistory(authContext).catch(() => []);
-      const revenue = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
-      const unpaidInvoices = invoices.filter(inv => inv.status !== 'Paid');
-      const unpaidAmount = unpaidInvoices.reduce((sum, inv) => sum + ((inv.grandTotal || 0) - (inv.totalSettlementValue || 0)), 0);
+      const wf = await getActiveWorkforce();
+      const pts = await getPoints('DEPARTMENT');
 
       return [
-        { title: 'Revenue MTD', value: `₹${revenue.toLocaleString('en-IN')}`, subtext: 'Billing Generated', change: '0%', trend: 'neutral' },
-        { title: 'GST Liability', value: '₹0', subtext: 'No pending filing', change: 'Optimal', trend: 'neutral' },
-        { title: 'Unpaid Amount', value: `₹${unpaidAmount.toLocaleString('en-IN')}`, subtext: `${unpaidInvoices.length} Invoices Pending`, change: 'Optimal', trend: 'neutral' },
-        { title: 'Unbilled Candidates', value: 0, subtext: '₹0 unbilled value', change: 'None', trend: 'neutral' },
+        { title: 'Staffing Calls', value: pts.calls, subtext: 'MTD', change: '0%', trend: 'neutral' },
+        { title: 'Staffing Active Workforce', value: wf, subtext: 'Currently deployed', change: '0%', trend: 'neutral' },
+        { title: 'Staffing Points', value: pts.total, subtext: 'MTD', change: '0%', trend: 'neutral' },
       ];
     }
 
     // Default User
-    const employees = await employeeService.getEmployees().catch(() => []);
-    const activeEmployees = employees.filter(e => e.employmentStatus === 'Active' || e.status === 'Active').length;
-
-    const { getLocalAttendanceDate } = await import('../../pages/Attendance/utils/attendance');
-    const todayStr = getLocalAttendanceDate();
-    const attendanceList = await attendanceRepository.getDailyForOrganization(todayStr, todayStr).catch(() => []);
-    const presentRecords = attendanceList.filter(a => a.status === 'Present' || a.status === 'Late' || a.status === 'Half Day' || a.status === 'WFH');
-    const presentCount = new Set(presentRecords.map(a => a.employeeId)).size;
+    const wf = await getActiveWorkforce();
+    const pts = await getPoints('OWN');
 
     return [
-      { title: 'Active Employees', value: activeEmployees, subtext: 'Total organization', change: '0%', trend: 'neutral' },
-      { title: 'Today Attendance', value: `${presentCount} / ${activeEmployees}`, subtext: 'present', change: '0%', trend: 'neutral' },
-      { title: 'Pending Documents', value: 0, subtext: 'Approvals required', change: 'None', trend: 'neutral' },
-      { title: 'Offers Generated', value: 0, subtext: '0 accepted', change: '0', trend: 'neutral' },
+      { title: 'My Calls', value: pts.calls, subtext: 'MTD', change: '0%', trend: 'neutral' },
+      { title: 'My Active Workforce', value: wf, subtext: 'Currently deployed', change: '0%', trend: 'neutral' },
+      { title: 'My Points', value: pts.total, subtext: 'MTD', change: '0%', trend: 'neutral' },
     ];
   }
 

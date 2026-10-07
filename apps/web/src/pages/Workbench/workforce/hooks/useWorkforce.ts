@@ -97,19 +97,20 @@ export function useWorkforce() {
 
       // 3. Map strictly to the legacy WorkforceItem shape to keep the UI unharmed
       const mappedItems: WorkforceItem[] = v2Records.map(v2 => {
-        const matchedPayout = currentMonthPayoutMap.get(v2.employeeId.trim().toLowerCase())
-                           || currentMonthPayoutMap.get(`wf-${v2.candidate.id}`.toLowerCase());
+
 
         let isWorking = false;
-        if (matchedPayout && (Number(matchedPayout.orders) > 0 || Number(matchedPayout.earnings) > 0)) {
-          isWorking = true;
+        if (v2.workforceType === 'Payroll') {
+           isWorking = v2.payroll?.currentWorkingStatus === 'Working' || false;
+        } else {
+           isWorking = v2.ots?.currentWorkingStatus === 'Working' || false;
         }
 
         return {
-          id: v2.employeeId,
-          placementBusinessId: v2.placement.placementId || '',
-          placementDocId: v2.placement.id,
-          workforceType: v2.workforceType,
+          id: v2.employeeId || '',
+          placementBusinessId: v2.placement?.placementId || '',
+          placementDocId: v2.placement?.id || '',
+          workforceType: v2.workforceType || 'Payroll',
 
           candidateId: v2.candidate.id,
           candidateName: v2.candidate.name,
@@ -119,22 +120,22 @@ export function useWorkforce() {
           hasActivePlacement: true,
           candidateLifecycleStatus: 'Active',
 
-          clientId: v2.client.id,
-          clientName: v2.client.name,
+          clientId: v2.client?.id,
+          clientName: v2.client?.name,
 
-          recruiterId: v2.placement.recruiterId || '',
-          recruiterName: v2.placement.recruiterName || '',
+          recruiterId: v2.candidate.assignedRecruiterId,
+          recruiterName: v2.candidate.assignedRecruiterName,
           associatePartnerId: v2.associatePartner?.id,
           associatePartnerName: v2.associatePartner?.name,
 
-          activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          workingFrom: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-          dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement.operationalData?.dateOfBirth),
-          aadhaarNumber: v2.payroll?.aadhaar || v2.placement.operationalData?.aadhaar || '',
-          panNumber: v2.payroll?.pan || v2.placement.operationalData?.pan || '',
-          bankAccountNumber: v2.payroll?.bankAccountNumber || v2.placement.operationalData?.bankAccountNumber || '',
-          ifscCode: v2.payroll?.ifscCode || v2.placement.operationalData?.ifscCode || '',
-          lastWorkingDate: formatDate(v2.placement.lastWorkingDate),
+          activeDate: formatDate(v2.placement?.activeDate) || formatDate(v2.candidate.createdAt) || '',
+          workingFrom: formatDate(v2.placement?.activeDate) || formatDate(v2.candidate.createdAt) || '',
+          dateOfBirth: formatDate(v2.payroll?.dateOfBirth || v2.ots?.dateOfBirth || v2.placement?.operationalData?.dateOfBirth),
+          aadhaarNumber: v2.payroll?.aadhaar || v2.placement?.operationalData?.aadhaar || '',
+          panNumber: v2.payroll?.pan || v2.placement?.operationalData?.pan || '',
+          bankAccountNumber: v2.payroll?.bankAccountNumber || v2.placement?.operationalData?.bankAccountNumber || '',
+          ifscCode: v2.payroll?.ifscCode || v2.placement?.operationalData?.ifscCode || '',
+          lastWorkingDate: formatDate(v2.placement?.lastWorkingDate),
 
           tenureDays: v2.ots?.tenureDays || 0,
           tenureDisplay: `${v2.ots?.tenureDays || 0} Days`,
@@ -144,9 +145,10 @@ export function useWorkforce() {
           totalEarnings: v2.monthly?.totalEarnings || 0,
           totalOrders: v2.monthly?.totalOrders || 0,
           rank: v2.monthly?.rank,
+          points: v2.points || 0,
 
           eligibility: (v2.ots?.eligibility as OtsEligibility) || 'Not Eligible',
-          billingStatus: (v2.placement.billingStatus as OtsBillingStatus) || 'Pending',
+          billingStatus: (v2.placement?.billingStatus as OtsBillingStatus) || 'Pending',
 
           activatedBy: '',
           currentAssignee: '',
@@ -154,14 +156,14 @@ export function useWorkforce() {
           payrollEmployeeId: v2.workforceType === 'Payroll' ? v2.employeeId : undefined,
           supportsOrders: v2.workforceType === 'Payroll',
           placementHistory: [{
-            id: v2.placement.id,
-            clientId: v2.client.id,
-            clientName: v2.client.name,
+            id: v2.placement?.id,
+            clientId: v2.client?.id,
+            clientName: v2.client?.name,
             clientType: v2.workforceType,
-            status: v2.placement.status || 'Active',
-            activeDate: formatDate(v2.placement.activeDate) || formatDate(new Date().toISOString())!,
-            recruiterId: v2.placement.recruiterId || '',
-            recruiterName: v2.placement.recruiterName || ''
+            status: v2.placement?.status || 'Active',
+            activeDate: formatDate(v2.placement?.activeDate) || formatDate(new Date().toISOString())!,
+            recruiterId: v2.placement?.recruiterId || '',
+            recruiterName: v2.placement?.recruiterName || ''
           }] as any[]
         } as unknown as WorkforceItem;
       });
@@ -195,8 +197,8 @@ export function useWorkforce() {
   // Client-side filtering across search and selected dropdowns
   const filteredWorkforce = useMemo(() => {
     return rawItems.filter((item) => {
-      // 1. Remove candidates without an active placement OR if their CRM lifecycle explicitly marks them as Inactive
-      if (!item.hasActivePlacement || item.candidateLifecycleStatus === 'Inactive') return false;
+      // 1. Remove candidates only if their CRM lifecycle explicitly marks them as Inactive
+      if (item.candidateLifecycleStatus === 'Inactive') return false;
 
       const normalizedSearch = filters.searchQuery.replace(/[\s-]/g, '').toLowerCase();
       const normalizedPhone = item.phone.replace(/[\s-]/g, '').toLowerCase();
@@ -213,10 +215,9 @@ export function useWorkforce() {
       const matchesRecruiter =
         filters.recruiter === 'ALL' || item.recruiterName === filters.recruiter;
 
-      // Month filter: Candidate's Active Date must be within the selected month
+      // Month filter: Active Month filters by candidate's Active Date ONLY.
       let matchesMonth = true;
       if (filters.activeMonth && filters.activeMonth !== 'ALL') {
-        // activeMonth is format "YYYY-MM"
         const [yearStr, monthStr] = filters.activeMonth.split('-');
         const filterYear = parseInt(yearStr, 10);
         const filterMonth = parseInt(monthStr, 10) - 1; // 0-indexed
@@ -235,7 +236,7 @@ export function useWorkforce() {
 
         matchesMonth = activeDateObj >= filterStart && activeDateObj <= filterEnd;
       }
-
+      
       return (
         matchesSearch &&
         matchesClient &&

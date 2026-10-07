@@ -121,7 +121,7 @@ export const createErpFirebaseToken = onCall<CreateErpTokenRequestPayload>(
       let canonicalRole = 'User';
       if (explicitAssigned === 'super admin' || explicitAssigned === 'super_admin') {
         canonicalRole = 'Super Admin';
-      } else if (explicitAssigned === 'master admin') {
+      } else if (explicitAssigned === 'master admin' || explicitAssigned === 'master_admin') {
         canonicalRole = 'Master Admin';
       } else if (explicitAssigned === 'admin') {
         canonicalRole = 'Admin';
@@ -129,7 +129,6 @@ export const createErpFirebaseToken = onCall<CreateErpTokenRequestPayload>(
 
       await adminAuth.setCustomUserClaims(employeeData.firebaseUid, {
         role: canonicalRole,
-        departmentId: employeeData.departmentId || null,
         employeeId: employeeData.employeeId
       });
       

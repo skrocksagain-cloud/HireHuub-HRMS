@@ -60,6 +60,7 @@ export interface WorkforceItem {
   totalOrders?: number;
   payrollEmployeeId?: string;
   rank?: number;
+  points?: number;
   eligibility: OtsEligibility;
   billingStatus: OtsBillingStatus;
   activatedBy: string;

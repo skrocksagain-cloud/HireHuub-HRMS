@@ -49,6 +49,7 @@ function buildNativeOfferPlaceholders(payload) {
     const data = payload.data || {};
     const pfApp = data.pfApplicable !== false;
     const esiApp = data.esiApplicable !== false;
+    const ptApp = data.ptApplicable !== false;
     const personNameVal = String(data.candidateName || data.personName || '');
     const personAddrVal = String(data.candidateAddress || data.personAddress || '');
     const personEmailVal = String(data.candidateEmail || data.personEmail || '');
@@ -91,9 +92,9 @@ function buildNativeOfferPlaceholders(payload) {
         SPECIAL_ANNUAL: formatCurrency(data.specialAnnual),
         SPECIAL_ALLOWANCE_MONTHLY: formatCurrency(data.specialMonthly),
         SPECIAL_ALLOWANCE_ANNUAL: formatCurrency(data.specialAnnual),
-        PROFESSIONAL_TAX_MONTHLY: formatCurrency(data.professionalTaxMonthly),
-        PROFESSIONAL_TAX_ANNUAL: formatCurrency(data.professionalTaxAnnual),
-        PROFESSIONAL_TAX: formatCurrency(data.professionalTaxMonthly),
+        PROFESSIONAL_TAX_MONTHLY: ptApp ? formatCurrency(data.professionalTaxMonthly) : 'Not Applicable',
+        PROFESSIONAL_TAX_ANNUAL: ptApp ? formatCurrency(data.professionalTaxAnnual) : 'Not Applicable',
+        PROFESSIONAL_TAX: ptApp ? formatCurrency(data.professionalTaxMonthly) : 'Not Applicable',
         EMPLOYEE_PF_MONTHLY: pfApp ? formatCurrency(data.employeePfMonthly) : 'Not Applicable',
         EMPLOYEE_PF_ANNUAL: pfApp ? formatCurrency(data.employeePfAnnual) : 'Not Applicable',
         PF_EMPLOYEE: pfApp ? formatCurrency(data.employeePfMonthly) : 'Not Applicable',
@@ -384,7 +385,7 @@ exports.generateNativeDocument = (0, https_1.onCall)({
                 INVOICE_NUMBER: String(data.invoiceNumber || payload.entityId || ''),
                 INVOICE_DATE: String(data.invoiceDate || ''),
                 PO_NUMBER: String(data.poNumber || ''),
-                CLIENT_NAME: String(data.clientName || data.clientLegalName || ''),
+                CLIENT_NAME: String(data.billingName || data.clientName || data.clientLegalName || ''),
                 CLIENT_ADDRESS: String(data.clientAddress || ''),
                 CLIENT_GSTIN: String(data.clientGstin || ''),
                 CLIENT_STATE: String(data.clientState || ''),

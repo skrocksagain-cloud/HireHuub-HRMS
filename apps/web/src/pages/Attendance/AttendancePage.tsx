@@ -28,7 +28,7 @@ export default function AttendancePage() {
   const canApprove = checkCanApprove('attendance');
   
   const activeScope = getSimplifiedModuleScope(actor.assignedRole);
-  const isOrganizationAdmin = activeScope === 'GLOBAL' || activeScope === 'DEPARTMENT';
+  const isOrganizationAdmin = activeScope === 'GLOBAL' || activeScope === 'GLOBAL';
 
   const todayRecord = attendance.data.today;
   const currentStatus = !todayRecord?.loginTime

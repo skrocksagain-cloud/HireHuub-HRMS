@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useMemo } from 'react';
-import { Award, CheckCircle2, Target, Percent, Plus, Layers, X, DollarSign } from 'lucide-react';
+import { Award, CheckCircle2, Target, Percent, Plus, X, DollarSign } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import PageHeader from '../../ui/PageHeader';
 import KpiCard from '../../ui/KpiCard';
@@ -9,10 +9,8 @@ import {
   type PerformanceSummary,
   type MonthlyRegisterItem,
 } from './services/performanceService';
-import { adminService } from '../../services/admin/adminService';
 import { useAuth } from '../../context/AuthContext';
 
-import type { BrandProfile } from '../../types/Admin';
 
 export default function PerformancePage() {
   const { user } = useAuth();
@@ -34,9 +32,7 @@ export default function PerformancePage() {
     return months.length > 0 ? months : ['August 2026', 'July 2026', 'June 2026'];
   }, []);
 
-  const [brands, setBrands] = useState<BrandProfile[]>([]);
-  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>(availableMonths[0]);
+      const [selectedMonth, setSelectedMonth] = useState<string>(availableMonths[0]);
   const [summaries, setSummaries] = useState<PerformanceSummary[]>([]);
   const [monthlyRegister, setMonthlyRegister] = useState<MonthlyRegisterItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,39 +42,15 @@ export default function PerformancePage() {
   // Target Modal Drawer State
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetEmpId, setTargetEmpId] = useState<string>('');
-  const [targetBrandId, setTargetBrandId] = useState<string>('');
-  const [targetPointsInput, setTargetPointsInput] = useState<number>(500);
+    const [targetPointsInput, setTargetPointsInput] = useState<number>(500);
 
-  const activeRole: any = null;  // Placeholder for future authorization implementation
-  const userEmpId = user?.employeeId || '';
-  const canManage = true; // Authorization is in bypass mode
-  const viewScope = 'GLOBAL'; // Authorization is in bypass mode, always GLOBAL scope
-
-  // Load Active Brands from Company Settings
-  useEffect(() => {
-    adminService
-      .getCompanySettings()
-      .then((settings) => {
-        const activeBrands = (settings?.brandProfilesList || []).filter(
-          (b) => b.isActive !== false
-        );
-        setBrands(activeBrands);
-        if (activeBrands.length > 0) {
-          setSelectedBrandId((prev) => prev || activeBrands[0].id);
-        }
-      })
-      .catch(() => setBrands([]));
-  }, []);
-
-  // Selected Brand Profile Object
-  const selectedBrandObj = useMemo(() => {
-    return brands.find((b) => b.id === selectedBrandId) || brands[0];
-  }, [brands, selectedBrandId]);
-
+      const canManage = true; // Authorization is in bypass mode
+  
+  
+  
   // Load Brand-Scoped Performance & Target Data
   const loadPerformanceData = async () => {
-    if (!selectedBrandId) return;
-    try {
+        try {
       setLoading(true);
       setError(null);
       const actorContext = {
@@ -89,7 +61,7 @@ export default function PerformancePage() {
         employeeName: (user as any)?.fullName || (user as any)?.name,
         employeeRole: (user as any)?.role,
       };
-      const res = await performanceService.getPerformanceForBrand(selectedBrandId, selectedMonth, actorContext);
+      const res = await performanceService.getPerformanceData(selectedMonth, actorContext);
       setSummaries(res.summaries);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load performance data.');
@@ -99,30 +71,20 @@ export default function PerformancePage() {
   };
 
   useEffect(() => {
-    if (selectedBrandId) {
-      void loadPerformanceData();
-    }
-  }, [selectedBrandId, selectedMonth]);
+    void loadPerformanceData();
+  }, [selectedMonth]);
 
   // Filter Active Employees Assigned to Selected Brand
   const filteredSummaries = useMemo(() => {
-    if (!selectedBrandId) return [];
-    const firstBrandId = brands[0]?.id;
-
+    
     return summaries.filter((s) => {
       const isActive = s.employmentStatus === 'Active';
       const isStaffing = s.department === 'Staffing';
       if (!isActive || !isStaffing) return false;
 
-      // Brand Filter Scoping: Must belong to selected active brand
-      if (!s.brandId) return selectedBrandId === firstBrandId;
-      return (
-        s.brandId === selectedBrandId ||
-        (selectedBrandObj &&
-          s.brandName?.toLowerCase() === selectedBrandObj.brandName.toLowerCase())
-      );
-    });
-  }, [summaries, selectedBrandId, selectedBrandObj, brands, activeRole, viewScope, userEmpId, user?.department, user?.name]);
+      return true;
+      });
+  }, [summaries]);
 
   // Compute Brand Aggregate KPIs
   const totalMonthlyTarget = filteredSummaries.reduce((acc, s) => acc + (s.targetPoints || 0), 0);
@@ -137,13 +99,9 @@ export default function PerformancePage() {
 
   // Load Monthly Register dynamically from Firestore
   useEffect(() => {
-    if (!selectedBrandId) {
-      setMonthlyRegister([]);
-      return;
-    }
+    
     performanceService
-      .getMonthlyRegisterForBrand(
-        selectedBrandId,
+      .getMonthlyRegister(
         selectedMonth,
         totalMonthlyTarget,
         totalAchievedPoints,
@@ -165,27 +123,24 @@ export default function PerformancePage() {
         setMonthlyRegister(updated);
       })
       .catch(() => setMonthlyRegister([]));
-  }, [selectedBrandId, selectedMonth, totalMonthlyTarget, totalAchievedPoints, totalActiveCandidates, totalIncentive]);
+  }, [selectedMonth, totalMonthlyTarget, totalAchievedPoints, totalActiveCandidates, totalIncentive]);
 
   const handleOpenTargetModal = (empId?: string) => {
     if (empId) setTargetEmpId(empId);
     else if (filteredSummaries.length > 0) setTargetEmpId(filteredSummaries[0].employeeId);
 
-    const initialBrand = selectedBrandId || brands[0]?.id || '';
-    setTargetBrandId(initialBrand);
-    setShowTargetModal(true);
+        setShowTargetModal(true);
   };
 
   const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetEmpId || !targetBrandId || !targetPointsInput) {
-      setError('Employee, Brand, and Target Points are required.');
+    if (!targetEmpId || !targetPointsInput) {
+      setError('Employee and Target Points are required.');
       return;
     }
 
     const empObj = filteredSummaries.find((s) => s.employeeId === targetEmpId);
-    const brandObj = brands.find((b) => b.id === targetBrandId);
-
+    
     try {
       setSavingTarget(true);
       setError(null);
@@ -193,8 +148,8 @@ export default function PerformancePage() {
         employeeId: targetEmpId,
         employeeName: empObj?.employeeName || 'Employee',
         employeeCode: empObj?.employeeCode || targetEmpId,
-        brandId: targetBrandId,
-        brandName: brandObj?.brandName || 'Brand',
+        brandId: 'ALL',
+          brandName: 'Hire Huub',
         month: selectedMonth,
         targetPoints: Number(targetPointsInput),
       }, {
@@ -221,7 +176,7 @@ export default function PerformancePage() {
         <PageHeader
           title="Performance Workspace"
           description={`Brand-scoped performance targets, achieved points, and calculated incentives for ${
-            selectedBrandObj?.brandName || 'Selected Brand'
+            "Hire Huub"
           }.`}
         />
 
@@ -238,7 +193,7 @@ export default function PerformancePage() {
               id: 'monthly-target',
               title: 'Target',
               value: totalMonthlyTarget > 0 ? `${totalMonthlyTarget} Pts` : 'Target not set',
-              subtext: `${selectedBrandObj?.brandName || 'Brand'} (${selectedMonth})`,
+              subtext: `$Hire Huub (${selectedMonth})`,
               change: 'Target',
               trend: 'neutral',
               category: 'people',
@@ -287,33 +242,8 @@ export default function PerformancePage() {
           />
         </div>
 
-        {/* Active Brand Selector & Actions Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <Layers size={14} className="text-slate-400" /> Select Active Brand:
-            </span>
-            {brands.length === 0 ? (
-              <span className="text-xs text-slate-400 italic">No active brands configured.</span>
-            ) : (
-              brands.map((brand) => (
-                <button
-                  key={brand.id}
-                  type="button"
-                  onClick={() => setSelectedBrandId(brand.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-                    selectedBrandId === brand.id
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {brand.brandName}
-                </button>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
+        {/* Actions Bar */}
+        <div className="flex items-center justify-end gap-2 mb-4">
             <select
               aria-label="Select Performance Month"
               value={selectedMonth}
@@ -326,8 +256,7 @@ export default function PerformancePage() {
                 </option>
               ))}
             </select>
-
-            {canManage && brands.length > 0 && (
+            {canManage && (
               <button
                 type="button"
                 onClick={() => handleOpenTargetModal()}
@@ -336,14 +265,13 @@ export default function PerformancePage() {
                 <Plus size={14} /> Assign Target
               </button>
             )}
-          </div>
         </div>
 
         {/* Employee Performance Table */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-900 text-sm">
-              Employee Performance — {selectedBrandObj?.brandName || 'Brand'}
+              Employee Performance — Hire Huub
             </h3>
             <span className="text-xs text-slate-500 font-medium">
               {filteredSummaries.length} Active Employees
@@ -351,11 +279,7 @@ export default function PerformancePage() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs text-slate-500">Loading brand performance data…</div>
-          ) : brands.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500 font-medium text-slate-400">
-              No active brands configured.
-            </div>
+            <div className="p-8 text-center text-xs text-slate-500">Loading performance data...</div>
           ) : filteredSummaries.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500 font-medium text-slate-400">
               No active employees assigned to this brand.
@@ -436,7 +360,7 @@ export default function PerformancePage() {
         {/* Monthly Register Table */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
           <h3 className="font-bold text-slate-900 text-sm">
-            Monthly Register — {selectedBrandObj?.brandName || 'Brand'}
+            Monthly Register — Hire Huub
           </h3>
 
           {monthlyRegister.length === 0 ? (
@@ -527,22 +451,7 @@ export default function PerformancePage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Brand *</label>
-                <select
-                  aria-label="Select Brand"
-                  value={targetBrandId}
-                  onChange={(e) => setTargetBrandId(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
-                >
-                  {brands.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.brandName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -594,3 +503,4 @@ export default function PerformancePage() {
     </DashboardLayout>
   );
 }
+
