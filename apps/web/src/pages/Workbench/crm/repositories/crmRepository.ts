@@ -19,7 +19,7 @@ const candidateFrom = (id: string, value: Record<string, unknown>): Candidate =>
 });
 
 export class CrmRepository {
-  async getCandidates(userSession?: { id: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<Candidate[]> {
+  async getCandidates(userSession?: { id?: string; employeeId?: string; role: string; assignedRole?: string; department?: string; teamId?: string; departmentId?: string }): Promise<Candidate[]> {
     let q = query(candidates);
 
     if (userSession) {
@@ -40,7 +40,7 @@ export class CrmRepository {
         const reportsQuery = query(employeesRef, where('reportingManagerId', '==', userSession.id));
         const reportsSnap = await getDocs(reportsQuery);
 
-        const authorizedIds = [userSession.id];
+        const authorizedIds = [(userSession.employeeId || userSession.id || '')];
         reportsSnap.docs.forEach(d => {
           const emp = d.data();
           if (emp.employeeId) authorizedIds.push(emp.employeeId);
@@ -55,7 +55,7 @@ export class CrmRepository {
         q = query(candidates, where('assignedRecruiterId', 'in', authorizedIds));
       } else {
         // 'SELF' or fallback
-        q = query(candidates, where('assignedRecruiterId', '==', userSession.id));
+        q = query(candidates, where('assignedRecruiterId', '==', (userSession.employeeId || userSession.id)));
       }
     }
 
@@ -354,7 +354,7 @@ export class CrmRepository {
   async getImportHistory(): Promise<ImportHistoryItem[]> { const result = await getDocs(imports); return result.docs.map((item) => ({ id: item.id, ...item.data() } as ImportHistoryItem)); }
   async addImportHistory(item: Omit<ImportHistoryItem, 'id' | 'importedAt'>): Promise<ImportHistoryItem> { const importedAt = new Date().toISOString(); const result = await addDoc(imports, { ...item, importedAt }); return { id: result.id, ...item, importedAt }; }
 
-      async getCallsTodayForUser(userSession: { id: string; role: string; assignedRole?: string; departmentId?: string }): Promise<number> {
+      async getCallsTodayForUser(userSession: { id?: string; employeeId?: string; role: string; assignedRole?: string; departmentId?: string }): Promise<number> {
     const today = new Date().toISOString().split('T')[0];
     const { getAuthorizationScope } = await import('../../../../core/authorization/authorizationResolver');
     const scope = getAuthorizationScope(userSession.assignedRole || userSession.role);
@@ -368,11 +368,11 @@ export class CrmRepository {
       const empSnap = await getDocs(query(collection(db, 'employees'), where('departmentId', '==', targetDept)));
       empSnap.forEach(d => { if (d.data().employeeId) authorizedIds.push(d.data().employeeId); });
     } else if (scope === 'TEAM') {
-      authorizedIds = [userSession.id];
+      authorizedIds = [(userSession.employeeId || userSession.id || '')];
       const empSnap = await getDocs(query(collection(db, 'employees'), where('reportingManagerId', '==', userSession.id)));
       empSnap.forEach(d => { if (d.data().employeeId) authorizedIds.push(d.data().employeeId); });
     } else {
-      authorizedIds = [userSession.id];
+      authorizedIds = [(userSession.employeeId || userSession.id || '')];
     }
 
     const q = query(collectionGroup(db, 'interactions'), where('timestamp', '>=', today));
@@ -419,20 +419,9 @@ export class CrmRepository {
         return candidateData.payrollEmployeeId; // Already generated
       }
 
-      // 2. Get Sequence
-      const sequenceRef = doc(db, 'system_sequences', 'ots_employee_id');
-      const sequenceSnap = await transaction.get(sequenceRef);
-
-      let nextNumber = 1;
-      if (sequenceSnap.exists()) {
-        nextNumber = (sequenceSnap.data().current || 0) + 1;
-      }
-
-      // 3. Update Sequence
-      transaction.set(sequenceRef, { current: nextNumber }, { merge: true });
-
-      // 4. Generate ID
-      const newId = `HH/CAN/OTS/${nextNumber.toString().padStart(4, '0')}`;
+      // Use shared unified allocator
+      const { allocateNextOtsEmployeeId } = await import('../../../../utils/sequenceHelper');
+      const newId = await allocateNextOtsEmployeeId(transaction, db);
 
       // 5. Update Candidate
       transaction.update(candidateRef, {
